@@ -17,10 +17,22 @@ class DailyPassSweep extends Command
     {
         $today = now()->toDateString();
 
-        // 1. Auto-expire day passes past 7:00 PM cutoff
+        // 1. Auto-expire day passes past 7:00 PM cutoff (this command is
+        // scheduled dailyAt('19:00'), so "active + still day-class" at run
+        // time is enough — no extra time check needed here). Also closes
+        // the matching pass_registrations row, same as long_term below, so
+        // the audit trail never has a stale "currently assigned" row for a
+        // pass that's actually expired and free to be reassigned.
         VisitorPass::where('pass_class', 'day')
             ->where('status', 'active')
-            ->update(['status' => 'expired']);
+            ->get()
+            ->each(function (VisitorPass $pass) {
+                $pass->openRegistration()?->update([
+                    'unassigned_at' => now(),
+                    'unassign_reason' => 'auto_expired',
+                ]);
+                $pass->update(['status' => 'expired']);
+            });
 
         // 2. Auto-expire long_term passes past their expected_return_date
         VisitorPass::where('pass_class', 'long_term')

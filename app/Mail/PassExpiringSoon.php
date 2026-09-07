@@ -7,7 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class MissingEgressReminder extends Mailable
+class PassExpiringSoon extends Mailable
 {
     use Queueable, SerializesModels;
 
@@ -17,7 +17,7 @@ class MissingEgressReminder extends Mailable
 
     public function build()
     {
-        return $this->subject('Reminder: Please scan out — LSB Visitor Access')
-            ->view('emails.missing-egress');
+        return $this->subject('Your visitor pass expires soon')
+            ->view('emails.expiring-soon');
     }
 }

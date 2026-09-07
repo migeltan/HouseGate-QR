@@ -7,6 +7,7 @@ use App\Models\ScanLog;
 use App\Models\VisitorPass;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
 
 class ScannerController extends Controller
 {
@@ -32,13 +33,14 @@ class ScannerController extends Controller
         $scannerBuilding = Building::findOrFail($data['scanned_building_id']);
         $pass = VisitorPass::with(['building', 'buildings'])->where('qr_token', $data['token'])->first();
 
-        $direction = 'null';
+        $direction = null;
         $result = 'INVALID';
         $reason = 'QR Token payload not recognized in central database.';
         $visitorName = 'Unknown / Unregistered';
         $passNumber = '----';
         $authorizedBuildingName = 'None';
         $colorHex = '#64748b';
+        $photoUrl = null;
 
         $staleNotice = null;
         if ($pass && $pass->hasStaleOccupancy()) {
@@ -52,7 +54,7 @@ class ScannerController extends Controller
             $passNumber = $pass->pass_number;
             $authorizedBuildingName = $pass->authorizedBuildingNames();
             $colorHex = $pass->is_multi_building ? self::BADGE_MULTI_COLOR : $pass->building->color_hex;
-            $photoUrl = $pass->photo_path ? \Storage::disk('public')->url($pass->photo_path) : null;
+            $photoUrl = $pass->photo_path ? Storage::disk('public')->url($pass->photo_path) : null;
 
             if ($pass->status === 'expired') {
                 $result = 'EXPIRED';
@@ -61,26 +63,24 @@ class ScannerController extends Controller
                 $result = 'REVOKED';
                 $reason = 'Visitor pass is REVOKED by Security.';
             } elseif (! $pass->isAuthorizedFor($scannerBuilding->id)) {
-    $result = 'UNAUTHORIZED';
-    $reason = "BUILDING MISMATCH! Pass is authorized ONLY for [{$authorizedBuildingName}], but scanned at [{$scannerBuilding->name}].";
-} elseif ($pass->current_building_id && (int) $pass->current_building_id !== $scannerBuilding->id) {
-    $result = 'BLOCKED';
-    $currentName = $pass->currentBuilding?->name ?? 'another building';
-    $reason = "Visitor must scan OUT of {$currentName} before entering {$scannerBuilding->name}.";
-} elseif ($pass->current_building_id === null) {
-    $direction = 'in';
-    $result = 'AUTHORIZED';
-    $reason = "Access Granted - Entry logged at {$scannerBuilding->name}.";
-    $pass->update(['current_building_id' => $scannerBuilding->id, 'checked_in_at' => now()]);
-} else {
-    $direction = 'out';
-    $result = 'AUTHORIZED';
-    $reason = "Access Granted - Exit logged at {$scannerBuilding->name}.";
-    $pass->update(['current_building_id' => null, 'last_egress_at' => now()]);
-}
+                $result = 'UNAUTHORIZED';
+                $reason = "BUILDING MISMATCH! Pass is authorized ONLY for [{$authorizedBuildingName}], but scanned at [{$scannerBuilding->name}].";
+            } elseif ($pass->current_building_id && (int) $pass->current_building_id !== $scannerBuilding->id) {
+                $result = 'BLOCKED';
+                $currentName = $pass->currentBuilding?->name ?? 'another building';
+                $reason = "Visitor must scan OUT of {$currentName} before entering {$scannerBuilding->name}.";
+            } elseif ($pass->current_building_id === null) {
+                $direction = 'in';
+                $result = 'AUTHORIZED';
+                $reason = "Access Granted - Entry logged at {$scannerBuilding->name}.";
+                $pass->update(['current_building_id' => $scannerBuilding->id, 'checked_in_at' => now()]);
+            } else {
+                $direction = 'out';
+                $result = 'AUTHORIZED';
+                $reason = "Access Granted - Exit logged at {$scannerBuilding->name}.";
+                $pass->update(['current_building_id' => null, 'last_egress_at' => now()]);
+            }
         }
-
-        
 
         $log = ScanLog::create([
             'visitor_pass_id' => $pass?->id,
@@ -102,7 +102,7 @@ class ScannerController extends Controller
             'authorized_building' => $authorizedBuildingName,
             'scanned_building' => $scannerBuilding->name,
             'color_hex' => $colorHex,
-            'photo_url' => $photoUrl ?? null,
+            'photo_url' => $photoUrl,
             'timestamp' => $log->created_at->format('h:i:s A'),
             'pass_class' => $pass?->pass_class,
             'days_remaining' => $pass?->daysRemaining(),

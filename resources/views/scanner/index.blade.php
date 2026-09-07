@@ -87,6 +87,13 @@
                     <div id="scanTimestamp" class="status-timestamp"></div>
                 </div>
 
+                {{-- Stale-occupancy notice — only shown when the backend flags
+                     a forgotten scan-out being treated as a fresh entry. --}}
+                <div id="staleNotice" class="advisory-card is-pending anim-fade-in-up hidden">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="staleNoticeText"></span>
+                </div>
+
                                <div class="flex gap-4 items-stretch w-full anim-fade-in-up">
                     <div class="flex-shrink-0">
                         <img id="resPhoto" class="rounded-lg border w-40 h-40 object-cover hidden" alt="Visitor photo">
@@ -100,6 +107,12 @@
                         <div><span class="meta-label">Pass #</span><div id="resPassNum" class="meta-value font-mono"></div></div>
                         <div><span class="meta-label">Authorized Bldg.</span><div id="resPassBldg" class="meta-value"></div></div>
                         <div><span class="meta-label">Scanned At</span><div id="resScanLoc" class="meta-value"></div></div>
+                        <div id="resPassClassRow" class="hidden">
+                            <span class="meta-label">Pass class</span>
+                            <div id="resPassClass" class="meta-value">
+                                <span class="badge-neutral" id="resPassClassBadge"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -170,6 +183,26 @@ function displayScanResultUI(data) {
     document.getElementById('resPassNum').innerText = data.pass_number;
     document.getElementById('resPassBldg').innerText = data.authorized_building;
     document.getElementById('resScanLoc').innerText = data.scanned_building;
+
+    // Pass class chip — only shown for long-term passes with days remaining.
+    const passClassRow = document.getElementById('resPassClassRow');
+    if (data.pass_class === 'long_term' && data.days_remaining !== null && data.days_remaining !== undefined) {
+        document.getElementById('resPassClassBadge').innerText = `Long-term · ${data.days_remaining}d left`;
+        passClassRow.classList.remove('hidden');
+    } else {
+        passClassRow.classList.add('hidden');
+    }
+
+    // Stale-occupancy notice — backend sends this only when it just reset
+    // a forgotten scan-out and treated this scan as a fresh entry.
+    const staleNotice = document.getElementById('staleNotice');
+    const staleNoticeText = document.getElementById('staleNoticeText');
+    if (data.stale_notice) {
+        staleNoticeText.innerText = data.stale_notice;
+        staleNotice.classList.remove('hidden');
+    } else {
+        staleNotice.classList.add('hidden');
+    }
 
     const photoImg = document.getElementById('resPhoto');
     const photoPlaceholder = document.getElementById('resPhotoPlaceholder');
