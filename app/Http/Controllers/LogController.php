@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Building; // ASSUMPTION: adjust to your actual Building model namespace/path
 use App\Models\ScanLog;
+use App\Models\PassRegistration;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -12,14 +13,15 @@ class LogController extends Controller
 {
     public function index(Request $request)
     {
-        $buildings = Building::orderBy('name')->get(); // same source used by scanner/index.blade.php's $buildings
+        $buildings = Building::orderBy('name')->get();
 
         $logs = $this->applyFilters(ScanLog::with(['scannedBuilding']), $request)
-            ->latest()
-            ->paginate(25)
-            ->withQueryString();
+            ->latest()->paginate(25)->withQueryString();
 
-        return view('logs.index', compact('logs', 'buildings'));
+        $registrations = $this->applyRegistrationFilters(PassRegistration::with('visitorPass.building'), $request)
+            ->latest('registered_at')->paginate(25, ['*'], 'reg_page')->withQueryString();
+
+        return view('logs.index', compact('logs', 'buildings', 'registrations'));
     }
 
     public function export(Request $request): StreamedResponse
@@ -46,6 +48,40 @@ class LogController extends Controller
         };
 
         return response()->streamDownload($callback, 'scan_logs_' . now()->format('Y-m-d') . '.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    /**
+     * CSV export for the Pass Registration Records sub-tab — separate file
+     * from export() above so the two audit trails never mix in one download.
+     */
+    public function exportRegistrations(Request $request): StreamedResponse
+    {
+        $registrations = $this->applyRegistrationFilters(PassRegistration::with('visitorPass.building'), $request)
+            ->latest('registered_at')
+            ->get();
+
+        $callback = function () use ($registrations) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Registered At', 'Visitor Name', 'ID Type', 'ID Ref', 'Pass Class', 'Expected Return', 'Registered By', 'Unassigned At', 'Reason']);
+            foreach ($registrations as $r) {
+                fputcsv($handle, [
+                    $r->registered_at->format('Y-m-d H:i:s'),
+                    $r->visitor_name,
+                    $r->id_type,
+                    $r->id_ref,
+                    $r->pass_class,
+                    $r->expected_return_date?->format('Y-m-d'),
+                    $r->registered_by,
+                    $r->unassigned_at?->format('Y-m-d H:i:s'),
+                    $r->unassign_reason,
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->streamDownload($callback, 'pass_registrations_' . now()->format('Y-m-d') . '.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
@@ -112,6 +148,30 @@ class LogController extends Controller
 
         if ($request->filled('building') && $request->building !== 'ALL') {
             $query->where('scanned_building_id', $request->building);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Same idea as applyFilters(), but for the separate Pass Registration
+     * Records sub-tab — deliberately no purge/delete method for this one,
+     * since pass_registrations is meant to be append-only.
+     */
+    private function applyRegistrationFilters(Builder $query, Request $request): Builder
+    {
+        if ($request->filled('reg_search')) {
+            $s = $request->reg_search;
+            $query->where(function ($q) use ($s) {
+                $q->where('visitor_name', 'like', "%{$s}%")
+                  ->orWhere('id_ref', 'like', "%{$s}%");
+            });
+        }
+
+        if ($request->filled('reg_status') && $request->reg_status !== 'ALL') {
+            $request->reg_status === 'open'
+                ? $query->whereNull('unassigned_at')
+                : $query->whereNotNull('unassigned_at');
         }
 
         return $query;

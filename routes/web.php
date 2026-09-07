@@ -23,3 +23,5 @@ Route::delete('/logs/purge/all', [LogController::class, 'purgeAll'])->name('logs
 
 Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');
 Route::post('/passes/{pass}/unassign', [PassController::class, 'unassign'])->name('passes.unassign');
+
+Route::get('/logs/registrations/export', [LogController::class, 'exportRegistrations'])->name('logs.registrations.export');

@@ -40,6 +40,13 @@ class ScannerController extends Controller
         $authorizedBuildingName = 'None';
         $colorHex = '#64748b';
 
+        $staleNotice = null;
+        if ($pass && $pass->hasStaleOccupancy()) {
+            $staleNotice = "Previous check-in at {$pass->currentBuilding?->name} was over "
+                . VisitorPass::STALE_OCCUPANCY_HOURS . "h ago with no exit scan — treating this as a fresh entry.";
+            $pass->update(['current_building_id' => null, 'checked_in_at' => null]);
+        }
+
         if ($pass) {
             $visitorName = $pass->visitor_name ?: 'Unassigned Card';
             $passNumber = $pass->pass_number;
@@ -64,12 +71,12 @@ class ScannerController extends Controller
     $direction = 'in';
     $result = 'AUTHORIZED';
     $reason = "Access Granted - Entry logged at {$scannerBuilding->name}.";
-    $pass->update(['current_building_id' => $scannerBuilding->id]);
+    $pass->update(['current_building_id' => $scannerBuilding->id, 'checked_in_at' => now()]);
 } else {
     $direction = 'out';
     $result = 'AUTHORIZED';
     $reason = "Access Granted - Exit logged at {$scannerBuilding->name}.";
-    $pass->update(['current_building_id' => null]);
+    $pass->update(['current_building_id' => null, 'last_egress_at' => now()]);
 }
         }
 
@@ -97,6 +104,9 @@ class ScannerController extends Controller
             'color_hex' => $colorHex,
             'photo_url' => $photoUrl ?? null,
             'timestamp' => $log->created_at->format('h:i:s A'),
+            'pass_class' => $pass?->pass_class,
+            'days_remaining' => $pass?->daysRemaining(),
+            'stale_notice' => $staleNotice,
         ]);
     }
 }

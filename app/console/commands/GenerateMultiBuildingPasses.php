@@ -19,22 +19,22 @@ class GenerateMultiBuildingPasses extends Command
 
     public function handle(): int
     {
-        // Real buildings only — used as the pool of "authorized buildings"
-        // a multi-pass can grant access to. The dedicated MULTI building
-        // (nominal/primary building_id for all multi-passes) is excluded
-        // here so a pass never lists "Multiple Access" as one of its own
-        // authorized buildings.
-        $buildings = Building::where('code', '!=', 'MULTI')->get();
+        // All real buildings are now fair game as the pool of "authorized
+        // buildings" a multi-pass can grant access to — the old dedicated
+        // MULTI building was retired in favor of homing multi-passes under
+        // North Gate (NG), so there's no longer a placeholder building to
+        // exclude here.
+        $buildings = Building::all();
 
         if ($buildings->count() < 2) {
-            $this->error('Need at least 2 non-MULTI buildings in the database before generating multi-building passes.');
+            $this->error('Need at least 2 buildings in the database before generating multi-building passes.');
             return self::FAILURE;
         }
 
-        $multiBuildingId = Building::where('code', 'MULTI')->value('id');
+        $multiBuildingId = Building::where('code', 'NG')->value('id');
 
         if (! $multiBuildingId) {
-            $this->error('No "Multiple Access" building found (code = MULTI). Create it first.');
+            $this->error('No North Gate building found (code = NG). Create it first.');
             return self::FAILURE;
         }
 
@@ -43,9 +43,9 @@ class GenerateMultiBuildingPasses extends Command
 
         // pass_number is sized to match the existing 4-digit convention
         // (e.g. "0001"), unlike qr_token which tolerates longer strings.
-        // Scoped to the MULTI building_id specifically, since that's what
-        // the visitor_passes_building_id_pass_number_unique constraint
-        // actually enforces uniqueness against.
+        // Scoped to North Gate's building_id specifically, since that's
+        // what the visitor_passes_building_id_pass_number_unique
+        // constraint actually enforces uniqueness against.
         $startingNumber = (int) (VisitorPass::query()
             ->where('building_id', $multiBuildingId)
             ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')

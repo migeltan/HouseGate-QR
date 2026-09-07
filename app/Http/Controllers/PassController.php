@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Building;
 use App\Models\VisitorPass;
+use App\Models\PassRegistration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -29,13 +30,28 @@ class PassController extends Controller
         if ($passType === 'multi') {
             return $this->registerMultiBuilding($request);
         }
+
         $data = $request->validate([
             'building_id' => 'required|exists:buildings,id',
             'visitor_name' => 'required|string|max:255',
             'id_type' => 'required|string|max:255',
             'id_ref' => 'required|string|max:255',
             'purpose' => 'required|string|max:255',
+            'visitor_email' => 'nullable|email|max:255',
+            'pass_class' => 'required|in:day,long_term',
+            'expected_return_date' => 'required_if:pass_class,long_term|nullable|date|after:today',
+            'registered_by' => 'nullable|string|max:255',
         ]);
+
+        if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
+            $cap = VisitorPass::addWorkingDays(now(), VisitorPass::MAX_LONG_TERM_WORKING_DAYS);
+            if (\Carbon\Carbon::parse($data['expected_return_date'])->gt($cap)) {
+                return back()->withErrors(
+                    'Expected return date exceeds the 30-working-day cap for long-term passes ('
+                    . $cap->format('M j, Y') . ' latest).'
+                )->withInput();
+            }
+        }
 
         $pass = VisitorPass::where('building_id', $data['building_id'])
             ->where('is_multi_building', false)
@@ -47,15 +63,7 @@ class PassController extends Controller
             return back()->withErrors('No available passes left for that building. Please choose another building.')->withInput();
         }
 
-        $pass->update([
-            'visitor_name' => $data['visitor_name'],
-            'id_ref' => $data['id_ref'],
-            'id_type' => $data['id_type'],
-            'purpose' => $data['purpose'],
-            'status' => 'active',
-            'issued_at' => now(),
-            'photo_path' => $this->storeVisitorPhoto($request) ?? $pass->photo_path,
-        ]);
+        $this->assignVisitorToPass($pass, $data, $request);
 
         return redirect()->route('passes.index')->with('success', "Pass assigned to {$pass->visitor_name}.");
     }
@@ -82,8 +90,8 @@ class PassController extends Controller
     }
 
     /**
-     * Multiple Access passes share one dedicated "MULTI" building slot
-     * (nominal/primary building_id — the pivot table is the real source of
+     * Multiple Access passes share one dedicated building slot (nominal/
+     * primary building_id — the pivot table is the real source of
      * authorization truth). Unlike single-building passes, they aren't
      * pre-seeded in bulk ahead of time — but once a pass_number/qr_token is
      * minted, it's permanent (these get printed onto physical PVC cards),
@@ -102,9 +110,23 @@ class PassController extends Controller
             'purpose' => 'required|string|max:255',
             'building_ids' => 'required|array|min:2',
             'building_ids.*' => 'exists:buildings,id',
+            'visitor_email' => 'nullable|email|max:255',
+            'pass_class' => 'required|in:day,long_term',
+            'expected_return_date' => 'required_if:pass_class,long_term|nullable|date|after:today',
+            'registered_by' => 'nullable|string|max:255',
         ]);
 
-        $multiBuildingId = Building::where('code', 'MULTI')->value('id');
+        if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
+            $cap = VisitorPass::addWorkingDays(now(), VisitorPass::MAX_LONG_TERM_WORKING_DAYS);
+            if (\Carbon\Carbon::parse($data['expected_return_date'])->gt($cap)) {
+                return back()->withErrors(
+                    'Expected return date exceeds the 30-working-day cap for long-term passes ('
+                    . $cap->format('M j, Y') . ' latest).'
+                )->withInput();
+            }
+        }
+
+        $multiBuildingId = Building::where('code', 'NG')->value('id');
 
         // Reuse an existing empty Multi pass (same printed QR) if one's free.
         $pass = VisitorPass::where('is_multi_building', true)
@@ -127,15 +149,8 @@ class PassController extends Controller
                 'is_multi_building' => true,
             ]);
         }
-                $pass->update([
-            'visitor_name' => $data['visitor_name'],
-            'id_ref' => $data['id_ref'],
-            'id_type' => $data['id_type'],
-            'purpose' => $data['purpose'],
-            'status' => 'active',
-            'issued_at' => now(),
-            'photo_path' => $this->storeVisitorPhoto($request) ?? $pass->photo_path,
-        ]);
+
+        $this->assignVisitorToPass($pass, $data, $request);
 
         $pass->buildings()->sync($data['building_ids']);
         $buildingCount = count($data['building_ids']);
@@ -149,12 +164,20 @@ class PassController extends Controller
         $pass->load(['building', 'buildings']);
         return view('passes.show', compact('pass'));
     }
-    
-        public function unassign(VisitorPass $pass)
+
+    public function unassign(VisitorPass $pass)
     {
         if ($pass->photo_path) {
             Storage::disk('public')->delete($pass->photo_path);
         }
+        if ($pass->id_photo_path) {
+            Storage::disk('public')->delete($pass->id_photo_path);
+        }
+
+        $pass->openRegistration()?->update([
+            'unassigned_at' => now(),
+            'unassign_reason' => 'returned',
+        ]);
 
         $pass->update([
             'visitor_name' => null,
@@ -164,13 +187,63 @@ class PassController extends Controller
             'status' => 'available',
             'issued_at' => null,
             'photo_path' => null,
+            'id_photo_path' => null,
+            'pass_class' => 'day',
+            'expected_return_date' => null,
+            'visitor_email' => null,
+            'registered_by' => null,
+            'current_building_id' => null,
+            'checked_in_at' => null,
+            'last_egress_at' => null,
         ]);
 
         if ($pass->is_multi_building) {
             $pass->buildings()->detach();
         }
+
         return redirect()->route('passes.index')
             ->with('success', "Pass #{$pass->pass_number} unassigned and returned to available stock.");
+    }
+
+    /**
+     * Shared assignment + history-logging helper. Updates the pass and
+     * writes a new pass_registrations row so there's a permanent record of
+     * who was ever assigned to this slot, separate from the reusable slot
+     * itself.
+     */
+    private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): void
+    {
+        $idPhotoPath = $this->storeIdPhoto($request) ?? $pass->id_photo_path;
+
+        $pass->update([
+            'visitor_name' => $data['visitor_name'],
+            'id_ref' => $data['id_ref'],
+            'id_type' => $data['id_type'],
+            'purpose' => $data['purpose'],
+            'status' => 'active',
+            'issued_at' => now(),
+            'photo_path' => $this->storeVisitorPhoto($request) ?? $pass->photo_path,
+            'id_photo_path' => $idPhotoPath,
+            'pass_class' => $data['pass_class'],
+            'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
+            'visitor_email' => $data['visitor_email'] ?? null,
+            'registered_by' => $data['registered_by'] ?? null,
+        ]);
+
+        PassRegistration::create([
+            'visitor_pass_id' => $pass->id,
+            'visitor_name' => $data['visitor_name'],
+            'id_type' => $data['id_type'],
+            'id_ref' => $data['id_ref'],
+            'photo_path' => $pass->photo_path,
+            'id_photo_path' => $idPhotoPath,
+            'purpose' => $data['purpose'],
+            'visitor_email' => $data['visitor_email'] ?? null,
+            'registered_by' => $data['registered_by'] ?? null,
+            'pass_class' => $data['pass_class'],
+            'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
+            'registered_at' => now(),
+        ]);
     }
 
     /**
@@ -191,6 +264,21 @@ class PassController extends Controller
         $imageData = base64_decode($imageData);
 
         $filename = 'visitor-photos/' . uniqid('visitor_') . '.jpg';
+        Storage::disk('public')->put($filename, $imageData);
+
+        return $filename;
+    }
+
+    private function storeIdPhoto(Request $request): ?string
+    {
+        if (! $request->filled('id_photo_data')) {
+            return null;
+        }
+
+        $imageData = $request->input('id_photo_data');
+        $imageData = base64_decode(substr($imageData, strpos($imageData, ',') + 1));
+
+        $filename = 'id-photos/' . uniqid('id_') . '.jpg';
         Storage::disk('public')->put($filename, $imageData);
 
         return $filename;
