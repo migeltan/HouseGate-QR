@@ -1,4 +1,4 @@
-# LSB Visitor Access — QR-Based Visitor Building Access Control & Monitoring System
+# HouseGate — QR-Based Visitor Building Access Control & Monitoring System
 
 **Department:** Legislative Security Bureau (LSB) | Perimeter Security Group
 **Institution:** House of Representatives of the Philippines
