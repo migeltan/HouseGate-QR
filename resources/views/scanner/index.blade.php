@@ -63,11 +63,19 @@
             <label class="card-header-title mb-2">
                 <i class="fa-solid fa-building-circle-check"></i> Personnel Station Location
             </label>
-            <select id="scannerBuildingId" class="scanner-select w-full rounded-2xl px-4 py-3 font-bold">
-                @foreach ($buildings as $b)
-                    <option value="{{ $b->id }}">{{ $b->name }} Entrance</option>
-                @endforeach
-            </select>
+
+            @if (auth()->user()->isGuard())
+                <div class="scanner-select w-full rounded-2xl px-4 py-3 font-bold bg-slate-100 text-slate-700">
+                    {{ $lockedBuilding->name }} Entrance (locked to your session)
+                </div>
+                <input type="hidden" id="scannerBuildingId" value="{{ $lockedBuilding->id }}">
+            @else
+                <select id="scannerBuildingId" class="scanner-select w-full rounded-2xl px-4 py-3 font-bold">
+                    @foreach ($buildings as $b)
+                        <option value="{{ $b->id }}">{{ $b->name }} Entrance</option>
+                    @endforeach
+                </select>
+            @endif
         </div>
 
         <div id="resultCard" class="card-govt card-vivid p-5 shadow-sm flex-grow flex flex-col" style="--ribbon-color: var(--brand-blue)">

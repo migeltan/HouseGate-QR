@@ -16,21 +16,33 @@ class ScannerController extends Controller
 
     public function index()
     {
-        $buildings = Building::orderBy('name')->get();
+        $buildings = Building::where('code', '!=', 'NG')->orderBy('name')->get();
         $passes = VisitorPass::with('building')->orderBy('building_id')->orderBy('pass_number')->get();
         $recentLogs = ScanLog::with(['visitorPass', 'scannedBuilding'])->latest()->limit(50)->get();
 
-        return view('scanner.index', compact('buildings', 'passes', 'recentLogs'));
+        // Admin still picks freely; guard's building comes from their locked session value.
+        $lockedBuildingId = auth()->user()->isGuard() ? session('assigned_building_id') : null;
+        $lockedBuilding = $lockedBuildingId ? Building::find($lockedBuildingId) : null;
+
+        return view('scanner.index', compact('buildings', 'passes', 'recentLogs', 'lockedBuilding'));
     }
 
     public function scan(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'token' => 'required|string',
-            'scanned_building_id' => 'required|exists:buildings,id',
-        ]);
+        $user = $request->user();
 
-        $scannerBuilding = Building::findOrFail($data['scanned_building_id']);
+        $data = $request->validate(['token' => 'required|string']);
+
+        if ($user->isGuard()) {
+            // Guard's building is locked server-side — ignore whatever the client sent.
+            $scannedBuildingId = session('assigned_building_id');
+            abort_unless($scannedBuildingId, 403, 'No building assigned to this session.');
+        } else {
+            $validated = $request->validate(['scanned_building_id' => 'required|exists:buildings,id']);
+            $scannedBuildingId = $validated['scanned_building_id'];
+        }
+
+        $scannerBuilding = Building::findOrFail($scannedBuildingId);
         $pass = VisitorPass::with(['building', 'buildings'])->where('qr_token', $data['token'])->first();
 
         $direction = null;
@@ -92,6 +104,7 @@ class ScannerController extends Controller
             'result' => $result,
             'reason' => $reason,
             'direction' => $direction,
+            'scanned_by_user_id' => $user->id,
         ]);
 
         return response()->json([

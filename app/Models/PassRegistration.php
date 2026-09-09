@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PassRegistration extends Model
 {
     protected $fillable = [
-        'visitor_pass_id', 'visitor_name', 'id_type', 'id_ref',
-        'photo_path', 'id_photo_path', 'purpose', 'visitor_email',
-        'registered_by', 'pass_class', 'expected_return_date',
-        'registered_at', 'unassigned_at', 'unassign_reason',
-    ];
+    'visitor_pass_id', 'visitor_name', 'first_name', 'middle_name', 'last_name',
+    'gender', 'contact_no', 'id_type', 'id_ref',
+    'photo_path', 'id_photo_path', 'purpose', 'office_to_visit', 'vehicle', 'visitor_email',
+    'registered_by', 'pass_class', 'expected_return_date',
+    'registered_at', 'unassigned_at', 'unassign_reason',
+];
 
     protected $casts = [
         'expected_return_date' => 'date',

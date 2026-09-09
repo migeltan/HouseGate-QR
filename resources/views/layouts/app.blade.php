@@ -9,8 +9,9 @@
 
     {{-- Google Font imports: UnifrakturMaguntia (nav header fallback), PT Serif (headings), Lato (body/UI) --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=PT+Serif:wght@400;700&family=Lato:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -33,11 +34,27 @@
                     <span class="brand-subtitle">Legislative Security Bureau, Perimeter Security Group</span>
                 </div>
             </div>
-            <nav class="flex gap-5">
-                <a href="{{ route('scanner.index') }}" class="nav-link-govt {{ request()->routeIs('scanner.*') ? 'is-active' : '' }}">Scanner</a>
-                <a href="{{ route('passes.index') }}" class="nav-link-govt {{ request()->routeIs('passes.*') ? 'is-active' : '' }}">Passes</a>
-                <a href="{{ route('logs.index') }}" class="nav-link-govt {{ request()->routeIs('logs.*') ? 'is-active' : '' }}">Logs</a>
-            </nav>
+
+            <div class="flex flex-wrap items-center gap-5">
+                @auth
+                    <nav class="flex gap-5">
+                        <a href="{{ route('scanner.index') }}" class="nav-link-govt {{ request()->routeIs('scanner.*') ? 'is-active' : '' }}">Scanner</a>
+                        <a href="{{ route('passes.index') }}" class="nav-link-govt {{ request()->routeIs('passes.*') ? 'is-active' : '' }}">Passes</a>
+                        <a href="{{ route('logs.index') }}" class="nav-link-govt {{ request()->routeIs('logs.*') ? 'is-active' : '' }}">Logs</a>
+                    </nav>
+
+                    <div class="flex items-center gap-3 text-xs">
+                        <span>{{ auth()->user()->name }} ({{ auth()->user()->role }})</span>
+                        @if (auth()->user()->isGuard() && session('assigned_building_id'))
+                            <span class="badge-neutral">{{ \App\Models\Building::find(session('assigned_building_id'))?->name }}</span>
+                        @endif
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="btn-govt-ghost px-3 py-1.5 rounded-lg">Logout</button>
+                        </form>
+                    </div>
+                @endauth
+            </div>
         </div>
     </header>
 

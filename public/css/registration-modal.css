@@ -1,0 +1,327 @@
+/* ---------------------------------------------------------------------
+   Registration modal — ported from Figma static HTML handoff.
+   Deliberately its own self-contained design system (Source Sans 3 /
+   Source Serif 4, blue/green accents) rather than matching theme-govt.css —
+   this is the new visual direction for this modal specifically.
+   --------------------------------------------------------------------- */
+
+.reg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgb(15 23 42 / 58%);
+    backdrop-filter: blur(2px);
+}
+
+.reg-modal {
+    width: min(760px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    background: white;
+    border-radius: 22px;
+    box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+    font-family: "Source Sans 3", sans-serif;
+    color: #0f172a;
+}
+
+.reg-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 92px;
+    padding: 20px 28px;
+    background: #fafbfc;
+    border-bottom: 1px solid #cbd5e1;
+}
+.reg-modal-header .header-icon {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    color: #245ba6;
+}
+.reg-eyebrow,
+.reg-step-label {
+    margin: 0;
+    color: #245ba6;
+    font:
+        600 14px/1.25 "Source Serif 4",
+        serif;
+}
+.reg-modal-header h1 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.15;
+}
+.reg-close-button {
+    margin-left: auto;
+    padding: 10px;
+    color: #334155;
+    font: 400 28px/1 sans-serif;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.reg-modal-body {
+    display: grid;
+    gap: 24px;
+    padding: 28px;
+}
+
+.reg-step-card {
+    padding: 24px;
+    background: #fafbfc;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+}
+.reg-step-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+.reg-step-heading .step-icon {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    color: #245ba6;
+}
+.reg-step-heading h2 {
+    margin: 2px 0 0;
+    font-size: 22px;
+    line-height: 1.2;
+}
+
+.reg-camera-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 190px;
+    gap: 28px;
+    align-items: end;
+}
+.reg-camera-preview {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1.25;
+    min-height: 220px;
+    overflow: hidden;
+    color: rgb(255 255 255 / 68%);
+    font-weight: 700;
+    background: #0f1622;
+    border-radius: 14px;
+    box-shadow: 0 3px 6px rgb(0 0 0 / 22%);
+}
+.reg-camera-preview video,
+.reg-camera-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+}
+.reg-focus-corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-color: rgb(255 255 255 / 55%);
+    border-style: solid;
+    pointer-events: none;
+}
+.reg-focus-corner.tl {
+    top: 14px;
+    left: 14px;
+    border-width: 3px 0 0 3px;
+    border-radius: 9px 0 0;
+}
+.reg-focus-corner.tr {
+    top: 14px;
+    right: 14px;
+    border-width: 3px 3px 0 0;
+    border-radius: 0 9px 0 0;
+}
+.reg-focus-corner.bl {
+    bottom: 14px;
+    left: 14px;
+    border-width: 0 0 3px 3px;
+    border-radius: 0 0 0 9px;
+}
+.reg-focus-corner.br {
+    right: 14px;
+    bottom: 14px;
+    border-width: 0 3px 3px 0;
+    border-radius: 0 0 9px;
+}
+
+.reg-camera-help {
+    margin-bottom: 12px;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.reg-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 42px;
+    padding: 10px 16px;
+    font:
+        700 14px/1 "Source Sans 3",
+        sans-serif;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: #f1f5f9;
+    cursor: pointer;
+}
+.reg-button-blue {
+    width: 100%;
+    color: white;
+    border-color: #245ba6;
+    background: #245ba6;
+}
+.reg-button-green {
+    color: white;
+    border-color: #059669;
+    background: #059669;
+}
+.reg-button-green:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.reg-form-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 18px 16px;
+}
+.reg-field {
+    grid-column: span 2;
+}
+.reg-field.half {
+    grid-column: span 3;
+}
+.reg-field.full {
+    grid-column: 1 / -1;
+}
+
+.reg-form-grid label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.reg-form-grid label.optional {
+    color: #475569;
+}
+.reg-required {
+    color: #dc2626;
+}
+
+.reg-form-grid input,
+.reg-form-grid select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    color: #0f172a;
+    font:
+        600 14px "Source Sans 3",
+        sans-serif;
+    background: white;
+    border: 1px solid #b8c2cf;
+    border-radius: 8px;
+    outline: none;
+}
+
+/* Building checkbox grid — clicking buildings replaces the old manual
+   Single/Multi toggle entirely. */
+.reg-building-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    border: 1px solid #b8c2cf;
+    border-radius: 10px;
+    padding: 14px;
+}
+.reg-building-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.reg-building-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex: none;
+}
+.reg-north-gate-hint {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: #eef4fc;
+    color: #245ba6;
+    border: 1px solid #cfe0f5;
+    display: none;
+}
+.reg-north-gate-hint.is-active {
+    display: block;
+}
+
+.reg-modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 28px 24px;
+    background: linear-gradient(rgb(255 255 255 / 80%), white 25%);
+}
+.reg-modal-footer .reg-button:last-child {
+    min-width: 240px;
+}
+
+@media (max-width: 640px) {
+    .reg-overlay {
+        padding: 0;
+        place-items: stretch;
+    }
+    .reg-modal {
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    .reg-modal-header,
+    .reg-modal-body,
+    .reg-modal-footer {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+    .reg-camera-layout {
+        grid-template-columns: 1fr;
+    }
+    .reg-field,
+    .reg-field.half {
+        grid-column: 1 / -1;
+    }
+    .reg-building-grid {
+        grid-template-columns: 1fr;
+    }
+    .reg-modal-footer {
+        align-items: stretch;
+    }
+    .reg-modal-footer .reg-button:last-child {
+        flex: 1;
+        min-width: 0;
+    }
+}

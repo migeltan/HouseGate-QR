@@ -165,10 +165,12 @@
                            class="btn-govt-success font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
                             <i class="fa-solid fa-file-csv"></i> Export CSV
                         </a>
-                        <button type="button" onclick="openDeleteModal()"
-                                class="btn-govt-cta font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-trash-can"></i> Purge Logs
-                        </button>
+                        @if (auth()->user()->isAdmin())
+                            <button type="button" onclick="openDeleteModal()"
+                                    class="btn-govt-cta font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-trash-can"></i> Purge Logs
+                            </button>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -306,12 +308,13 @@
 
 </form>
 
-{{-- Purge Modal (scans only) --}}
+{{-- Purge Modal (scans only) — entire modal is admin-only markup, not just the trigger button,
+     so the forms/inputs never even exist in a guard's DOM. --}}
+@if (auth()->user()->isAdmin())
 <div id="purgeModalOverlay" class="modal-overlay-govt hidden" onclick="if(event.target === this) closeDeleteModal()">
     <div class="modal-govt-panel modal-purge-panel">
         <div class="modal-header-govt">
             <h3><i class="fa-solid fa-trash-can"></i> Purge Logs</h3>
-            <button type="button" class="modal-close-govt" onclick="closeDeleteModal()" aria-label="Close">&times;</button>
         </div>
 
         <div class="modal-body-govt space-y-5">
@@ -353,6 +356,7 @@
         </div>
     </div>
 </div>
+@endif
 
 @endsection
 
@@ -376,11 +380,13 @@
     })();
 
     function openDeleteModal() {
-        document.getElementById('purgeModalOverlay').classList.remove('hidden');
+        const overlay = document.getElementById('purgeModalOverlay');
+        if (overlay) overlay.classList.remove('hidden');
     }
 
     function closeDeleteModal() {
-        document.getElementById('purgeModalOverlay').classList.add('hidden');
+        const overlay = document.getElementById('purgeModalOverlay');
+        if (overlay) overlay.classList.add('hidden');
     }
 
     // ---- Sub-tab toggle ----

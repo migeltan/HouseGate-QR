@@ -13,12 +13,15 @@ class LogController extends Controller
 {
     public function index(Request $request)
     {
-        $buildings = Building::orderBy('name')->get();
+        $user = $request->user();
+        $buildings = $user->isGuard()
+            ? Building::where('id', session('assigned_building_id'))->get()
+            : Building::orderBy('name')->get();
 
-        $logs = $this->applyFilters(ScanLog::with(['scannedBuilding']), $request)
+        $logs = $this->applyFilters($this->scopedLogsQuery($request), $request)
             ->latest()->paginate(25)->withQueryString();
 
-        $registrations = $this->applyRegistrationFilters(PassRegistration::with('visitorPass.building'), $request)
+        $registrations = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request)
             ->latest('registered_at')->paginate(25, ['*'], 'reg_page')->withQueryString();
 
         return view('logs.index', compact('logs', 'buildings', 'registrations'));
@@ -26,7 +29,7 @@ class LogController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $logs = $this->applyFilters(ScanLog::with(['scannedBuilding']), $request)
+        $logs = $this->applyFilters($this->scopedLogsQuery($request), $request)
             ->latest()
             ->get();
 
@@ -58,7 +61,7 @@ class LogController extends Controller
      */
     public function exportRegistrations(Request $request): StreamedResponse
     {
-        $registrations = $this->applyRegistrationFilters(PassRegistration::with('visitorPass.building'), $request)
+        $registrations = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request)
             ->latest('registered_at')
             ->get();
 
@@ -88,6 +91,7 @@ class LogController extends Controller
 
     /**
      * Option A — delete logs whose created_at falls within [start_date, end_date] (inclusive).
+     * Reachable only by admin — locked out via the 'admin' route middleware.
      */
     public function purgeRange(Request $request)
     {
@@ -108,6 +112,7 @@ class LogController extends Controller
     /**
      * Option B — delete every log. Requires the literal string "PURGE" typed by the user.
      * Uses delete() rather than truncate() to respect FK constraints on scanned_building_id.
+     * Reachable only by admin — locked out via the 'admin' route middleware.
      */
     public function purgeAll(Request $request)
     {
@@ -125,6 +130,37 @@ class LogController extends Controller
 
         return redirect()->route('logs.index')
             ->with('success', "All {$count} log(s) were permanently deleted.");
+    }
+
+    /**
+     * Base scan-log query, scoped to the guard's locked building — used by
+     * index() AND export() so the CSV can never show more than the screen
+     * does. Admin gets everything, unscoped.
+     */
+    private function scopedLogsQuery(Request $request): Builder
+    {
+        $query = ScanLog::with(['scannedBuilding']);
+
+        if ($request->user()->isGuard()) {
+            $query->where('scanned_building_id', session('assigned_building_id'));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Same idea, for pass_registrations — used by index() AND
+     * exportRegistrations().
+     */
+    private function scopedRegistrationsQuery(Request $request): Builder
+    {
+        $query = PassRegistration::with('visitorPass.building');
+
+        if ($request->user()->isGuard()) {
+            $query->whereHas('visitorPass', fn ($q) => $q->where('building_id', session('assigned_building_id')));
+        }
+
+        return $query;
     }
 
     /**

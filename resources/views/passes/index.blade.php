@@ -70,10 +70,12 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     @foreach ($buildings as $b)
         @php
-            $buildingPasses = $passes->where('building_id', $b->id);
-            $activeCount = $buildingPasses->whereNotNull('visitor_name')->count();
-            $availableCount = $buildingPasses->whereNull('visitor_name')->count();
-        @endphp
+    $buildingPasses = $passes->filter(fn ($p) => $p->is_multi_building
+        ? $p->buildings->contains('id', $b->id)
+        : $p->building_id === $b->id);
+    $activeCount = $buildingPasses->whereNotNull('visitor_name')->count();
+    $availableCount = $buildingPasses->whereNull('visitor_name')->count();
+@endphp
         <button type="button" onclick="openBuildingModal({{ $b->id }})"
                 class="building-card-frame relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out text-left w-full p-2 cursor-pointer {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}"
                 style="background: {{ $b->color_hex }};">
@@ -125,7 +127,7 @@
                     @forelse ($passes->where('building_id', $b->id) as $p)
                         @php
                             $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
-                            $buildingLabel = $p->is_multi_building ? 'Multiple Access' : $p->building->name;
+                             $buildingLabel = $p->is_multi_building ? 'North Gate Access' : $b->name;
                             $statusKey = $p->visitor_name ? 'active' : 'available';
                         @endphp
                         <div class="pass-card-item rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm" data-status="{{ $statusKey }}">
@@ -204,6 +206,7 @@
         <h3 class="font-bold text-slate-800">Register visitor &amp; issue pass</h3>
 
         {{-- Pass type toggle --}}
+        @if (auth()->user()->isAdmin())
         <div class="flex gap-2 text-xs">
             <label class="pass-type-option flex-1">
                 <input type="radio" name="pass_type_radio" value="single" checked onchange="setPassType('single')" class="sr-only">
@@ -214,6 +217,7 @@
                 <span class="pass-type-btn" id="passTypeBtnMulti">Multiple Access Pass</span>
             </label>
         </div>
+        @endif
 
                 <form method="POST" action="{{ route('passes.register') }}" class="space-y-3 text-xs" id="registerForm">
             @csrf
@@ -364,10 +368,224 @@
                 <p class="text-slate-400 mt-1" id="multiCountHint">0 buildings selected</p>
             </div>
 
-            <div class="pt-2 flex justify-end gap-2 sticky bottom-0 bg-white pb-1">
-                <button type="button" onclick="closeRegisterModal()" class="px-4 py-2 rounded-lg btn-govt-ghost">Cancel</button>
-                <button type="submit" id="registerSubmitBtn" class="px-4 py-2 rounded-lg btn-govt-cta">Assign &amp; issue</button>
+            <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
+    <section class="reg-modal">
+        <header class="reg-modal-header">
+            <svg class="header-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="8" width="31" height="24" rx="2" />
+                <path d="M12 39h19M18 32v7M39 16h3v20H18" />
+            </svg>
+            <div>
+                <p class="reg-eyebrow">Registration</p>
+                <h1 id="registration-title">Register Visitor and Issue Pass</h1>
             </div>
+            <button type="button" class="reg-close-button" aria-label="Close" onclick="closeRegisterModal()">&times;</button>
+        </header>
+
+        <form method="POST" action="{{ route('passes.register') }}" id="registerForm">
+            @csrf
+
+            <main class="reg-modal-body">
+
+                {{-- Step 1: Photo capture — visitor face + ID, both styled to match the mockup's camera panel --}}
+                <section class="reg-step-card">
+                    <div class="reg-step-heading">
+                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 13l3-5h9l3 5h6a4 4 0 014 4v20a4 4 0 01-4 4H10a4 4 0 01-4-4V17a4 4 0 014-4h7z" />
+                            <circle cx="24" cy="26" r="8" />
+                        </svg>
+                        <div>
+                            <p class="reg-step-label">Step 1: Camera Terminal</p>
+                            <h2>Entrance Photo Capture</h2>
+                        </div>
+                    </div>
+
+                    <div class="reg-camera-layout">
+                        <div class="reg-camera-preview" id="photoCaptureArea">
+                            <span class="reg-focus-corner tl"></span>
+                            <span class="reg-focus-corner tr"></span>
+                            <span class="reg-focus-corner bl"></span>
+                            <span class="reg-focus-corner br"></span>
+                            <video id="photoVideo" autoplay playsinline class="hidden"></video>
+                            <img id="photoPreview" class="hidden" alt="Captured photo">
+                            <span id="photoPlaceholderText">Awaiting Camera Feed</span>
+                        </div>
+                        <div>
+                            <p class="reg-camera-help">Capture the photo of the visitor properly.</p>
+                            <button type="button" id="startCameraBtn" class="reg-button reg-button-blue" onclick="startCamera()">
+                                <span aria-hidden="true">&#9654;</span> Start Camera
+                            </button>
+                            <button type="button" id="captureBtn" class="reg-button reg-button-blue hidden" onclick="capturePhoto()">Capture</button>
+                            <button type="button" id="retakeBtn" class="reg-button hidden" onclick="retakePhoto()">Retake</button>
+                        </div>
+                    </div>
+                    <canvas id="photoCanvas" class="hidden"></canvas>
+                    <input type="hidden" name="photo_data" id="photoDataInput">
+
+                    <div class="reg-camera-layout" style="margin-top: 20px;">
+                        <div class="reg-camera-preview" id="idPhotoCaptureArea">
+                            <span class="reg-focus-corner tl"></span>
+                            <span class="reg-focus-corner tr"></span>
+                            <span class="reg-focus-corner bl"></span>
+                            <span class="reg-focus-corner br"></span>
+                            <video id="idPhotoVideo" autoplay playsinline class="hidden"></video>
+                            <img id="idPhotoPreview" class="hidden" alt="Captured ID photo">
+                            <span id="idPhotoPlaceholderText">Awaiting ID Photo</span>
+                        </div>
+                        <div>
+                            <p class="reg-camera-help">Capture a clear photo of the visitor's ID.</p>
+                            <button type="button" id="startIdCameraBtn" class="reg-button reg-button-blue" onclick="startIdCamera()">
+                                <span aria-hidden="true">&#9654;</span> Start Camera
+                            </button>
+                            <button type="button" id="captureIdBtn" class="reg-button reg-button-blue hidden" onclick="captureIdPhoto()">Capture</button>
+                            <button type="button" id="retakeIdBtn" class="reg-button hidden" onclick="retakeIdPhoto()">Retake</button>
+                        </div>
+                    </div>
+                    <canvas id="idPhotoCanvas" class="hidden"></canvas>
+                    <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
+                </section>
+
+                {{-- Step 2: Visitor Information --}}
+                <section class="reg-step-card">
+                    <div class="reg-step-heading">
+                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 5h18l7 7v31H13zM31 5v8h7M19 21h13M19 27h13M19 33h9" />
+                        </svg>
+                        <div>
+                            <p class="reg-step-label">Step 2: Information</p>
+                            <h2>Visitor Information Form</h2>
+                        </div>
+                    </div>
+
+                    <div class="reg-form-grid">
+                        <div class="reg-field">
+                            <label>First Name <span class="reg-required">*</span></label>
+                            <input type="text" name="first_name" required>
+                        </div>
+                        <div class="reg-field">
+                            <label class="optional">Middle Name</label>
+                            <input type="text" name="middle_name">
+                        </div>
+                        <div class="reg-field">
+                            <label>Last Name <span class="reg-required">*</span></label>
+                            <input type="text" name="last_name" required>
+                        </div>
+
+                        <div class="reg-field">
+                            <label>Gender / Sex <span class="reg-required">*</span></label>
+                            <select name="gender" required>
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="PNS">Prefer not to say</option>
+                            </select>
+                        </div>
+                        <div class="reg-field">
+                            <label>Contact No. <span class="reg-required">*</span></label>
+                            <input type="text" name="contact_no" required placeholder="+(63) ...">
+                        </div>
+                        <div class="reg-field">
+                            <label class="optional">Email Address</label>
+                            <input type="email" name="visitor_email" placeholder="For check-out / expiry reminders">
+                        </div>
+
+                        <div class="reg-field half">
+                            <label>Government ID Type <span class="reg-required">*</span></label>
+                            <select name="id_type" required>
+                                <option value="">Select ID type</option>
+                                <option value="Driver's License">Driver's License</option>
+                                <option value="UMID">UMID</option>
+                                <option value="Passport">Passport</option>
+                                <option value="SSS ID">SSS ID</option>
+                                <option value="PhilHealth ID">PhilHealth ID</option>
+                                <option value="PhilSys (National ID)">PhilSys (National ID)</option>
+                                <option value="Company ID">Company ID</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="reg-field half">
+                            <label>ID Number <span class="reg-required">*</span></label>
+                            <input type="text" name="id_ref" required placeholder="e.g. N01-23-456789">
+                        </div>
+                    </div>
+                </section>
+
+                {{-- Step 3: Destination + buildings + pass duration --}}
+                <section class="reg-step-card">
+                    <div class="reg-step-heading">
+                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 5h18l7 7v31H13zM31 5v8h7M19 21h13M19 27h13M19 33h9" />
+                        </svg>
+                        <div>
+                            <p class="reg-step-label">Step 3: Reason and Other Details</p>
+                            <h2>Destination</h2>
+                        </div>
+                    </div>
+
+                    <div class="reg-form-grid">
+                        <div class="reg-field half">
+                            <label>Office to Visit/Manager <span class="reg-required">*</span></label>
+                            <input type="text" name="office_to_visit" required placeholder="e.g. Congressman Dela Cruz">
+                        </div>
+                        <div class="reg-field half">
+                            <label>Reason for Visiting <span class="reg-required">*</span></label>
+                            <input type="text" name="purpose" required>
+                        </div>
+
+                        <div class="reg-field full">
+                            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access)</span></label>
+                            <div class="reg-building-grid" id="regBuildingGrid">
+                                @foreach ($buildings as $b)
+                                    <label class="reg-building-option">
+                                        <input type="checkbox" name="building_ids[]" value="{{ $b->id }}" onchange="updateBuildingSelection()">
+                                        <span class="reg-building-dot" style="background:{{ $b->color_hex }}"></span>
+                                        {{ $b->name }}
+                                    </label>
+                                @endforeach
+                            </div>
+                            <p class="reg-north-gate-hint" id="northGateHint">
+                                2 or more buildings selected — this will be issued as a <strong>North Gate Access</strong> pass, valid at all selected buildings.
+                            </p>
+                        </div>
+
+                        <div class="reg-field half">
+                            <label class="optional">Vehicle</label>
+                            <input type="text" name="vehicle" placeholder="Plate number, optional">
+                        </div>
+                        <div class="reg-field half">
+                            <label class="optional">Registered by</label>
+                            <input type="text" name="registered_by" placeholder="Entrance personnel name">
+                        </div>
+
+                        <div class="reg-field full">
+                            <label>Pass duration <span class="reg-required">*</span></label>
+                            <div style="display:flex; gap:8px;">
+                                <label class="pass-type-option" style="flex:1;">
+                                    <input type="radio" name="pass_class" value="day" checked onchange="setPassClass('day')" class="sr-only">
+                                    <span class="pass-type-btn is-active" id="passClassBtnDay">Day</span>
+                                </label>
+                                <label class="pass-type-option" style="flex:1;">
+                                    <input type="radio" name="pass_class_radio" value="long_term" onchange="setPassClass('long_term')" class="sr-only">
+                                    <span class="pass-type-btn" id="passClassBtnLongTerm">Long-term</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="reg-field full hidden" id="expectedReturnField">
+                            <label>Expected return date <span class="reg-required">*</span></label>
+                            <input type="date" name="expected_return_date" id="expectedReturnInput">
+                            <p class="optional" style="margin-top:6px; font-size:12.5px;" id="expectedReturnCapHint"></p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="reg-modal-footer">
+                <button type="button" class="reg-button" onclick="closeRegisterModal()">Cancel</button>
+                <button type="submit" id="registerSubmitBtn" class="reg-button reg-button-green">Admit and Auto-assign</button>
+            </footer>
+        </form>
+    </section>
+</div>
         </form>
     </div>
 </div>
@@ -375,42 +593,183 @@
 
 @section('scripts')
 <script>
-    function setPassType(type) {
-        document.getElementById('passTypeInput').value = type;
 
-        const single = document.getElementById('singlePassField');
-        const multi = document.getElementById('multiBuildingField');
-        const passIdSelect = document.getElementById('buildingIdSelect');
-        const btnSingle = document.getElementById('passTypeBtnSingle');
-        const btnMulti = document.getElementById('passTypeBtnMulti');
+function updateBuildingSelection() {
+    const checked = document.querySelectorAll('input[name="building_ids[]"]:checked').length;
+    const hint = document.getElementById('northGateHint');
+    const submitBtn = document.getElementById('registerSubmitBtn');
 
-        if (type === 'multi') {
-            single.classList.add('hidden');
-            multi.classList.remove('hidden');
-            passIdSelect.removeAttribute('required');
-            btnSingle.classList.remove('is-active');
-            btnMulti.classList.add('is-active');
-        } else {
-            single.classList.remove('hidden');
-            multi.classList.add('hidden');
-            passIdSelect.setAttribute('required', 'required');
-            btnSingle.classList.add('is-active');
-            btnMulti.classList.remove('is-active');
-        }
+    hint.classList.toggle('is-active', checked >= 2);
 
-        updateMultiCount();
+    submitBtn.disabled = checked === 0;
+    submitBtn.style.opacity = submitBtn.disabled ? '0.5' : '1';
+}
+
+function setPassClass(passClass) {
+    const field = document.getElementById('expectedReturnField');
+    const input = document.getElementById('expectedReturnInput');
+    const btnDay = document.getElementById('passClassBtnDay');
+    const btnLongTerm = document.getElementById('passClassBtnLongTerm');
+
+    if (passClass === 'long_term') {
+        field.classList.remove('hidden');
+        input.setAttribute('required', 'required');
+        btnDay.classList.remove('is-active');
+        btnLongTerm.classList.add('is-active');
+
+        const cap = addWorkingDaysClientSide(new Date(), 30);
+        input.max = cap.toISOString().split('T')[0];
+        document.getElementById('expectedReturnCapHint').textContent =
+            'Max 30 working days from today — latest allowed: ' +
+            cap.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } else {
+        field.classList.add('hidden');
+        input.removeAttribute('required');
+        input.value = '';
+        btnDay.classList.add('is-active');
+        btnLongTerm.classList.remove('is-active');
     }
+}
 
-    function updateMultiCount() {
-        const checked = document.querySelectorAll('input[name="building_ids_multi"]:checked').length;
-        document.getElementById('multiCountHint').textContent = checked + ' building' + (checked === 1 ? '' : 's') + ' selected';
-
-        const submitBtn = document.getElementById('registerSubmitBtn');
-        const type = document.getElementById('passTypeInput').value;
-        submitBtn.disabled = (type === 'multi' && checked < 2);
-        submitBtn.style.opacity = submitBtn.disabled ? '0.5' : '1';
+function addWorkingDaysClientSide(startDate, days) {
+    const date = new Date(startDate);
+    let added = 0;
+    while (added < days) {
+        date.setDate(date.getDate() + 1);
+        const dow = date.getDay();
+        if (dow >= 1 && dow <= 4) added++;
     }
+    return date;
+}
 
+// ---- Photo capture (visitor face) ----
+let photoStream = null;
+
+async function startCamera() {
+    const video = document.getElementById('photoVideo');
+    try {
+        photoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        video.srcObject = photoStream;
+        video.classList.remove('hidden');
+        document.getElementById('photoPlaceholderText').classList.add('hidden');
+        document.getElementById('startCameraBtn').classList.add('hidden');
+        document.getElementById('captureBtn').classList.remove('hidden');
+    } catch (err) {
+        alert('Could not access camera: ' + err.message);
+    }
+}
+
+function capturePhoto() {
+    const video = document.getElementById('photoVideo');
+    const canvas = document.getElementById('photoCanvas');
+    const preview = document.getElementById('photoPreview');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    document.getElementById('photoDataInput').value = dataUrl;
+
+    preview.src = dataUrl;
+    preview.classList.remove('hidden');
+    video.classList.add('hidden');
+    document.getElementById('captureBtn').classList.add('hidden');
+    document.getElementById('retakeBtn').classList.remove('hidden');
+    stopCameraStream();
+}
+
+function retakePhoto() {
+    document.getElementById('photoPreview').classList.add('hidden');
+    document.getElementById('retakeBtn').classList.add('hidden');
+    document.getElementById('photoDataInput').value = '';
+    startCamera();
+}
+
+function stopCameraStream() {
+    if (photoStream) { photoStream.getTracks().forEach(t => t.stop()); photoStream = null; }
+}
+
+function resetPhotoCapture() {
+    stopCameraStream();
+    document.getElementById('photoVideo').classList.add('hidden');
+    document.getElementById('photoPreview').classList.add('hidden');
+    document.getElementById('photoPlaceholderText').classList.remove('hidden');
+    document.getElementById('retakeBtn').classList.add('hidden');
+    document.getElementById('captureBtn').classList.add('hidden');
+    document.getElementById('startCameraBtn').classList.remove('hidden');
+    document.getElementById('photoDataInput').value = '';
+}
+// ---- End visitor face photo capture ----
+
+// ---- Photo capture (ID) ----
+let idPhotoStream = null;
+
+async function startIdCamera() {
+    const video = document.getElementById('idPhotoVideo');
+    try {
+        idPhotoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = idPhotoStream;
+        video.classList.remove('hidden');
+        document.getElementById('idPhotoPlaceholderText').classList.add('hidden');
+        document.getElementById('startIdCameraBtn').classList.add('hidden');
+        document.getElementById('captureIdBtn').classList.remove('hidden');
+    } catch (err) {
+        alert('Could not access camera: ' + err.message);
+    }
+}
+
+function captureIdPhoto() {
+    const video = document.getElementById('idPhotoVideo');
+    const canvas = document.getElementById('idPhotoCanvas');
+    const preview = document.getElementById('idPhotoPreview');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    document.getElementById('idPhotoDataInput').value = dataUrl;
+
+    preview.src = dataUrl;
+    preview.classList.remove('hidden');
+    video.classList.add('hidden');
+    document.getElementById('captureIdBtn').classList.add('hidden');
+    document.getElementById('retakeIdBtn').classList.remove('hidden');
+    stopIdCameraStream();
+}
+
+function retakeIdPhoto() {
+    document.getElementById('idPhotoPreview').classList.add('hidden');
+    document.getElementById('retakeIdBtn').classList.add('hidden');
+    document.getElementById('idPhotoDataInput').value = '';
+    startIdCamera();
+}
+
+function stopIdCameraStream() {
+    if (idPhotoStream) { idPhotoStream.getTracks().forEach(t => t.stop()); idPhotoStream = null; }
+}
+
+function resetIdPhotoCapture() {
+    stopIdCameraStream();
+    document.getElementById('idPhotoVideo').classList.add('hidden');
+    document.getElementById('idPhotoPreview').classList.add('hidden');
+    document.getElementById('idPhotoPlaceholderText').classList.remove('hidden');
+    document.getElementById('retakeIdBtn').classList.add('hidden');
+    document.getElementById('captureIdBtn').classList.add('hidden');
+    document.getElementById('startIdCameraBtn').classList.remove('hidden');
+    document.getElementById('idPhotoDataInput').value = '';
+}
+// ---- End ID photo capture ----
+
+function closeRegisterModal() {
+    document.getElementById('registerModal').classList.add('hidden');
+    document.getElementById('registerForm').reset();
+    resetPhotoCapture();
+    resetIdPhotoCapture();
+    setPassClass('day');
+    updateBuildingSelection();
+}
     // ---- Day / Long-term pass class toggle ----
     // Mirrors the server's cap: 30 *working* days (Mon–Thu, HOR's compressed week).
     function addWorkingDaysClientSide(startDate, days) {

@@ -11,13 +11,14 @@ use Illuminate\Support\Carbon;
 class VisitorPass extends Model
 {
     protected $fillable = [
-        'building_id', 'pass_number', 'qr_token',
-        'visitor_name', 'id_ref', 'id_type', 'purpose', 'status', 'issued_at',
-        'is_multi_building', 'current_building_id', 'photo_path',
-        'pass_class', 'expected_return_date', 'visitor_email', 'id_photo_path',
-        'registered_by', 'checked_in_at', 'last_egress_at',
-        'egress_reminder_sent_on', 'expiry_reminder_sent_on',
-    ];
+    'building_id', 'pass_number', 'qr_token',
+    'visitor_name', 'first_name', 'middle_name', 'last_name', 'gender', 'contact_no',
+    'id_ref', 'id_type', 'purpose', 'office_to_visit', 'vehicle', 'status', 'issued_at',
+    'is_multi_building', 'current_building_id', 'photo_path',
+    'pass_class', 'expected_return_date', 'visitor_email', 'id_photo_path',
+    'registered_by', 'checked_in_at', 'last_egress_at',
+    'egress_reminder_sent_on', 'expiry_reminder_sent_on',
+];
 
     protected $casts = [
         'issued_at' => 'datetime',
