@@ -16,7 +16,7 @@ class LogController extends Controller
         $user = $request->user();
         $buildings = $user->isGuard()
             ? Building::where('id', session('assigned_building_id'))->get()
-            : Building::orderBy('name')->get();
+            : Building::where('code', '!=', 'NG')->orderBy('name')->get();
 
         $logs = $this->applyFilters($this->scopedLogsQuery($request), $request)
             ->latest()->paginate(25)->withQueryString();

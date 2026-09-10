@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call([UserSeeder::class]);  
         $buildings = [
     ['code' => 'NW',  'name' => 'North Wing',        'color_name' => 'Red',    'color_hex' => '#dc2626', 'template_image' => 'images/passes/nw.png',  'qr_color_hex' => '#7f1d1d'],
     ['code' => 'SW',  'name' => 'South Wing',        'color_name' => 'Orange', 'color_hex' => '#ea580c', 'template_image' => 'images/passes/sw.png',  'qr_color_hex' => '#7c2d12'],
@@ -25,7 +26,7 @@ class DatabaseSeeder extends Seeder
             for ($i = 1; $i <= 5; $i++) {
                 $passNumber = str_pad($i, 4, '0', STR_PAD_LEFT);
                 $token = "HOR-20TH-{$b['code']}-{$passNumber}-SEC2026";
-
+                
                 VisitorPass::updateOrCreate(
                     ['building_id' => $building->id, 'pass_number' => $passNumber],
                     ['qr_token' => $token, 'status' => 'available']

@@ -10,7 +10,7 @@ class BuildingSelectController extends Controller
     public function show()
     {
         abort_if(auth()->user()->isAdmin(), 404); // admins never need this screen
-        $buildings = Building::orderBy('name')->get();
+       $buildings = Building::where('code', '!=', 'NG')->orderBy('name')->get();
         return view('auth.select-building', compact('buildings'));
     }
 

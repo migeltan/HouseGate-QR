@@ -24,16 +24,21 @@ class DailyPassSweep extends Command
         // the audit trail never has a stale "currently assigned" row for a
         // pass that's actually expired and free to be reassigned.
         VisitorPass::where('pass_class', 'day')
-            ->where('status', 'active')
-            ->get()
-            ->each(function (VisitorPass $pass) {
-                $pass->openRegistration()?->update([
-                    'unassigned_at' => now(),
-                    'unassign_reason' => 'auto_expired',
-                ]);
-                $pass->update(['status' => 'expired']);
-            });
+    ->where('status', 'active')
+    ->get()
+    ->each(function (VisitorPass $pass) {
+        $pass->openRegistration()?->update([
+            'unassigned_at' => now(),
+            'unassign_reason' => 'auto_expired',
+        ]);
 
+        $pass->update([
+            'status' => 'expired',
+            'current_building_id' => null,
+            'checked_in_at' => null,
+            'last_egress_at' => $pass->current_building_id ? now() : $pass->last_egress_at,
+        ]);
+    });
         // 2. Auto-expire long_term passes past their expected_return_date
         VisitorPass::where('pass_class', 'long_term')
             ->where('status', 'active')

@@ -11,7 +11,7 @@ class AuthController extends Controller
     public function showLogin()
     {
         return view('auth.login', [
-            'buildings' => Building::orderBy('name')->get(),
+            'buildings' => Building::where('code', '!=', 'NG')->orderBy('name')->get(),
         ]);
     }
 

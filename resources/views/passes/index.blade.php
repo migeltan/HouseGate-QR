@@ -127,6 +127,7 @@
                     @forelse ($passes->where('building_id', $b->id) as $p)
                         @php
                             $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
+
                              $buildingLabel = $p->is_multi_building ? 'North Gate Access' : $b->name;
                             $statusKey = $p->visitor_name ? 'active' : 'available';
                         @endphp
@@ -200,173 +201,6 @@
         </div>
     </div>
 </div>
-
-<div id="registerModal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
-   <div class="modal-govt-panel shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-        <h3 class="font-bold text-slate-800">Register visitor &amp; issue pass</h3>
-
-        {{-- Pass type toggle --}}
-        @if (auth()->user()->isAdmin())
-        <div class="flex gap-2 text-xs">
-            <label class="pass-type-option flex-1">
-                <input type="radio" name="pass_type_radio" value="single" checked onchange="setPassType('single')" class="sr-only">
-                <span class="pass-type-btn is-active" id="passTypeBtnSingle">Single-Building Pass</span>
-            </label>
-            <label class="pass-type-option flex-1">
-                <input type="radio" name="pass_type_radio" value="multi" onchange="setPassType('multi')" class="sr-only">
-                <span class="pass-type-btn" id="passTypeBtnMulti">Multiple Access Pass</span>
-            </label>
-        </div>
-        @endif
-
-                <form method="POST" action="{{ route('passes.register') }}" class="space-y-3 text-xs" id="registerForm">
-            @csrf
-            <input type="hidden" name="pass_type" id="passTypeInput" value="single">
-
-            <div>
-                <label class="block mb-1">Visitor photo</label>
-                <div id="photoCaptureArea">
-                    <video id="photoVideo" autoplay playsinline class="w-full max-h-56 object-cover rounded border hidden"></video>
-                    <canvas id="photoCanvas" class="hidden"></canvas>
-                    <img id="photoPreview" class="w-full max-h-56 object-cover rounded border hidden" alt="Captured photo">
-
-                    <div class="flex gap-2 mt-2">
-                        <button type="button" id="startCameraBtn" onclick="startCamera()"
-                                class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">
-                            Open Camera
-                        </button>
-                        <button type="button" id="captureBtn" onclick="capturePhoto()"
-                                class="px-3 py-1.5 rounded bg-red-600 text-white text-xs hidden">
-                            Capture
-                        </button>
-                        <button type="button" id="retakeBtn" onclick="retakePhoto()"
-                                class="px-3 py-1.5 rounded btn-govt-ghost text-xs hidden">
-                            Retake
-                        </button>
-                    </div>
-                </div>
-                <input type="hidden" name="photo_data" id="photoDataInput">
-            </div>
-
-            {{-- ID photo capture — separate from the visitor face photo above.
-                 Mirrors the same camera/canvas/preview pattern with id- prefixed
-                 element IDs so both capture widgets can run independently. --}}
-            <div>
-                <label class="block mb-1">ID photo</label>
-                <div id="idPhotoCaptureArea">
-                    <video id="idPhotoVideo" autoplay playsinline class="w-full max-h-56 object-cover rounded border hidden"></video>
-                    <canvas id="idPhotoCanvas" class="hidden"></canvas>
-                    <img id="idPhotoPreview" class="w-full max-h-56 object-cover rounded border hidden" alt="Captured ID photo">
-
-                    <div class="flex gap-2 mt-2">
-                        <button type="button" id="startIdCameraBtn" onclick="startIdCamera()"
-                                class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">
-                            Open Camera
-                        </button>
-                        <button type="button" id="captureIdBtn" onclick="captureIdPhoto()"
-                                class="px-3 py-1.5 rounded bg-red-600 text-white text-xs hidden">
-                            Capture
-                        </button>
-                        <button type="button" id="retakeIdBtn" onclick="retakeIdPhoto()"
-                                class="px-3 py-1.5 rounded btn-govt-ghost text-xs hidden">
-                            Retake
-                        </button>
-                    </div>
-                </div>
-                <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
-            </div>
-
-            <div>
-                <label class="block mb-1">Visitor full name *</label>
-                <input type="text" name="visitor_name" required class="w-full px-3 py-2">
-            </div>
-            <div>
-                <label class="block mb-1">Visitor email</label>
-                <input type="email" name="visitor_email" class="w-full px-3 py-2" placeholder="For check-out / expiry reminders">
-            </div>
-            <div>
-                <label class="block mb-1">Government ID type *</label>
-                <select name="id_type" required class="w-full px-3 py-2 bg-slate-50">
-                    <option value="">Select ID type</option>
-                    <option value="Driver's License">Driver's License</option>
-                    <option value="UMID">UMID</option>
-                    <option value="Passport">Passport</option>
-                    <option value="SSS ID">SSS ID</option>
-                    <option value="PhilHealth ID">PhilHealth ID</option>
-                    <option value="PhilSys (National ID)">PhilSys (National ID)</option>
-                    <option value="Company ID">Company ID</option>
-                    <option value="Other">Other</option>
-                </select>
-            </div>
-            <div>
-                <label class="block mb-1">ID number *</label>
-                <input type="text" name="id_ref" required class="w-full px-3 py-2" placeholder="e.g. N01-23-456789">
-            </div>
-            <div>
-                <label class="block mb-1">Purpose of visit *</label>
-                <input type="text" name="purpose" required class="w-full px-3 py-2">
-            </div>
-            <div>
-                <label class="block mb-1">Registered by</label>
-                <input type="text" name="registered_by" class="w-full px-3 py-2" placeholder="Entrance personnel name">
-            </div>
-
-            {{-- Day vs Long-term toggle --}}
-            <div>
-                <label class="block mb-1">Pass duration *</label>
-                <div class="flex gap-2">
-                    <label class="pass-type-option flex-1">
-                        <input type="radio" name="pass_class_radio" value="day" checked onchange="setPassClass('day')" class="sr-only">
-                        <span class="pass-type-btn is-active" id="passClassBtnDay">Day</span>
-                    </label>
-                    <label class="pass-type-option flex-1">
-                        <input type="radio" name="pass_class_radio" value="long_term" onchange="setPassClass('long_term')" class="sr-only">
-                        <span class="pass-type-btn" id="passClassBtnLongTerm">Long-term</span>
-                    </label>
-                </div>
-                <input type="hidden" name="pass_class" id="passClassInput" value="day">
-            </div>
-
-            {{-- Shown only for long_term. Client-side cap hint mirrors the
-                 server's 30-*working*-day rule (Mon–Thu) so staff don't pick a
-                 date the backend will reject — computed in JS below. --}}
-            <div id="expectedReturnField" class="hidden">
-                <label class="block mb-1">Expected return date *</label>
-                <input type="date" name="expected_return_date" id="expectedReturnInput" class="w-full px-3 py-2">
-                <p class="text-slate-400 mt-1" id="expectedReturnCapHint"></p>
-            </div>
-
-            {{-- Single-building: pick a building, and the backend auto-assigns
-                 the next available pass in that building. Only buildings with
-                 at least one free pass are listed. --}}
-            <div id="singlePassField">
-                <label class="block mb-1">Select building *</label>
-                <select name="building_id" id="buildingIdSelect" class="w-full px-3 py-2 bg-slate-50">
-                    @foreach ($buildings as $b)
-                        @php
-                            $available = $passes->where('building_id', $b->id)->where('is_multi_building', false)->whereNull('visitor_name')->count();
-                        @endphp
-                        @if ($available > 0)
-                            <option value="{{ $b->id }}">{{ $b->name }} ({{ $available }} available)</option>
-                        @endif
-                    @endforeach
-                </select>
-                <p class="text-slate-400 mt-1">The next available pass in this building will be assigned automatically.</p>
-            </div>
-            {{-- Multi-building: check every building this pass should open --}}
-            <div id="multiBuildingField" class="hidden">
-                <label class="block mb-1">Authorized buildings * <span class="text-slate-400">(select 2 or more)</span></label>
-                <div class="grid grid-cols-2 gap-2 border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto">
-                    @foreach ($buildings as $b)
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" name="building_ids_multi" value="{{ $b->id }}" onchange="updateMultiCount()">
-                            <span class="w-2 h-2 rounded-full" style="background:{{ $b->color_hex }}"></span>
-                            {{ $b->name }}
-                        </label>
-                    @endforeach
-                </div>
-                <p class="text-slate-400 mt-1" id="multiCountHint">0 buildings selected</p>
-            </div>
 
             <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
     <section class="reg-modal">
@@ -565,7 +399,7 @@
                                     <span class="pass-type-btn is-active" id="passClassBtnDay">Day</span>
                                 </label>
                                 <label class="pass-type-option" style="flex:1;">
-                                    <input type="radio" name="pass_class_radio" value="long_term" onchange="setPassClass('long_term')" class="sr-only">
+                                    <input type="radio" name="pass_class" value="long_term" onchange="setPassClass('long_term')" class="sr-only">
                                     <span class="pass-type-btn" id="passClassBtnLongTerm">Long-term</span>
                                 </label>
                             </div>
@@ -585,9 +419,6 @@
             </footer>
         </form>
     </section>
-</div>
-        </form>
-    </div>
 </div>
 @endsection
 
@@ -770,49 +601,6 @@ function closeRegisterModal() {
     setPassClass('day');
     updateBuildingSelection();
 }
-    // ---- Day / Long-term pass class toggle ----
-    // Mirrors the server's cap: 30 *working* days (Mon–Thu, HOR's compressed week).
-    function addWorkingDaysClientSide(startDate, days) {
-        const date = new Date(startDate);
-        let added = 0;
-        while (added < days) {
-            date.setDate(date.getDate() + 1);
-            const dow = date.getDay(); // 0=Sun..6=Sat
-            if (dow >= 1 && dow <= 4) { // Mon–Thu
-                added++;
-            }
-        }
-        return date;
-    }
-
-    function setPassClass(passClass) {
-        document.getElementById('passClassInput').value = passClass;
-
-        const field = document.getElementById('expectedReturnField');
-        const input = document.getElementById('expectedReturnInput');
-        const btnDay = document.getElementById('passClassBtnDay');
-        const btnLongTerm = document.getElementById('passClassBtnLongTerm');
-
-        if (passClass === 'long_term') {
-            field.classList.remove('hidden');
-            input.setAttribute('required', 'required');
-            btnDay.classList.remove('is-active');
-            btnLongTerm.classList.add('is-active');
-
-            const cap = addWorkingDaysClientSide(new Date(), 30);
-            const capStr = cap.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            input.max = cap.toISOString().split('T')[0];
-            document.getElementById('expectedReturnCapHint').textContent =
-                'Max 30 working days from today — latest allowed: ' + capStr;
-        } else {
-            field.classList.add('hidden');
-            input.removeAttribute('required');
-            input.value = '';
-            btnDay.classList.add('is-active');
-            btnLongTerm.classList.remove('is-active');
-        }
-    }
-    // ---- End pass class toggle ----
 
     function openBuildingModal(buildingId) {
         document.querySelectorAll('[id^="buildingPassGroup-"]').forEach(el => el.classList.add('hidden'));
@@ -852,156 +640,5 @@ function closeRegisterModal() {
         });
     }
 
-    // ---- Photo capture (visitor face) ----
-    let photoStream = null;
-
-    async function startCamera() {
-        const video = document.getElementById('photoVideo');
-        try {
-            photoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-            video.srcObject = photoStream;
-            video.classList.remove('hidden');
-            document.getElementById('startCameraBtn').classList.add('hidden');
-            document.getElementById('captureBtn').classList.remove('hidden');
-        } catch (err) {
-            alert('Could not access camera: ' + err.message);
-        }
-    }
-
-    function capturePhoto() {
-        const video = document.getElementById('photoVideo');
-        const canvas = document.getElementById('photoCanvas');
-        const preview = document.getElementById('photoPreview');
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        document.getElementById('photoDataInput').value = dataUrl;
-
-        preview.src = dataUrl;
-        preview.classList.remove('hidden');
-        video.classList.add('hidden');
-        document.getElementById('captureBtn').classList.add('hidden');
-        document.getElementById('retakeBtn').classList.remove('hidden');
-
-        stopCameraStream();
-    }
-
-    function retakePhoto() {
-        document.getElementById('photoPreview').classList.add('hidden');
-        document.getElementById('retakeBtn').classList.add('hidden');
-        document.getElementById('photoDataInput').value = '';
-        startCamera();
-    }
-
-    function stopCameraStream() {
-        if (photoStream) {
-            photoStream.getTracks().forEach(track => track.stop());
-            photoStream = null;
-        }
-    }
-
-    function resetPhotoCapture() {
-        stopCameraStream();
-        document.getElementById('photoVideo').classList.add('hidden');
-        document.getElementById('photoPreview').classList.add('hidden');
-        document.getElementById('retakeBtn').classList.add('hidden');
-        document.getElementById('captureBtn').classList.add('hidden');
-        document.getElementById('startCameraBtn').classList.remove('hidden');
-        document.getElementById('photoDataInput').value = '';
-    }
-    // ---- End visitor face photo capture ----
-
-    // ---- Photo capture (ID) — separate stream/variable so it can run independently ----
-    let idPhotoStream = null;
-
-    async function startIdCamera() {
-        const video = document.getElementById('idPhotoVideo');
-        try {
-            idPhotoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            video.srcObject = idPhotoStream;
-            video.classList.remove('hidden');
-            document.getElementById('startIdCameraBtn').classList.add('hidden');
-            document.getElementById('captureIdBtn').classList.remove('hidden');
-        } catch (err) {
-            alert('Could not access camera: ' + err.message);
-        }
-    }
-
-    function captureIdPhoto() {
-        const video = document.getElementById('idPhotoVideo');
-        const canvas = document.getElementById('idPhotoCanvas');
-        const preview = document.getElementById('idPhotoPreview');
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        document.getElementById('idPhotoDataInput').value = dataUrl;
-
-        preview.src = dataUrl;
-        preview.classList.remove('hidden');
-        video.classList.add('hidden');
-        document.getElementById('captureIdBtn').classList.add('hidden');
-        document.getElementById('retakeIdBtn').classList.remove('hidden');
-
-        stopIdCameraStream();
-    }
-
-    function retakeIdPhoto() {
-        document.getElementById('idPhotoPreview').classList.add('hidden');
-        document.getElementById('retakeIdBtn').classList.add('hidden');
-        document.getElementById('idPhotoDataInput').value = '';
-        startIdCamera();
-    }
-
-    function stopIdCameraStream() {
-        if (idPhotoStream) {
-            idPhotoStream.getTracks().forEach(track => track.stop());
-            idPhotoStream = null;
-        }
-    }
-
-    function resetIdPhotoCapture() {
-        stopIdCameraStream();
-        document.getElementById('idPhotoVideo').classList.add('hidden');
-        document.getElementById('idPhotoPreview').classList.add('hidden');
-        document.getElementById('retakeIdBtn').classList.add('hidden');
-        document.getElementById('captureIdBtn').classList.add('hidden');
-        document.getElementById('startIdCameraBtn').classList.remove('hidden');
-        document.getElementById('idPhotoDataInput').value = '';
-    }
-    // ---- End ID photo capture ----
-
-    function closeRegisterModal() {
-        document.getElementById('registerModal').classList.add('hidden');
-        document.getElementById('registerForm').reset();
-        resetPhotoCapture();
-        resetIdPhotoCapture();
-        setPassType('single');
-        setPassClass('day');
-    }
-
-    document.getElementById('registerForm').addEventListener('submit', function (e) {
-        const type = document.getElementById('passTypeInput').value;
-        if (type === 'multi') {
-            const checked = document.querySelectorAll('input[name="building_ids_multi"]:checked');
-            if (checked.length < 2) {
-                e.preventDefault();
-                alert('Select at least 2 buildings for a Multiple Access pass.');
-                return;
-            }
-            checked.forEach(function (cb) {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.name = 'building_ids[]';
-                hidden.value = cb.value;
-                this.appendChild(hidden);
-            }, this);
-        }
-    });
 </script>
 @endsection

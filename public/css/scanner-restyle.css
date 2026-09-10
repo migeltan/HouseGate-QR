@@ -1,0 +1,549 @@
+/* =============================================================
+   scanner-restyle.css
+   Dedicated stylesheet for the Figma-matched header + Scanner
+   page redesign. Intentionally self-contained: every class here
+   is new, so it never depends on (or conflicts with) whatever is
+   already defined in theme-govt.css. Loaded AFTER theme-govt.css
+   in layouts/app.blade.php.
+   ============================================================= */
+@font-face {
+    font-family: "Old English Text MT";
+    src: url("/fonts/oldenglishtextmt.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    --brand-blue: #245ba6;
+    --brand-yellow: #fec91b;
+    --brand-red: #f13948;
+    --card-header-bg: #fafbfc;
+    --card-body-bg: #ffffff;
+    --page-bg: #f3f5f8;
+    --ink: #1a2733;
+    --ink-soft: #55606b;
+    --line: #e7eaee;
+}
+
+.gov-page-bg {
+    background: var(--page-bg);
+}
+
+/* ---------- Header ---------- */
+.gov-header {
+    position: relative;
+    background: var(--brand-blue);
+    border-bottom: 4px solid var(--brand-yellow);
+    overflow: hidden;
+}
+.gov-header-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: url("/images/rattan-pattern-raw.svg");
+    background-repeat: repeat;
+    background-size: 220px;
+    opacity: 0.12;
+    pointer-events: none;
+}
+.gov-header-inner {
+    position: relative;
+    z-index: 10;
+}
+
+.gov-brand-logo img {
+    height: 5.75rem;
+    width: 5.75rem;
+    object-fit: contain;
+}
+
+.gov-brand-title {
+    font-family: "Old English Text MT", serif;
+    font-size: 2.4rem; /* was 1.85rem */
+    line-height: 1.1;
+    color: #ffffff;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+    display: block;
+}
+.gov-brand-subtitle-1 {
+    font-family: "Source Serif Pro", serif;
+    font-weight: 650;
+    font-size: 1.25rem;
+    color: #ffffff;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+    display: block;
+}
+.gov-brand-subtitle-2 {
+    font-family: "Source Serif Pro", serif;
+    font-weight: 650;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+    display: block;
+}
+
+.gov-nav {
+    font-family: "Source Sans Pro", sans-serif;
+}
+.gov-nav-link {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding-bottom: 6px;
+    border-bottom: 2px solid transparent;
+    transition:
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+.gov-nav-link:hover {
+    color: #ffffff;
+}
+.gov-nav-link.is-active {
+    color: #ffffff;
+    border-bottom-color: var(--brand-red);
+}
+
+.gov-header-meta {
+    font-family: "Source Sans Pro", sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+}
+.gov-badge-neutral {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+}
+.gov-btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    transition: background 0.15s ease;
+}
+.gov-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- Card shell (shared by all 4 sections) ---------- */
+.gov-card {
+    background: var(--card-body-bg);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow:
+        0 1px 2px rgba(16, 24, 40, 0.04),
+        0 1px 3px rgba(16, 24, 40, 0.06);
+}
+.gov-card-header {
+    position: relative;
+    background: var(--card-header-bg);
+    border-bottom: 1px solid var(--line);
+    padding: 1.1rem 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.gov-card-header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+}
+.gov-card-header-icon {
+    color: var(--brand-blue);
+    font-size: 1.4rem;
+    margin-top: 3px;
+}
+.gov-eyebrow {
+    font-family: "Source Serif Pro", serif;
+    font-weight: 600;
+    color: var(--brand-blue);
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 2px;
+}
+.gov-card-title {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: var(--ink);
+    display: block;
+}
+.gov-card-body {
+    padding: 1.5rem;
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 400;
+    color: var(--ink);
+}
+
+/* Dual-triangle yellow/blue corner accent, top-right of a card header */
+.gov-corner-accent {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 96px;
+    height: 96px;
+    overflow: hidden;
+    pointer-events: none;
+}
+.gov-corner-accent::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 108px 108px 0;
+    border-color: transparent var(--brand-yellow) transparent transparent;
+}
+.gov-corner-accent::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 96px 96px 0;
+    border-color: transparent var(--brand-blue) transparent transparent;
+}
+
+/* ---------- Instructions body ---------- */
+.gov-steps {
+    margin-top: 0.75rem;
+    padding-left: 1.25rem;
+    list-style: decimal;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+/* ---------- Live Scanner ---------- */
+.gov-scanner-viewport {
+    position: relative;
+    background: #0f1b2d;
+    border-radius: 0.85rem;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.gov-scan-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: "Source Sans Pro", sans-serif;
+}
+.gov-scan-placeholder i {
+    font-size: 2.75rem;
+}
+
+.gov-scan-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.gov-scan-corner {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 3px solid rgba(255, 255, 255, 0.6);
+}
+.gov-scan-corner-tl {
+    top: 14px;
+    left: 14px;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 6px 0 0 0;
+}
+.gov-scan-corner-tr {
+    top: 14px;
+    right: 14px;
+    border-left: none;
+    border-bottom: none;
+    border-radius: 0 6px 0 0;
+}
+.gov-scan-corner-bl {
+    bottom: 14px;
+    left: 14px;
+    border-right: none;
+    border-top: none;
+    border-radius: 0 0 0 6px;
+}
+.gov-scan-corner-br {
+    bottom: 14px;
+    right: 14px;
+    border-left: none;
+    border-top: none;
+    border-radius: 0 0 6px 0;
+}
+
+.gov-btn-camera {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #ffffff;
+    background: var(--brand-blue);
+    border-radius: 9999px;
+    padding: 0.45rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.15s ease;
+}
+.gov-btn-camera:hover {
+    filter: brightness(1.05);
+}
+.gov-btn-camera.is-recording {
+    background: var(--brand-red);
+}
+
+/* ---------- Authorization ---------- */
+.gov-location-badge {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #ffffff;
+    background: var(--brand-blue);
+    border-radius: 9999px;
+    padding: 0.4rem 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    border: none;
+}
+select.gov-location-badge {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.gov-idle-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #a6aeb8;
+    flex-grow: 1;
+}
+.gov-idle-panel i {
+    font-size: 2.25rem;
+    margin-bottom: 0.5rem;
+}
+.gov-idle-panel h3 {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-size: 1rem;
+}
+
+.gov-status-banner {
+    border-radius: 0.85rem;
+    padding: 1rem 1.1rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.gov-status-banner.is-authorized {
+    background: #eafbf1;
+    border: 1px solid #beebd2;
+}
+.gov-status-banner.is-denied {
+    background: #fdebec;
+    border: 1px solid #f8c5c9;
+}
+.gov-status-title {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--ink);
+}
+.gov-status-banner.is-authorized .gov-status-title-accent {
+    color: #1c9a5b;
+}
+.gov-status-banner.is-denied .gov-status-title-accent {
+    color: var(--brand-red);
+}
+.gov-status-subtitle {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-top: 2px;
+}
+.gov-status-timestamp {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+
+.gov-advisory {
+    font-family: "Source Sans Pro", sans-serif;
+    font-size: 0.85rem;
+    border-radius: 0.6rem;
+    padding: 0.65rem 0.9rem;
+}
+.gov-advisory.is-authorized {
+    background: #f3fbf6;
+    color: #1c7a47;
+}
+.gov-advisory.is-denied {
+    background: #fcf1f2;
+    color: #b32430;
+}
+.gov-advisory.is-pending {
+    background: #fff8e8;
+    color: #8a6300;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.gov-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.gov-meta-label {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    display: block;
+}
+.gov-meta-value {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--ink);
+}
+
+/* ---------- User Journey carousel ---------- */
+.gov-journey-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    position: relative;
+    padding: 1rem 0 0.5rem;
+}
+.gov-journey-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+.gov-journey-bar {
+    position: absolute;
+    top: 26px;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: var(--brand-blue);
+    z-index: 0;
+}
+.gov-journey-icon {
+    position: relative;
+    z-index: 1;
+    width: 64px;
+    height: 64px;
+    border-radius: 9999px;
+    background: var(--brand-blue);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    border: 4px solid var(--page-bg);
+}
+.gov-journey-num {
+    margin-top: 0.75rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    border: 2px solid var(--brand-blue);
+    color: var(--brand-blue);
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.gov-journey-label {
+    margin-top: 0.4rem;
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    color: var(--brand-blue);
+    font-size: 0.95rem;
+    line-height: 1.25;
+}
+
+.gov-journey-nav {
+    position: absolute;
+    top: 50%;
+    right: -0.5rem;
+    transform: translateY(-50%);
+    color: var(--brand-red);
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.gov-journey-nav:hover {
+    transform: translateY(-50%) scale(1.1);
+}
+.gov-journey-nav.is-prev {
+    right: auto;
+    left: -0.5rem;
+}
+.gov-journey-nav:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+.gov-journey-nav:disabled:hover {
+    transform: translateY(-50%);
+}
+
+/* ---------- Footer ---------- */
+.gov-footer {
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem 1rem 3rem;
+}
+.gov-footer img {
+    height: 6.5rem;
+    object-fit: contain;
+}
+
+@media (max-width: 767px) {
+    .gov-brand-title {
+        font-size: 1.4rem;
+    }
+    .gov-corner-accent {
+        width: 64px;
+        height: 64px;
+    }
+    .gov-corner-accent::before {
+        border-width: 0 74px 74px 0;
+    }
+    .gov-corner-accent::after {
+        border-width: 0 64px 64px 0;
+    }
+}

@@ -139,6 +139,47 @@ let isCameraActive = false;
 let lastScannedToken = null;
 let scanCooldownActive = false;
 
+// --- Hardware scanner (Honeywell HF680, USB HID keyboard-wedge mode) ---
+// The HF680 isn't a camera — it types the scanned token as fast keystrokes
+// followed by Enter, into whatever has focus. We don't rely on focus at
+// all: we watch every keystroke on the page, and treat a burst of
+// characters arriving faster than a human could type, terminated by
+// Enter, as a hardware scan. This works no matter what element (or
+// nothing) currently has focus.
+let hwBuffer = '';
+let hwLastKeyTime = 0;
+const HW_SCAN_MAX_GAP_MS = 50;   // keystrokes this close together = scanner, not typing
+const HW_SCAN_MIN_LENGTH = 4;    // ignore stray Enter presses / accidental short bursts
+
+document.addEventListener('keydown', (e) => {
+    const now = Date.now();
+
+    if (e.key === 'Enter') {
+        if (hwBuffer.length >= HW_SCAN_MIN_LENGTH && (now - hwLastKeyTime) <= HW_SCAN_MAX_GAP_MS) {
+            const token = hwBuffer;
+            hwBuffer = '';
+            if (!scanCooldownActive || token !== lastScannedToken) {
+                lastScannedToken = token;
+                scanCooldownActive = true;
+                processScanToken(token);
+                setTimeout(() => { scanCooldownActive = false; lastScannedToken = null; }, 3000);
+            }
+        } else {
+            hwBuffer = '';
+        }
+        return;
+    }
+
+    // Single printable character, arriving fast enough to be the scanner.
+    if (e.key.length === 1) {
+        if (now - hwLastKeyTime > HW_SCAN_MAX_GAP_MS) {
+            hwBuffer = ''; // gap too long — this is a human typing, start over
+        }
+        hwBuffer += e.key;
+        hwLastKeyTime = now;
+    }
+});
+
 function playAudioFeedback(authorized) {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();

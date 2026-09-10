@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Building extends Model
 {
-    protected $fillable = ['code', 'name', 'color_name', 'color_hex'];
+    protected $fillable = ['code', 'name', 'color_name', 'color_hex', 'template_image', 'qr_color_hex'];
 
     public function passes(): HasMany
     {
@@ -18,6 +18,10 @@ class Building extends Model
     public function scanLogs(): HasMany
     {
         return $this->hasMany(ScanLog::class, 'scanned_building_id');
+    }
+    public function scopeSelectable($query)
+    {
+        return $query->where('code', '!=', 'NG');
     }
 
     /**
