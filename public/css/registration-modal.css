@@ -41,9 +41,12 @@
 }
 .reg-modal-header .header-icon {
     width: 44px;
-    height: 44px;
     flex: none;
     color: #245ba6;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .reg-eyebrow,
 .reg-step-label {
@@ -86,11 +89,15 @@
     gap: 14px;
     margin-bottom: 22px;
 }
+
 .reg-step-heading .step-icon {
     width: 36px;
-    height: 36px;
     flex: none;
     color: #245ba6;
+    font-size: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .reg-step-heading h2 {
     margin: 2px 0 0;
@@ -324,4 +331,18 @@
         flex: 1;
         min-width: 0;
     }
+}
+
+.reg-building-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #245ba6;
+    flex: none;
+    cursor: pointer;
+}
+.reg-building-option:has(input:checked) {
+    background: #eef4fc;
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin: -4px -8px;
 }

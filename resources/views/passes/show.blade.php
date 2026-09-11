@@ -17,7 +17,7 @@ $templateImage = $isMulti
 @endphp
 
 <div class="flex flex-col items-center gap-4">
-    <p class="eyebrow-label">House of Representatives &middot; Visitor pass</p>
+   <p class="gov-eyebrow">House of Representatives &middot; Visitor pass</p> 
     <div class="flex justify-center">
         <div class="space-y-4">
             <div id="printablePassArea" class="pass-preview-card relative w-[300px] h-[500px] rounded-xl overflow-hidden"
@@ -35,8 +35,8 @@ $templateImage = $isMulti
             </div>
 
             <div class="flex gap-2">
-                <button onclick="window.print()" class="flex-1 btn-govt-primary font-bold py-2 rounded-xl text-xs"><i class="fa-solid fa-print"></i> Print</button>
-                <a href="{{ route('passes.index') }}" class="flex-1 btn-govt-ghost font-bold py-2 rounded-xl text-xs text-center">Back</a>
+                <button onclick="window.print()" class="flex-1 gov-btn-camera" style="justify-content:center;"><i class="fa-solid fa-print"></i> Print</button>
+                <a href="{{ route('passes.index') }}" class="flex-1 gov-btn-outline" style="justify-content:center;">Back</a>
             </div>
         </div>
     </div>

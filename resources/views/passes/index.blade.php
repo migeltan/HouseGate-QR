@@ -18,22 +18,29 @@
 @endphp
 
 {{-- Hero — reuses the exact segmented-border treatment from scanner/index.blade.php and logs/index.blade.php --}}
-<div class="hero-govt">
-    <div class="sunburst-red" aria-hidden="true"></div>
-
-    <div class="hero-frame">
-        <div class="hero-frame-rattan" aria-hidden="true"></div>
-
-        <div class="hero-inner-panel flex items-center gap-5">
-            <div class="hero-logo-badge hidden sm:flex">
-                <img src="{{ asset('images/lsb-icon.png') }}" alt="LSB emblem">
-            </div>
+<div class="gov-card">
+    <div class="gov-card-header">
+        <div class="gov-card-header-left">
+            <i class="fa-solid fa-clipboard-list gov-card-header-icon"></i>
             <div>
-                <p class="eyebrow">Perimeter Security Group &middot; Pass registry</p>
-                <h1>Visitor Pass Management</h1>
-                <p class="lead">5 passes per building - assign a visitor to issue and print a badge.</p>
+                <span class="gov-eyebrow">Instructions</span>
+                <span class="gov-card-title">Visitor Pass Registry</span>
             </div>
         </div>
+        <div class="gov-corner-accent" aria-hidden="true"></div>
+    </div>
+    <div class="gov-card-body gov-card-body-split">
+        <div>
+            <p>Register a visitor with their agenda and detail for access to a certain building. The personnel must:</p>
+            <ol class="gov-steps">
+                <li>Register the visitor</li>
+                <li>Assign the specific building/s they need</li>
+                <li>Unassign after return of visitor pass</li>
+            </ol>
+        </div>
+        <button onclick="document.getElementById('registerModal').classList.remove('hidden')" class="gov-btn-camera flex-shrink-0">
+            <i class="fa-solid fa-user-plus"></i> Register Visitor
+        </button>
     </div>
 </div>
 
@@ -50,16 +57,9 @@
     </div>
 @endif
 
-<div class="card-govt card-vivid p-5 shadow-sm flex flex-wrap justify-between items-center gap-4" style="--ribbon-color: var(--brand-gold)">
-    <div>
-                <label class="card-header-title text-2xl font-bold flex items-center gap-2">
-            <i class="fa-solid fa-id-card-clip"></i> Visitor Pass Registry
-        </label>
-        <p class="text-xs mt-1 opacity-80">Register a visitor with their agenda, and details to a specific visitor pass.</p>
-     </div>
-    <button onclick="document.getElementById('registerModal').classList.remove('hidden')" class="btn-govt-cta px-4 py-2 text-xs flex-shrink-0">
-        <i class="fa-solid fa-user-plus"></i> Register visitor &amp; issue pass
-    </button>
+<div class="gov-legend">
+    <span class="gov-legend-item"><span class="gov-legend-dot is-active"></span> Active Passes</span>
+    <span class="gov-legend-item"><span class="gov-legend-dot is-available"></span> Available Passes</span>
 </div>
 
 {{-- Building grid — click a building to view/manage its passes. When the
@@ -67,6 +67,7 @@
      half-width + centered so it doesn't sit awkwardly alone on the left.
      Subtext now shows live active/available counts instead of static copy,
      and cards lift on hover to signal clickability. --}}
+
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     @foreach ($buildings as $b)
         @php
@@ -77,21 +78,42 @@
     $availableCount = $buildingPasses->whereNull('visitor_name')->count();
 @endphp
         <button type="button" onclick="openBuildingModal({{ $b->id }})"
-                class="building-card-frame relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out text-left w-full p-2 cursor-pointer {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}"
-                style="background: {{ $b->color_hex }};">
-            <div class="hero-frame-rattan" aria-hidden="true"></div>
-            <div class="relative z-10 flex items-stretch h-32">
-                <div class="bg-white rounded-l-xl px-4 flex flex-col justify-center flex-shrink-0 w-2/5">
-                    <h3 class="text-base text-slate-900">{{ $b->name }}</h3>
-                    <p class="text-xs text-slate-500 mt-1">{{ $activeCount }} Active &middot; {{ $availableCount }} Available</p>
-                </div>
-                <div class="flex-1 rounded-r-xl overflow-hidden">
-                    <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"
-                         alt="{{ $b->name }}" class="w-full h-full object-cover opacity-85">
-                </div>
+                class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
+            <div class="gov-building-card-info">
+                <h3>{{ $b->name }}</h3>
+                <p class="is-active">{{ $activeCount }} Active Passes</p>
+                <p class="is-available">{{ $availableCount }} Available Passes</p>
+            </div>
+            <div class="gov-building-card-photo">
+                <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"
+                     alt="{{ $b->name }}">
             </div>
         </button>
     @endforeach
+</div>
+
+{{-- User Journey --}}
+<div class="gov-card">
+    <div class="gov-card-header">
+        <div class="gov-card-header-left">
+            <i class="fa-solid fa-people-arrows gov-card-header-icon"></i>
+            <div>
+                <span class="gov-eyebrow">User Journey</span>
+                <span class="gov-card-title">Diagram of User Journey of the System</span>
+            </div>
+        </div>
+        <div class="gov-corner-accent" aria-hidden="true"></div>
+    </div>
+    <div class="gov-card-body">
+        <div class="relative">
+            <img src="{{ asset('images/user-journey-diagram.svg') }}"
+                 alt="User journey: Visitor Registration, Pass Assignment, QR Code from Pass, Visitor Presents Pass"
+                 class="w-full h-auto">
+            <button type="button" class="gov-journey-nav" aria-label="Next step">
+                <i class="fa-solid fa-caret-right"></i>
+            </button>
+        </div>
+    </div>
 </div>
 
 {{-- Per-building passes modal --}}
@@ -205,10 +227,7 @@
             <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
     <section class="reg-modal">
         <header class="reg-modal-header">
-            <svg class="header-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="6" y="8" width="31" height="24" rx="2" />
-                <path d="M12 39h19M18 32v7M39 16h3v20H18" />
-            </svg>
+            <i class="fa-solid fa-desktop header-icon"></i>
             <div>
                 <p class="reg-eyebrow">Registration</p>
                 <h1 id="registration-title">Register Visitor and Issue Pass</h1>
@@ -224,10 +243,7 @@
                 {{-- Step 1: Photo capture — visitor face + ID, both styled to match the mockup's camera panel --}}
                 <section class="reg-step-card">
                     <div class="reg-step-heading">
-                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 13l3-5h9l3 5h6a4 4 0 014 4v20a4 4 0 01-4 4H10a4 4 0 01-4-4V17a4 4 0 014-4h7z" />
-                            <circle cx="24" cy="26" r="8" />
-                        </svg>
+                        <i class="fa-solid fa-camera step-icon"></i>
                         <div>
                             <p class="reg-step-label">Step 1: Camera Terminal</p>
                             <h2>Entrance Photo Capture</h2>
@@ -282,9 +298,7 @@
                 {{-- Step 2: Visitor Information --}}
                 <section class="reg-step-card">
                     <div class="reg-step-heading">
-                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M13 5h18l7 7v31H13zM31 5v8h7M19 21h13M19 27h13M19 33h9" />
-                        </svg>
+                        <i class="fa-solid fa-file-lines step-icon"></i>
                         <div>
                             <p class="reg-step-label">Step 2: Information</p>
                             <h2>Visitor Information Form</h2>
@@ -347,9 +361,7 @@
                 {{-- Step 3: Destination + buildings + pass duration --}}
                 <section class="reg-step-card">
                     <div class="reg-step-heading">
-                        <svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M13 5h18l7 7v31H13zM31 5v8h7M19 21h13M19 27h13M19 33h9" />
-                        </svg>
+                        <i class="fa-solid fa-signs-post step-icon"></i>
                         <div>
                             <p class="reg-step-label">Step 3: Reason and Other Details</p>
                             <h2>Destination</h2>
