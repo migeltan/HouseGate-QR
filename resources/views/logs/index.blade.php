@@ -3,353 +3,149 @@
 
 @section('content')
 
-{{-- Hero — reuses the exact segmented-border treatment from scanner/index.blade.php --}}
-<div class="hero-govt">
-    <div class="sunburst-red" aria-hidden="true"></div>
+<style>
+    @import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
+    .font-source-sans {
+        font-family: 'Source Sans Pro', sans-serif;
+    }
+    .font-times {
+        font-family: 'Times New Roman', Times, serif;
+    }
+    .no-scrollbar {
+        scrollbar-width: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+</style>
 
-    <div class="hero-frame">
-        <div class="hero-frame-rattan" aria-hidden="true"></div>
+@include('logs._header')
 
-        <div class="hero-inner-panel flex items-center gap-5">
-            <div class="hero-logo-badge hidden sm:flex">
-                <img src="{{ asset('images/lsb-icon.png') }}" alt="LSB emblem">
-            </div>
-            <div>
-                <p class="eyebrow">Perimeter Security Group &middot; Audit Trail</p>
-                <h1>Centralized Visitor Audit Trail</h1>
-                <p class="lead">Every scan event, authorized or denied, recorded with timestamp, pass, and reason.</p>
-            </div>
-        </div>
-    </div>
-</div>
-
+{{-- ============================= ALERTS ============================= --}}
 @if (session('success'))
-    <div class="alert-govt-success" role="status">
-        <i class="fa-solid fa-circle-check"></i> {{ session('success') }}
+    <div class="mb-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">
+        <i class="fa-solid fa-circle-check text-emerald-500"></i> {{ session('success') }}
     </div>
 @endif
 
 @if (session('error'))
-    <div class="alert-govt-error" role="alert">
-        <i class="fa-solid fa-triangle-exclamation"></i> {{ session('error') }}
+    <div class="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" role="alert">
+        <i class="fa-solid fa-triangle-exclamation text-red-500"></i> {{ session('error') }}
     </div>
 @endif
 
-{{-- Sub-tabs: Scan Audit Trail / Pass Registration Records --}}
-<div class="records-subtabs">
-    <button type="button" class="records-subtab-btn is-active" data-tab="scans" onclick="showRecordsTab('scans')">
-        Scan Audit Trail
-    </button>
-    <button type="button" class="records-subtab-btn" data-tab="registrations" onclick="showRecordsTab('registrations')">
-        Pass Registration Records
-    </button>
+{{-- ============================= FOLDER-STYLE TABS + CARD ============================= --}}
+<div class="relative">
+
+    {{-- --------------------------------------------------------------------- --}}
+    {{-- --------------------------------------------------------------------- --}}
+    {{-- Tabs: active tab pops up as a folder "tab" attached to the card below --}}
+    {{-- --------------------------------------------------------------------- --}}
+    {{-- --------------------------------------------------------------------- --}}
+    <div class="flex items-end gap-1 pl-6 overflow-x-auto no-scrollbar [container-type:inline-size]">
+
+
+        {{-- ++++++++++++++++ --}}
+        {{-- Scan Audit Trail --}}
+        {{-- ++++++++++++++++ --}}
+        <button type="button" id="tabBtn-scans" data-tab="scans" onclick="showRecordsTab('scans')"
+                class="tab-btn w-[clamp(160px,42cqw,300.5px)] h-[clamp(60px,14cqw,90.5px)] shrink-0 relative z-10 -mb-px flex items-center gap-3 rounded-t-xl border border-slate-300 bg-white px-4 pt-3 pb-4 transition-colors">
+
+            <div class="w-auto h-auto shrink-0 flex">
+                <span class="tab-icon grid h-auto w-auto shrink-0 place-items-center bg-white pr-[10.5px]">
+                    <img src="{{ asset('images/icons/Folder.svg') }}" alt="Table Logs" class="h-[clamp(24px,6cqw,48px)] w-[clamp(24px,6cqw,48px)] shrink-0">
+                </span>
+                <span class="text-left min-w-0">
+                    <span class="tab-eyebrow block truncate font-times text-[clamp(11px,2.2cqw,17px)] font-semibold text-blue-700">Table Logs</span>
+                    <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,25px)] font-bold text-slate-1000">Scan Audit Trail</span>
+                </span>
+            </div>
+
+        </button>
+
+        {{-- ++++++++++++++++++++ --}}
+        {{-- Registration Records --}}
+        {{-- ++++++++++++++++++++ --}}
+        <button type="button" id="tabBtn-registrations" data-tab="registrations" onclick="showRecordsTab('registrations')"
+                class="tab-btn w-[clamp(160px,42cqw,320.5px)] h-[clamp(60px,14cqw,90.5px)] shrink-0 self-end flex items-center gap-3 rounded-t-lg px-3 pb-3 transition-colors">
+
+            <div class="w-auto h-auto shrink-0 flex">
+                <span class="tab-icon hidden h-auto w-auto shrink-0 place-items-center bg-white pr-[10.5px]">
+                    <img src="{{ asset('images/icons/Folder.svg') }}" alt="Table Logs" class="h-[clamp(24px,6cqw,48px)] w-[clamp(24px,6cqw,48px)] shrink-0">
+                </span>
+                <span class="text-left min-w-0">
+                    <span class="tab-eyebrow hidden truncate font-times text-[clamp(11px,2.2cqw,17px)] font-semibold text-blue-700">Table Logs</span>
+                    <span class="tab-title block whitespace-nowrap leading-tight font-source-sans text-[clamp(14px,3.2cqw,25px)] font-semibold text-slate-400">Registration Records</span>
+                </span>
+            </div>
+
+        </button>
+    </div>
+
+
+        {{-- +++++++++++++ --}}
+        {{--  Folder Body --}}
+        {{-- ++++++++++++++++++++ --}}
+        <form method="GET" id="logsFilterForm" class="relative overflow-hidden rounded-xl rounded-tr-xl border border-slate-300 bg-white shadow-[200px] ">
+            @include('logs._scans-table')
+            @include('logs._registrations-table')
+        </form>
 </div>
+{{-- ========================= END FOLDER-STYLE TABS + CARD ========================= --}}
 
-<form method="GET" id="logsFilterForm" class="space-y-6">
-
-    {{-- ============================= SCANS PANE ============================= --}}
-    <div id="scansPane" class="records-pane">
-
-        {{-- Filter by Building (red) / Filter by Result (blue) — vivid cards --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="card-govt card-vivid p-5 shadow-sm" style="--ribbon-color: var(--brand-red)">
-                <label class="card-header-title mb-2">
-                    <i class="fa-solid fa-building-circle-check"></i> Filter by Building
-                </label>
-                <select name="building" class="scanner-select w-full rounded-2xl px-4 py-3 font-bold" onchange="this.form.submit()">
-                    <option value="ALL">All buildings</option>
-                    @foreach ($buildings as $b)
-                        <option value="{{ $b->id }}" {{ (string) request('building') === (string) $b->id ? 'selected' : '' }}>
-                            {{ $b->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="card-govt card-vivid p-5 shadow-sm" style="--ribbon-color: var(--brand-blue)">
-                <label class="card-header-title mb-2">
-                    <i class="fa-solid fa-shield-halved"></i> Filter by Result
-                </label>
-                <select name="result" class="scanner-select w-full rounded-2xl px-4 py-3 font-bold" onchange="this.form.submit()">
-                    <option value="ALL">All results</option>
-                    <option value="AUTHORIZED" {{ request('result') === 'AUTHORIZED' ? 'selected' : '' }}>Authorized</option>
-                    <option value="UNAUTHORIZED" {{ request('result') === 'UNAUTHORIZED' ? 'selected' : '' }}>Unauthorized</option>
-                    <option value="INVALID" {{ request('result') === 'INVALID' ? 'selected' : '' }}>Invalid</option>
-                </select>
-            </div>
-        </div>
-
-        {{-- Audit Logs — gold vivid card wrapping the search bar + table --}}
-        <div class="card-govt card-vivid p-5 shadow-sm mt-6" style="--ribbon-color: var(--brand-gold)">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <label class="card-header-title">
-                    <i class="fa-solid fa-magnifying-glass"></i> Audit Logs
-                </label>
-
-                <div class="search-field-govt search-field-govt--vivid">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="logSearchInput" name="search" value="{{ request('search') }}"
-                           placeholder="Search by name, pass #, building..." autocomplete="off">
-                </div>
-            </div>
-
-            {{-- White inset panel — same pattern as meta-grid-card / status-banner-card on vivid backgrounds --}}
-            <div class="table-panel-govt">
-                <div class="table-scroll-govt custom-scrollbar">
-                    <table class="table-govt w-full text-left text-xs">
-                        <thead>
-                            <tr>
-                                <th class="py-3 px-4">Timestamp</th>
-                                <th class="py-3 px-4">Visitor</th>
-                                <th class="py-3 px-4">Pass #</th>
-                                <th class="py-3 px-4">Authorized bldg</th>
-                                <th class="py-3 px-4">Scanned at</th>
-                                <th class="py-3 px-4">Result</th>
-                                <th class="py-3 px-4">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse ($logs as $l)
-                                <tr class="row-govt {{ $loop->even ? 'row-alt-govt' : '' }}">
-                                    <td class="py-3 px-4 font-mono text-slate-500">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
-                                    <td class="py-3 px-4 font-bold text-slate-900">{{ $l->visitor_name_snapshot }}</td>
-                                    <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ $l->pass_number_snapshot }}</td>
-                                    <td class="py-3 px-4 text-slate-700 font-medium">{{ $l->authorized_building_snapshot }}</td>
-                                    <td class="py-3 px-4 text-slate-700 font-medium">{{ $l->scannedBuilding->name ?? '' }}</td>
-                                    <td class="py-3 px-4">
-                                        <span class="badge-status {{ $l->result === 'AUTHORIZED' ? 'badge-authorized' : 'badge-denied' }}">
-                                            {{ ucfirst(strtolower($l->result)) }}
-                                        </span>
-                                    </td>
-                                    <td class="py-3 px-4 text-slate-600 truncate max-w-xs" title="{{ $l->reason }}">{{ $l->reason }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="7" class="py-8 text-center text-slate-400">No scan events recorded yet.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- Bottom toolbar: results + pagination grouped left, Export + Purge grouped right --}}
-                <div class="pager-footer-govt">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <p class="pager-count-govt">
-                            @if ($logs->total() > 0)
-                                Showing {{ $logs->firstItem() }} to {{ $logs->lastItem() }} of {{ $logs->total() }} results
-                            @else
-                                No results
-                            @endif
-                        </p>
-
-                        @if ($logs->hasPages())
-                            <nav class="pager-govt" aria-label="Log pagination">
-                                <a href="{{ $logs->previousPageUrl() ?? '#' }}"
-                                   class="pager-btn-govt pager-arrow-govt {{ $logs->onFirstPage() ? 'is-disabled' : '' }}"
-                                   aria-label="Previous page">&lsaquo;</a>
-
-                                @foreach ($logs->getUrlRange(1, $logs->lastPage()) as $page => $url)
-                                    <a href="{{ $url }}" class="pager-btn-govt {{ $page == $logs->currentPage() ? 'is-active' : '' }}">
-                                        {{ $page }}
-                                    </a>
-                                @endforeach
-
-                                <a href="{{ $logs->nextPageUrl() ?? '#' }}"
-                                   class="pager-btn-govt pager-arrow-govt {{ !$logs->hasMorePages() ? 'is-disabled' : '' }}"
-                                   aria-label="Next page">&rsaquo;</a>
-                            </nav>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <a href="{{ route('logs.export', request()->query()) }}"
-                           class="btn-govt-success font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-file-csv"></i> Export CSV
-                        </a>
-                        @if (auth()->user()->isAdmin())
-                            <button type="button" onclick="openDeleteModal()"
-                                    class="btn-govt-cta font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
-                                <i class="fa-solid fa-trash-can"></i> Purge Logs
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {{-- =========================== END SCANS PANE ============================ --}}
-
-    {{-- ======================= PASS REGISTRATION RECORDS PANE ======================= --}}
-    <div id="registrationsPane" class="records-pane hidden">
-
-        <div class="card-govt card-vivid p-5 shadow-sm" style="--ribbon-color: var(--brand-blue)">
-            <label class="card-header-title mb-2">
-                <i class="fa-solid fa-clipboard-check"></i> Filter by Status
-            </label>
-            <select name="reg_status" class="scanner-select w-full rounded-2xl px-4 py-3 font-bold" onchange="this.form.submit()">
-                <option value="ALL">All registrations</option>
-                <option value="open" {{ request('reg_status') === 'open' ? 'selected' : '' }}>Currently assigned</option>
-                <option value="closed" {{ request('reg_status') === 'closed' ? 'selected' : '' }}>Returned / expired</option>
-            </select>
-        </div>
-
-        {{-- Pass Registration Records — append-only history, no purge button by design --}}
-        <div class="card-govt card-vivid p-5 shadow-sm mt-6" style="--ribbon-color: var(--brand-gold)">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <label class="card-header-title">
-                    <i class="fa-solid fa-magnifying-glass"></i> Pass Registration Records
-                </label>
-
-                <div class="search-field-govt search-field-govt--vivid">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="regSearchInput" name="reg_search" value="{{ request('reg_search') }}"
-                           placeholder="Search by visitor name or ID #..." autocomplete="off">
-                </div>
-            </div>
-
-            <div class="table-panel-govt">
-                <div class="table-scroll-govt custom-scrollbar">
-                    <table class="table-govt w-full text-left text-xs">
-                        <thead>
-                            <tr>
-                                <th class="py-3 px-4">Photos</th>
-                                <th class="py-3 px-4">Registered at</th>
-                                <th class="py-3 px-4">Visitor</th>
-                                <th class="py-3 px-4">ID type / ref</th>
-                                <th class="py-3 px-4">Pass class</th>
-                                <th class="py-3 px-4">Expected return</th>
-                                <th class="py-3 px-4">Registered by</th>
-                                <th class="py-3 px-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse ($registrations as $r)
-                                <tr class="row-govt {{ $loop->even ? 'row-alt-govt' : '' }}">
-                                    <td class="py-3 px-4">
-                                        <div class="flex gap-1.5">
-                                            @if ($r->photo_path)
-                                                <img src="{{ asset('storage/' . $r->photo_path) }}" alt="Visitor photo" class="reg-thumb">
-                                            @endif
-                                            @if ($r->id_photo_path)
-                                                <img src="{{ asset('storage/' . $r->id_photo_path) }}" alt="ID photo" class="reg-thumb">
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="py-3 px-4 font-mono text-slate-500">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</td>
-                                    <td class="py-3 px-4 font-bold text-slate-900">{{ $r->visitor_name }}</td>
-                                    <td class="py-3 px-4 text-slate-700 font-medium">{{ $r->id_type }} &middot; {{ $r->id_ref }}</td>
-                                    <td class="py-3 px-4">
-                                        @if ($r->pass_class === 'long_term')
-                                            <span class="badge-neutral">Long-term</span>
-                                        @else
-                                            <span class="badge-neutral">Day</span>
-                                        @endif
-                                    </td>
-                                    <td class="py-3 px-4 text-slate-700 font-medium">{{ $r->expected_return_date?->format('Y-m-d') ?? '—' }}</td>
-                                    <td class="py-3 px-4 text-slate-700 font-medium">{{ $r->registered_by ?? '—' }}</td>
-                                    <td class="py-3 px-4">
-                                        @if (! $r->unassigned_at)
-                                            <span class="badge-status badge-authorized">Currently assigned</span>
-                                        @else
-                                            <span class="badge-status badge-denied">
-                                                {{ $r->unassign_reason === 'auto_expired' ? 'Auto-expired' : ($r->unassign_reason === 'renewed' ? 'Renewed' : 'Returned') }}
-                                            </span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="8" class="py-8 text-center text-slate-400">No pass registrations recorded yet.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- Bottom toolbar: results + pagination grouped left, Export grouped right — no Purge button here on purpose --}}
-                <div class="pager-footer-govt">
-                    <div class="flex flex-wrap items-center gap-4">
-                        <p class="pager-count-govt">
-                            @if ($registrations->total() > 0)
-                                Showing {{ $registrations->firstItem() }} to {{ $registrations->lastItem() }} of {{ $registrations->total() }} results
-                            @else
-                                No results
-                            @endif
-                        </p>
-
-                        @if ($registrations->hasPages())
-                            <nav class="pager-govt" aria-label="Registration pagination">
-                                <a href="{{ $registrations->previousPageUrl() ?? '#' }}"
-                                   class="pager-btn-govt pager-arrow-govt {{ $registrations->onFirstPage() ? 'is-disabled' : '' }}"
-                                   aria-label="Previous page">&lsaquo;</a>
-
-                                @foreach ($registrations->getUrlRange(1, $registrations->lastPage()) as $page => $url)
-                                    <a href="{{ $url }}" class="pager-btn-govt {{ $page == $registrations->currentPage() ? 'is-active' : '' }}">
-                                        {{ $page }}
-                                    </a>
-                                @endforeach
-
-                                <a href="{{ $registrations->nextPageUrl() ?? '#' }}"
-                                   class="pager-btn-govt pager-arrow-govt {{ !$registrations->hasMorePages() ? 'is-disabled' : '' }}"
-                                   aria-label="Next page">&rsaquo;</a>
-                            </nav>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <a href="{{ route('logs.registrations.export', request()->query()) }}"
-                           class="btn-govt-success font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-file-csv"></i> Export CSV
-                        </a>
-                        {{-- No purge/delete button here — pass_registrations is append-only by design. --}}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {{-- ===================== END PASS REGISTRATION RECORDS PANE ===================== --}}
-
-</form>
-
-{{-- Purge Modal (scans only) — entire modal is admin-only markup, not just the trigger button,
+{{-- ============================= PURGE MODAL (scans only) ============================= --}}
+{{-- Entire modal is admin-only markup, not just the trigger button,
      so the forms/inputs never even exist in a guard's DOM. --}}
 @if (auth()->user()->isAdmin())
-<div id="purgeModalOverlay" class="modal-overlay-govt hidden" onclick="if(event.target === this) closeDeleteModal()">
-    <div class="modal-govt-panel modal-purge-panel">
-        <div class="modal-header-govt">
-            <h3><i class="fa-solid fa-trash-can"></i> Purge Logs</h3>
+<div id="purgeModalOverlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4"
+     onclick="if(event.target === this) closeDeleteModal()">
+    <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div class="flex items-center gap-2 border-b border-slate-200 px-6 py-4">
+            <h3 class="flex items-center gap-2 text-base font-bold text-slate-900">
+                <i class="fa-solid fa-trash-can text-red-500"></i> Purge Logs
+            </h3>
         </div>
 
-        <div class="modal-body-govt space-y-5">
+        <div class="space-y-5 px-6 py-5">
             {{-- Option A --}}
             <form method="POST" action="{{ route('logs.purge.range') }}">
                 @csrf
                 @method('DELETE')
-                <p class="modal-option-title-govt">Option A — Clear a date range</p>
-                <div class="grid grid-cols-2 gap-3 mt-2">
-                    <label class="modal-field-govt">
-                        <span>Start date</span>
-                        <input type="date" name="start_date" required>
+                <p class="text-sm font-semibold text-slate-700">Option A — Clear a date range</p>
+                <div class="mt-2 grid grid-cols-2 gap-3">
+                    <label class="block text-xs font-medium text-slate-500">
+                        <span class="mb-1 block">Start date</span>
+                        <input type="date" name="start_date" required
+                               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                     </label>
-                    <label class="modal-field-govt">
-                        <span>End date</span>
-                        <input type="date" name="end_date" required>
+                    <label class="block text-xs font-medium text-slate-500">
+                        <span class="mb-1 block">End date</span>
+                        <input type="date" name="end_date" required
+                               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                     </label>
                 </div>
-                <button type="submit" class="btn-govt-gold w-full mt-3 py-2.5 rounded-xl font-bold"
-                        onclick="return confirm('Delete all logs in this date range? This cannot be undone.');">
+                <button type="submit"
+                        onclick="return confirm('Delete all logs in this date range? This cannot be undone.');"
+                        class="mt-3 w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600 transition-colors">
                     Delete Logs In Range
                 </button>
             </form>
 
-            <hr class="modal-divider-govt">
+            <hr class="border-slate-200">
 
             {{-- Option B --}}
             <form method="POST" action="{{ route('logs.purge.all') }}">
                 @csrf
                 @method('DELETE')
-                <p class="modal-option-title-govt modal-option-title-govt--danger">Option B — Purge all logs</p>
-                <p class="modal-option-hint-govt">This permanently deletes every audit log. Type <strong>PURGE</strong> to confirm.</p>
-                <input type="text" name="confirm" required placeholder="Type PURGE to confirm" class="modal-confirm-input-govt mt-2">
-                <button type="submit" class="btn-govt-cta w-full mt-3 py-2.5 rounded-xl font-bold"
-                        onclick="return confirm('This deletes ALL audit logs permanently. Continue?');">
+                <p class="text-sm font-semibold text-red-600">Option B — Purge all logs</p>
+                <p class="mt-1 text-xs text-slate-500">
+                    This permanently deletes every audit log. Type <strong>PURGE</strong> to confirm.
+                </p>
+                <input type="text" name="confirm" required placeholder="Type PURGE to confirm"
+                       class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none">
+                <button type="submit"
+                        onclick="return confirm('This deletes ALL audit logs permanently. Continue?');"
+                        class="mt-3 w-full rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-700 transition-colors">
                     Delete All Logs
                 </button>
             </form>
@@ -357,6 +153,9 @@
     </div>
 </div>
 @endif
+
+{{-- ============================= UNIVERSAL ROW DETAILS MODAL ============================= --}}
+@include('logs._row-modal')
 
 @endsection
 
@@ -389,11 +188,44 @@
         if (overlay) overlay.classList.add('hidden');
     }
 
-    // ---- Sub-tab toggle ----
+    // ---- Folder-tab toggle ----
+    // Active tab: raised "folder tab" look (icon + eyebrow + bold title, white bg,
+    // border on 3 sides, sits flush against the card via -mb-px).
+    // Inactive tab: flat plain-text label, no icon/eyebrow, muted color.
+    function setTabState(btn, active) {
+        const icon = btn.querySelector('.tab-icon');
+        const eyebrow = btn.querySelector('.tab-eyebrow');
+        const title = btn.querySelector('.tab-title');
+
+        btn.classList.toggle('relative', active);
+        btn.classList.toggle('z-10', active);
+        btn.classList.toggle('-mb-px', active);
+        btn.classList.toggle('border', active);
+        btn.classList.toggle('border-b-0', active);
+        btn.classList.toggle('border-slate-300', active);
+        btn.classList.toggle('bg-white', active);
+        btn.classList.toggle('rounded-t-xl', active);
+        btn.classList.toggle('pt-3', active);
+        btn.classList.toggle('pb-4', active);
+        btn.classList.toggle('px-4', active);
+
+        btn.classList.toggle('self-end', !active);
+        btn.classList.toggle('rounded-t-lg', !active);
+        btn.classList.toggle('pb-3', !active);
+        btn.classList.toggle('px-3', !active);
+
+        icon.classList.toggle('hidden', !active);
+        icon.classList.toggle('grid', active);
+        eyebrow.classList.toggle('hidden', !active);
+        title.classList.toggle('text-slate-900', active);
+        title.classList.toggle('font-bold', active);
+        title.classList.toggle('text-slate-400', !active);
+        title.classList.toggle('font-semibold', !active);
+    }
+
     function showRecordsTab(tab) {
-        document.querySelectorAll('.records-subtab-btn').forEach(btn => {
-            btn.classList.toggle('is-active', btn.dataset.tab === tab);
-        });
+        setTabState(document.getElementById('tabBtn-scans'), tab === 'scans');
+        setTabState(document.getElementById('tabBtn-registrations'), tab === 'registrations');
         document.getElementById('scansPane').classList.toggle('hidden', tab !== 'scans');
         document.getElementById('registrationsPane').classList.toggle('hidden', tab !== 'registrations');
     }
