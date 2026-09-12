@@ -112,7 +112,10 @@
             <!-- Status -->
             <div id="statusHeader" class="gov-status-banner">
                 <div>
-                    <div id="statusText" class="gov-status-title"></div>
+                    <div class="gov-status-title-row">
+                        <div id="statusText" class="gov-status-title"></div>
+                        <span id="resDirectionBadge" class="gov-direction-badge hidden"></span>
+                    </div>
                     <div id="statusSubtitle" class="gov-status-subtitle"></div>
                 </div>
 
@@ -205,6 +208,11 @@
         </div>
 
     </div>
+
+<div id="resActivitySection" class="gov-activity-section hidden">
+    <p class="gov-activity-heading">Recent Activity — This Pass</p>
+    <div id="resActivityList" class="gov-activity-list"></div>
+</div>
 
     {{--
                 <div id="securityAdvisory" class="gov-advisory anim-fade-in-up anim-delay-2"><span id="advisoryText"></span></div>
@@ -396,20 +404,52 @@ function displayScanResultUI(data) {
     const advisoryBox = document.getElementById('securityAdvisory');
 
     if (data.result === 'AUTHORIZED') {
-        header.className = 'gov-status-banner is-authorized anim-fade-in-up';
-        document.getElementById('statusText').innerText = 'Access authorized';
-        document.getElementById('statusSubtitle').innerText = 'Visitor authorized for this building';
-        advisoryBox.className = 'gov-advisory is-authorized anim-fade-in-up anim-delay-2';
-        advisory.innerText = `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`;
+    header.className = 'gov-status-banner is-authorized anim-fade-in-up';
+    document.getElementById('statusText').innerText = 'Access Authorized';
+    document.getElementById('statusSubtitle').innerText = data.reason;
+    advisoryBox.className = 'gov-advisory is-authorized anim-fade-in-up anim-delay-2';
+    advisory.innerText = `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`;
     } else {
         header.className = 'gov-status-banner is-denied anim-fade-in-up';
-        document.getElementById('statusText').innerText = 'Denied: ' + data.result.charAt(0) + data.result.slice(1).toLowerCase();
-        document.getElementById('statusSubtitle').innerText = 'Security alert';
+        document.getElementById('statusText').innerText = 'Denied Access: ' + data.result.charAt(0) + data.result.slice(1).toLowerCase();
+        document.getElementById('statusSubtitle').innerText = data.reason;
         advisoryBox.className = 'gov-advisory is-denied anim-fade-in-up anim-delay-2';
         advisory.innerText = data.reason;
     }
+
+    const directionBadge = document.getElementById('resDirectionBadge');
+    if (data.direction === 'in') {
+        directionBadge.textContent = 'IN';
+        directionBadge.className = 'gov-direction-badge is-in';
+    } else if (data.direction === 'out') {
+        directionBadge.textContent = 'OUT';
+        directionBadge.className = 'gov-direction-badge is-out';
+    } else {
+        directionBadge.className = 'gov-direction-badge hidden';
+    }
+
+    const activitySection = document.getElementById('resActivitySection');
+    const activityList = document.getElementById('resActivityList');
+    activityList.innerHTML = '';
+    if (data.recent_activity && data.recent_activity.length) {
+        data.recent_activity.forEach(entry => {
+            const label = entry.direction === 'in' ? 'Entered' : entry.direction === 'out' ? 'Exited' : 'Scanned';
+            const row = document.createElement('div');
+            row.className = 'gov-activity-row';
+            row.innerHTML = `
+                <span class="gov-activity-dir is-${entry.direction || 'neutral'}">${label}</span>
+                <span class="gov-activity-building">${entry.building}</span>
+                <span class="gov-activity-time">${entry.time} &middot; ${entry.date}</span>
+            `;
+            activityList.appendChild(row);
+        });
+        activitySection.classList.remove('hidden');
+    } else {
+        activitySection.classList.add('hidden');
+    }
+
     playAudioFeedback(data.result === 'AUTHORIZED');
-}
+    }
 
 function toggleFullscreen(elId) {
     const el = document.getElementById(elId);

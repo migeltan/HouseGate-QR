@@ -15,7 +15,6 @@ class ScannerController extends Controller
     private const BADGE_MULTI_COLOR = '#475569';
 
     public function index()
-
     {
         $buildings = Building::where('code', '!=', 'NG')->orderBy('name')->get();
         $passes = VisitorPass::with('building')->orderBy('building_id')->orderBy('pass_number')->get();
@@ -108,6 +107,27 @@ class ScannerController extends Controller
             'scanned_by_user_id' => $user->id,
         ]);
 
+        // Recent in/out history for this specific pass, so the guard can see
+        // the visitor's movement pattern at a glance. Only AUTHORIZED scans
+        // count as real entries/exits — denied/blocked attempts aren't
+        // actual movements and would just clutter the timeline.
+        $recentActivity = [];
+        if ($pass) {
+            $recentActivity = ScanLog::where('visitor_pass_id', $pass->id)
+                ->where('result', 'AUTHORIZED')
+                ->with('scannedBuilding')
+                ->latest()
+                ->limit(6)
+                ->get()
+                ->map(fn ($entry) => [
+                    'direction' => $entry->direction,
+                    'building'  => $entry->scannedBuilding->name ?? $entry->authorized_building_snapshot,
+                    'time'      => $entry->created_at->format('h:i A'),
+                    'date'      => $entry->created_at->format('M j'),
+                ])
+                ->values();
+        }
+
         return response()->json([
             'result' => $result,
             'reason' => $reason,
@@ -121,6 +141,8 @@ class ScannerController extends Controller
             'pass_class' => $pass?->pass_class,
             'days_remaining' => $pass?->daysRemaining(),
             'stale_notice' => $staleNotice,
+            'direction' => $direction,
+            'recent_activity' => $recentActivity,
         ]);
     }
 }

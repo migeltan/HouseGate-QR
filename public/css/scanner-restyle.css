@@ -967,3 +967,85 @@ select.gov-location-badge {
         justify-content: space-between;
     }
 }
+
+/* ---------- Direction badge (IN / OUT) on scan result ---------- */
+.gov-status-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.gov-direction-badge {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    letter-spacing: 0.03em;
+}
+.gov-direction-badge.is-in {
+    background: #eafbf1;
+    color: #1c9a5b;
+}
+.gov-direction-badge.is-out {
+    background: #eef4fc;
+    color: var(--brand-blue);
+}
+
+/* ---------- Recent in/out activity list ---------- */
+.gov-activity-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+}
+.gov-activity-heading {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+.gov-activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.gov-activity-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: "Source Sans Pro", sans-serif;
+    font-size: 0.8rem;
+}
+.gov-activity-dir {
+    font-weight: 700;
+    font-size: 0.68rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+    width: 4.4rem;
+    text-align: center;
+}
+.gov-activity-dir.is-in {
+    background: #eafbf1;
+    color: #1c9a5b;
+}
+.gov-activity-dir.is-out {
+    background: #eef4fc;
+    color: var(--brand-blue);
+}
+.gov-activity-building {
+    flex: 1;
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gov-activity-time {
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+    flex-shrink: 0;
+}
