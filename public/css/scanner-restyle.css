@@ -12,7 +12,6 @@
     src: url("/fonts/oldenglishtextmt.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
-    @import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
     font-display: swap;
 }
 
@@ -722,7 +721,7 @@ select.gov-location-badge {
     color: #1c9a5b;
 }
 .gov-building-card-info p.is-available {
-    color: var(--ink-soft);
+    color: var(--brand-blue);
 }
 .gov-building-card-photo {
     flex: 1;
@@ -752,4 +751,219 @@ select.gov-location-badge {
 }
 .gov-btn-outline:hover {
     background: var(--card-header-bg);
+}
+
+.gov-toast-container {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 380px;
+}
+.gov-toast {
+    position: relative;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 30px rgba(16, 24, 40, 0.15);
+    padding: 0.9rem 1.1rem 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    font-family: "Source Sans Pro", sans-serif;
+    animation: gov-toast-in 0.25s ease-out;
+}
+.gov-toast.is-leaving {
+    animation: gov-toast-out 0.25s ease-in forwards;
+}
+@keyframes gov-toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+@keyframes gov-toast-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(24px);
+    }
+}
+.gov-toast i {
+    font-size: 1.1rem;
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+.gov-toast-message {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.35;
+}
+.gov-toast-bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 100%;
+    animation: gov-toast-countdown 5s linear forwards;
+}
+@keyframes gov-toast-countdown {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+.gov-toast.is-success i {
+    color: #1c9a5b;
+}
+.gov-toast.is-success .gov-toast-bar {
+    background: #1c9a5b;
+}
+.gov-toast.is-error i {
+    color: var(--brand-red);
+}
+.gov-toast.is-error .gov-toast-bar {
+    background: var(--brand-red);
+}
+
+/* ---------- Building passes modal: search + list rows ---------- */
+.gov-modal-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.gov-modal-search i {
+    position: absolute;
+    left: 0.85rem;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    pointer-events: none;
+}
+.gov-modal-search input {
+    min-width: 220px;
+    padding: 0.55rem 0.75rem 0.55rem 2rem;
+    font-size: 0.8rem;
+    font-family: "Source Sans Pro", sans-serif;
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    background: #fff;
+    color: var(--ink);
+}
+.gov-modal-search input:focus {
+    outline: none;
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(36, 91, 166, 0.15);
+}
+
+.gov-pass-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--brand-blue);
+    border-radius: 0.6rem;
+    padding: 0.65rem 1rem;
+    font-family: "Source Sans Pro", sans-serif;
+}
+.gov-pass-row-number {
+    font-family: "SFMono-Regular", Menlo, monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    width: 3.5rem;
+    flex-shrink: 0;
+}
+.gov-pass-row-main {
+    flex: 1;
+    min-width: 0;
+}
+.gov-pass-row-visitor {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gov-pass-row-unassigned {
+    font-style: italic;
+    font-weight: 600;
+    color: #94a3b8;
+}
+.gov-pass-row-sub {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gov-pass-row-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+.gov-pass-badge {
+    font-weight: 700;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+}
+.gov-pass-badge.is-active {
+    background: #eafbf1;
+    color: #1c9a5b;
+}
+.gov-pass-badge.is-available {
+    background: #eef4fc;
+    color: var(--brand-blue);
+}
+.gov-pass-row-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+.gov-pass-row-btn {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    padding: 0.4rem 0.8rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+}
+.gov-pass-row-btn:hover {
+    filter: brightness(0.95);
+}
+.gov-pass-row-btn.is-ghost {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+@media (max-width: 640px) {
+    .gov-pass-row {
+        flex-wrap: wrap;
+    }
+    .gov-pass-row-badges,
+    .gov-pass-row-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
 }

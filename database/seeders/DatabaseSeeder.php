@@ -23,6 +23,11 @@ class DatabaseSeeder extends Seeder
         foreach ($buildings as $b) {
             $building = Building::updateOrCreate(['code' => $b['code']], $b);
 
+            if ($b['code'] === 'NG') {
+                continue; // North Gate only ever holds multi-building passes
+            }
+
+
             for ($i = 1; $i <= 5; $i++) {
                 $passNumber = str_pad($i, 4, '0', STR_PAD_LEFT);
                 $token = "HOR-20TH-{$b['code']}-{$passNumber}-SEC2026";

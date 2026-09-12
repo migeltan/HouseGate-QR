@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}?v={{ filemtime(public_path('css/registration-modal.css')) }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -60,18 +60,55 @@
         </div>
     </header>
 
-    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        @if (session('success'))
-            <div class="alert-govt-success px-4 py-3 text-sm">
-                {{ session('success') }}
-            </div>
-        @endif
+        <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         @yield('content')
       </main>
 
     <footer class="gov-footer">
         <img src="{{ asset('images/inspire-logo.png') }}" alt="House of Representatives INSPIRE">
     </footer>
+
+        <script>
+   function showToast(message, type = 'success') {
+    let container = document.getElementById('govToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'govToastContainer';
+        container.className = 'gov-toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `gov-toast is-${type}`;
+    const icon = type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation';
+    toast.innerHTML = `
+        <i class="fa-solid ${icon}"></i>
+        <div class="gov-toast-message">${message}</div>
+        <button type="button" class="gov-toast-close" aria-label="Dismiss">&times;</button>
+        <div class="gov-toast-bar"></div>
+    `;
+    container.appendChild(toast);
+
+    const dismiss = () => {
+        toast.classList.add('is-leaving');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    };
+
+    const timer = setTimeout(dismiss, 5000);
+
+    toast.querySelector('.gov-toast-close').addEventListener('click', () => {
+        clearTimeout(timer);
+        dismiss();
+    });
+}
+
+    @if (session('success'))
+        document.addEventListener('DOMContentLoaded', () => showToast(@json(session('success')), 'success'));
+    @endif
+    @if ($errors->any())
+        document.addEventListener('DOMContentLoaded', () => showToast(@json($errors->first()), 'error'));
+    @endif
+    </script>
 
     @yield('scripts')
 

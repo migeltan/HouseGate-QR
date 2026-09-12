@@ -5,19 +5,18 @@
 @php
     $isMulti = $pass->is_multi_building;
 
-    // Save your uploaded "Multiple Access" template to this path.
-    // Adjust if you'd rather keep it somewhere else.
-$templateImage = $isMulti
-    ? asset('images/passes/ma.png')
-    : asset($pass->building->template_image);
-
-    // Dark/charcoal so the QR reads cleanly against the gray card —
-    // same idea as the maroon-on-red used for North Wing, etc.
-    $qrColor = $isMulti ? '#1c1f26' : $pass->building->qr_color_hex;
+    // Multi-building passes are homed at North Gate's own building_id
+    // (see PassController::registerMultiBuilding()), so $pass->building
+    // already IS the North Gate row — the old "ma.png" special-case
+    // predates that and is no longer needed. North Gate's own
+    // template_image/qr_color_hex columns drive the artwork now, same
+    // as every other building.
+    $templateImage = asset($pass->building->template_image);
+    $qrColor = $pass->building->qr_color_hex;
 @endphp
 
 <div class="flex flex-col items-center gap-4">
-   <p class="gov-eyebrow">House of Representatives &middot; Visitor pass</p> 
+   <p class="gov-eyebrow">House of Representatives &middot; {{ $isMulti ? 'North Gate Access' : 'Visitor pass' }}</p>
     <div class="flex justify-center">
         <div class="space-y-4">
             <div id="printablePassArea" class="pass-preview-card relative w-[300px] h-[500px] rounded-xl overflow-hidden"

@@ -71,9 +71,7 @@ This prototype implements a simple core mechanism: every visitor pass is tied to
 - **ScanLog** — a permanent, immutable-by-design record of every scan attempt (a snapshot of the visitor/pass/building at scan time), its result, reason, direction (in/out), and now which authenticated user performed the scan.
 - **User** — `admin` or `guard` role, plus an `hrep_id` reference field.
 
-### `app/console/commands/`
-
-> **Note:** this directory is lowercase (`app/console/commands`) while the classes inside declare `namespace App\Console\Commands;` — see Known Issues, this is currently broken on a case-sensitive filesystem.
+### `app/Console/Commands/`
 
 - **DailyPassSweep** — `php artisan passes:daily-sweep`, scheduled nightly at 19:00 (`routes/console.php`). Auto-expires due day/long-term passes and queues the two reminder emails.
 - **GenerateMultiBuildingPasses** — `php artisan passes:seed-multi {count=5}`, a dev utility that generates sample North Gate Access passes (each randomly authorized for 2–3 buildings) for testing scanner validation logic.

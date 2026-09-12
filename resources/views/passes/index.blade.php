@@ -13,7 +13,7 @@
         'RVM'   => 'rvm.png',
         'NG'    => 'northgate.png',
         'MB'    => 'main.png',
-        'SWA'   => 'rvm.png', // TODO: swap once South Wing Annex photo is supplied
+        'SWA'   => 'swa.jpg',
     ];
 @endphp
 
@@ -44,18 +44,6 @@
     </div>
 </div>
 
-@if (session('success'))
-    <div class="alert-govt-success" role="status">
-        <i class="fa-solid fa-circle-check"></i> {{ session('success') }}
-    </div>
-@endif
-
-@if ($errors->any())
-    <div class="alert-govt-error" role="alert">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        {{ $errors->first() }}
-    </div>
-@endif
 
 <div class="gov-legend">
     <span class="gov-legend-item"><span class="gov-legend-dot is-active"></span> Active Passes</span>
@@ -69,13 +57,15 @@
      and cards lift on hover to signal clickability. --}}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    @foreach ($buildings as $b)
+    @foreach ($displayBuildings as $b)
         @php
-    $buildingPasses = $passes->filter(fn ($p) => $p->is_multi_building
-        ? $p->buildings->contains('id', $b->id)
-        : $p->building_id === $b->id);
-    $activeCount = $buildingPasses->whereNotNull('visitor_name')->count();
-    $availableCount = $buildingPasses->whereNull('visitor_name')->count();
+       // North Gate's own pool must only ever contain multi-building passes;
+    // any single-building pass homed there is stale legacy data and is
+    // deliberately excluded rather than counted.
+        $buildingPasses = $passes->where('building_id', $b->id)
+            ->where('is_multi_building', $b->code === 'NG');
+        $activeCount = $buildingPasses->whereNotNull('visitor_name')->count();
+        $availableCount = $buildingPasses->whereNull('visitor_name')->count();
 @endphp
         <button type="button" onclick="openBuildingModal({{ $b->id }})"
                 class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
@@ -134,97 +124,94 @@
                 </button>
             </div>
 
-            <div class="flex gap-2 mt-4">
-                <button type="button" onclick="filterModalPasses('all')" class="modal-filter-pill is-active" data-filter="all">All</button>
-                <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active</button>
-                <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available</button>
+            <div class="flex flex-wrap items-center justify-between gap-3 mt-4">
+                <div class="flex gap-2">
+                    <button type="button" onclick="filterModalPasses('all')" class="modal-filter-pill is-active" data-filter="all">All</button>
+                    <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active</button>
+                    <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available</button>
+                </div>
+                <div class="gov-modal-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="buildingModalSearch" placeholder="Search by name or pass #..." autocomplete="off" oninput="applyModalFilters()">
+                </div>
             </div>
         </div>
 
-        <div class="px-6 py-5 overflow-y-auto">
-            @foreach ($buildings as $b)
+              <div class="px-6 py-5 overflow-y-auto">
+            @foreach ($displayBuildings as $b)
                 <div id="buildingPassGroup-{{ $b->id }}"
-                     class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                     class="hidden flex flex-col gap-2"
                      data-building-color="{{ $b->color_hex }}">
-                    @forelse ($passes->where('building_id', $b->id) as $p)
+                    @forelse ($passes->where('building_id', $b->id)->where('is_multi_building', $b->code === 'NG') as $p)
                         @php
                             $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
-
-                             $buildingLabel = $p->is_multi_building ? 'North Gate Access' : $b->name;
+                            $buildingLabel = $p->is_multi_building ? 'North Gate Access' : $b->name;
                             $statusKey = $p->visitor_name ? 'active' : 'available';
+                            $searchText = strtolower($p->pass_number . ' ' . ($p->visitor_name ?? 'unassigned'));
                         @endphp
-                        <div class="pass-card-item rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm" data-status="{{ $statusKey }}">
-                            <div class="p-4 flex justify-between items-start border-b border-slate-100">
-                                <div>
-                                    <span class="text-[0.65rem] font-bold tracking-wide uppercase" style="color: var(--seal-gold);">House of Reps</span>
-                                    <div class="pass-card-building">{{ $buildingLabel }}</div>
-                                    <div class="text-xs font-semibold text-slate-500">
-                                        @if ($p->is_multi_building)
-                                            @if ($p->buildings->isEmpty())
-                                                Awaiting building assignment
-                                            @else
-                                                Multiple access: {{ $p->buildings->pluck('name')->join(', ') }}
-                                            @endif
+                        <div class="gov-pass-row" data-status="{{ $statusKey }}" data-search="{{ $searchText }}"
+                             style="border-left-color: {{ $cardColor }};">
+                            <div class="gov-pass-row-number">{{ $p->pass_number }}</div>
+
+                            <div class="gov-pass-row-main">
+                                <div class="gov-pass-row-visitor">
+                                    @if ($p->visitor_name)
+                                        {{ $p->visitor_name }}
+                                    @else
+                                        <span class="gov-pass-row-unassigned">Unassigned</span>
+                                    @endif
+                                </div>
+                                <div class="gov-pass-row-sub">
+                                    @if ($p->is_multi_building)
+                                        @if ($p->buildings->isEmpty())
+                                            Awaiting building assignment
                                         @else
-                                            Visitor pass
+                                            {{ $buildingLabel }} &middot; {{ $p->buildings->pluck('name')->join(', ') }}
                                         @endif
-                                    </div>
-                                </div>
-                                <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                                    @if ($statusKey === 'active')
-                                        <span class="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-xs">Active</span>
                                     @else
-                                        <span class="bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">Available</span>
-                                    @endif
-                                    @if ($p->pass_class === 'long_term' && $statusKey === 'active')
-                                        <span class="badge-neutral">Long-term &middot; {{ $p->daysRemaining() }}d left</span>
+                                        {{ $buildingLabel }} &middot; Visitor pass
                                     @endif
                                 </div>
                             </div>
 
-                            <div class="p-4 space-y-2">
-                                <div class="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5">
-                                    <span class="text-xs text-slate-400">Pass #</span>
-                                    <span class="font-mono font-bold text-slate-900 text-sm">{{ $p->pass_number }}</span>
-                                </div>
-                                <div>
-                                    @if ($p->visitor_name)
-                                        <div class="text-slate-900 font-bold text-sm truncate">{{ $p->visitor_name }}</div>
-                                    @else
-                                        <span class="text-slate-400 italic bg-slate-50 px-2 py-0.5 rounded-md text-xs">Unassigned</span>
-                                    @endif
-                                </div>
+                            <div class="gov-pass-row-badges">
+                                @if ($statusKey === 'active')
+                                    <span class="gov-pass-badge is-active">Active</span>
+                                @else
+                                    <span class="gov-pass-badge is-available">Available</span>
+                                @endif
+                                @if ($p->pass_class === 'long_term' && $statusKey === 'active')
+                                    <span class="badge-neutral">Long-term &middot; {{ $p->daysRemaining() }}d left</span>
+                                @endif
                             </div>
 
-                            <div class="px-4 py-3 flex justify-between items-center" style="border-top: 3px solid {{ $cardColor }};">
-                                <div class="flex gap-1.5">
-                                    @if ($p->visitor_name)
-                                        <form method="POST" action="{{ route('passes.unassign', $p) }}"
-                                              onsubmit="return confirm('Unassign {{ $p->visitor_name }} from Pass #{{ $p->pass_number }}? The card will be reset and returned to available stock.');">
-                                            @csrf
-                                            <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full text-xs font-bold transition-colors">
-                                                <i class="fa-solid fa-user-xmark"></i> Unassign
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                                <a href="{{ route('passes.show', $p) }}"
-                                   class="text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-transform active:scale-95"
-                                   style="background: {{ $cardColor }};">
+                            <div class="gov-pass-row-actions">
+                                @if ($p->visitor_name)
+                                    <form method="POST" action="{{ route('passes.unassign', $p) }}"
+                                          onsubmit="return confirm('Unassign {{ $p->visitor_name }} from Pass #{{ $p->pass_number }}? The card will be reset and returned to available stock.');">
+                                        @csrf
+                                        <button type="submit" class="gov-pass-row-btn is-ghost">
+                                            <i class="fa-solid fa-user-xmark"></i> Unassign
+                                        </button>
+                                    </form>
+                                @endif
+                                <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn" style="background: {{ $cardColor }};">
                                     <i class="fa-solid fa-qrcode"></i> View QR
                                 </a>
                             </div>
                         </div>
                     @empty
-                        <p class="text-sm text-slate-400 col-span-full text-center py-8">No passes exist for this building yet.</p>
+                        <p class="text-sm text-slate-400 text-center py-8">No passes exist for this building yet.</p>
                     @endforelse
+                    <p class="gov-pass-row-empty hidden text-sm text-slate-400 text-center py-8">No passes match your search.</p>
                 </div>
             @endforeach
         </div>
     </div>
 </div>
 
-            <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
+
+<div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
     <section class="reg-modal">
         <header class="reg-modal-header">
             <i class="fa-solid fa-desktop header-icon"></i>
@@ -250,47 +237,50 @@
                         </div>
                     </div>
 
-                    <div class="reg-camera-layout">
-                        <div class="reg-camera-preview" id="photoCaptureArea">
-                            <span class="reg-focus-corner tl"></span>
-                            <span class="reg-focus-corner tr"></span>
-                            <span class="reg-focus-corner bl"></span>
-                            <span class="reg-focus-corner br"></span>
-                            <video id="photoVideo" autoplay playsinline class="hidden"></video>
-                            <img id="photoPreview" class="hidden" alt="Captured photo">
-                            <span id="photoPlaceholderText">Awaiting Camera Feed</span>
-                        </div>
-                        <div>
+                                        <div class="reg-camera-grid">
+                        <div class="reg-camera-col">
                             <p class="reg-camera-help">Capture the photo of the visitor properly.</p>
-                            <button type="button" id="startCameraBtn" class="reg-button reg-button-blue" onclick="startCamera()">
-                                <span aria-hidden="true">&#9654;</span> Start Camera
-                            </button>
-                            <button type="button" id="captureBtn" class="reg-button reg-button-blue hidden" onclick="capturePhoto()">Capture</button>
-                            <button type="button" id="retakeBtn" class="reg-button hidden" onclick="retakePhoto()">Retake</button>
+                            <div class="reg-camera-preview" id="photoCaptureArea">
+                                <span class="reg-focus-corner tl"></span>
+                                <span class="reg-focus-corner tr"></span>
+                                <span class="reg-focus-corner bl"></span>
+                                <span class="reg-focus-corner br"></span>
+                                <video id="photoVideo" autoplay playsinline class="hidden"></video>
+                                <img id="photoPreview" class="hidden" alt="Captured photo">
+                                <span id="photoPlaceholderText">Awaiting Camera Feed</span>
+                            </div>
+                            <div class="reg-camera-actions">
+                                <button type="button" id="startCameraBtn" class="reg-button reg-button-blue" onclick="startCamera()">
+                                    <span aria-hidden="true">&#9654;</span> Start Camera
+                                </button>
+                                <button type="button" id="captureBtn" class="reg-button reg-button-blue hidden" onclick="capturePhoto()">Capture</button>
+                                <button type="button" id="retakeBtn" class="reg-button hidden" onclick="retakePhoto()">Retake</button>
+                            </div>
                         </div>
-                    </div>
-                    <canvas id="photoCanvas" class="hidden"></canvas>
-                    <input type="hidden" name="photo_data" id="photoDataInput">
 
-                    <div class="reg-camera-layout" style="margin-top: 20px;">
-                        <div class="reg-camera-preview" id="idPhotoCaptureArea">
-                            <span class="reg-focus-corner tl"></span>
-                            <span class="reg-focus-corner tr"></span>
-                            <span class="reg-focus-corner bl"></span>
-                            <span class="reg-focus-corner br"></span>
-                            <video id="idPhotoVideo" autoplay playsinline class="hidden"></video>
-                            <img id="idPhotoPreview" class="hidden" alt="Captured ID photo">
-                            <span id="idPhotoPlaceholderText">Awaiting ID Photo</span>
-                        </div>
-                        <div>
+                        <div class="reg-camera-col">
                             <p class="reg-camera-help">Capture a clear photo of the visitor's ID.</p>
-                            <button type="button" id="startIdCameraBtn" class="reg-button reg-button-blue" onclick="startIdCamera()">
-                                <span aria-hidden="true">&#9654;</span> Start Camera
-                            </button>
-                            <button type="button" id="captureIdBtn" class="reg-button reg-button-blue hidden" onclick="captureIdPhoto()">Capture</button>
-                            <button type="button" id="retakeIdBtn" class="reg-button hidden" onclick="retakeIdPhoto()">Retake</button>
+                            <div class="reg-camera-preview" id="idPhotoCaptureArea">
+                                <span class="reg-focus-corner tl"></span>
+                                <span class="reg-focus-corner tr"></span>
+                                <span class="reg-focus-corner bl"></span>
+                                <span class="reg-focus-corner br"></span>
+                                <video id="idPhotoVideo" autoplay playsinline class="hidden"></video>
+                                <img id="idPhotoPreview" class="hidden" alt="Captured ID photo">
+                                <span id="idPhotoPlaceholderText">Awaiting ID Photo</span>
+                            </div>
+                            <div class="reg-camera-actions">
+                                <button type="button" id="startIdCameraBtn" class="reg-button reg-button-blue" onclick="startIdCamera()">
+                                    <span aria-hidden="true">&#9654;</span> Start Camera
+                                </button>
+                                <button type="button" id="captureIdBtn" class="reg-button reg-button-blue hidden" onclick="captureIdPhoto()">Capture</button>
+                                <button type="button" id="retakeIdBtn" class="reg-button hidden" onclick="retakeIdPhoto()">Retake</button>
+                            </div>
                         </div>
                     </div>
+
+                                       <canvas id="photoCanvas" class="hidden"></canvas>
+                    <input type="hidden" name="photo_data" id="photoDataInput">
                     <canvas id="idPhotoCanvas" class="hidden"></canvas>
                     <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
                 </section>
@@ -359,7 +349,7 @@
                 </section>
 
                 {{-- Step 3: Destination + buildings + pass duration --}}
-                <section class="reg-step-card">
+                <section class="reg-step-card reg-step-card-emphasis">
                     <div class="reg-step-heading">
                         <i class="fa-solid fa-signs-post step-icon"></i>
                         <div>
@@ -379,14 +369,15 @@
                         </div>
 
                         <div class="reg-field full">
-                            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access)</span></label>
+                            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access(Multi-Access Pass))</span></label>
                             <div class="reg-building-grid" id="regBuildingGrid">
                                 @foreach ($buildings as $b)
-                                    <label class="reg-building-option">
-                                        <input type="checkbox" name="building_ids[]" value="{{ $b->id }}" onchange="updateBuildingSelection()">
-                                        <span class="reg-building-dot" style="background:{{ $b->color_hex }}"></span>
-                                        {{ $b->name }}
-                                    </label>
+                                   
+                                <label class="reg-building-option">
+                                    <input type="checkbox" name="building_ids[]" value="{{ $b->id }}" onchange="updateBuildingSelection()">
+                                    <span class="reg-building-dot" style="background:{{ $b->color_hex }}"></span>
+                                    <span class="reg-building-name">{{ $b->name }}</span>
+                                </label>
                                 @endforeach
                             </div>
                             <p class="reg-north-gate-hint" id="northGateHint">
@@ -582,6 +573,7 @@ function captureIdPhoto() {
     stopIdCameraStream();
 }
 
+
 function retakeIdPhoto() {
     document.getElementById('idPhotoPreview').classList.add('hidden');
     document.getElementById('retakeIdBtn').classList.add('hidden');
@@ -614,6 +606,8 @@ function closeRegisterModal() {
     updateBuildingSelection();
 }
 
+       let currentModalFilter = 'all';
+
     function openBuildingModal(buildingId) {
         document.querySelectorAll('[id^="buildingPassGroup-"]').forEach(el => el.classList.add('hidden'));
         const group = document.getElementById('buildingPassGroup-' + buildingId);
@@ -623,14 +617,19 @@ function closeRegisterModal() {
         const buildingName = card ? card.innerText : 'Building';
         document.getElementById('buildingModalTitle').innerText = buildingName + ' — Visitor Passes';
 
-        const total = group.querySelectorAll('.pass-card-item').length;
+        const total = group.querySelectorAll('.gov-pass-row').length;
         document.getElementById('buildingModalCount').innerText =
             total + (total === 1 ? ' pass total' : ' passes total');
 
         const color = group.dataset.buildingColor || '#1e3a8a';
         document.getElementById('buildingModalAccent').style.background = color;
 
-        filterModalPasses('all');
+        document.getElementById('buildingModalSearch').value = '';
+        currentModalFilter = 'all';
+        document.querySelectorAll('.modal-filter-pill').forEach(pill => {
+            pill.classList.toggle('is-active', pill.dataset.filter === 'all');
+        });
+        applyModalFilters();
 
         document.getElementById('buildingPassesModal').classList.remove('hidden');
     }
@@ -640,16 +639,32 @@ function closeRegisterModal() {
     }
 
     function filterModalPasses(status) {
+        currentModalFilter = status;
         document.querySelectorAll('.modal-filter-pill').forEach(pill => {
             pill.classList.toggle('is-active', pill.dataset.filter === status);
         });
+        applyModalFilters();
+    }
 
+    function applyModalFilters() {
         const visibleGroup = document.querySelector('[id^="buildingPassGroup-"]:not(.hidden)');
         if (!visibleGroup) return;
 
-        visibleGroup.querySelectorAll('.pass-card-item').forEach(card => {
-            card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
+        const query = document.getElementById('buildingModalSearch').value.trim().toLowerCase();
+        let anyVisible = false;
+
+        visibleGroup.querySelectorAll('.gov-pass-row').forEach(row => {
+            const matchesStatus = currentModalFilter === 'all' || row.dataset.status === currentModalFilter;
+            const matchesSearch = !query || (row.dataset.search || '').includes(query);
+            const show = matchesStatus && matchesSearch;
+            row.style.display = show ? '' : 'none';
+            if (show) anyVisible = true;
         });
+
+        const emptyState = visibleGroup.querySelector('.gov-pass-row-empty');
+        if (emptyState) {
+            emptyState.classList.toggle('hidden', anyVisible || visibleGroup.querySelectorAll('.gov-pass-row').length === 0);
+        }
     }
 
 </script>

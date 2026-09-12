@@ -15,6 +15,7 @@ class ScannerController extends Controller
     private const BADGE_MULTI_COLOR = '#475569';
 
     public function index()
+
     {
         $buildings = Building::where('code', '!=', 'NG')->orderBy('name')->get();
         $passes = VisitorPass::with('building')->orderBy('building_id')->orderBy('pass_number')->get();

@@ -14,13 +14,23 @@ class PassController extends Controller
     {
         $user = $request->user();
 
-        // North Gate is internal bookkeeping only — never shown as a
-        // selectable/visible building anywhere in the UI.
+               // Buildings selectable as a registration destination — North Gate
+        // is excluded here on purpose; it's not a real destination, it's
+        // the bookkeeping home for multi-building passes.
         $buildingsQuery = Building::where('code', '!=', 'NG')->orderBy('name');
         if ($user->isGuard()) {
             $buildingsQuery->where('id', session('assigned_building_id'));
         }
         $buildings = $buildingsQuery->get();
+
+        // Buildings shown as their own clickable tile on the Passes grid —
+        // same guard scoping as $buildings, but North Gate IS included so
+        // its own dedicated pass pool gets a visible card.
+        $displayBuildingsQuery = Building::orderBy('name');
+        if ($user->isGuard()) {
+            $displayBuildingsQuery->where('id', session('assigned_building_id'));
+        }
+        $displayBuildings = $displayBuildingsQuery->get();
 
         $passesQuery = VisitorPass::with(['building', 'buildings']);
         if ($user->isGuard()) {
@@ -28,7 +38,7 @@ class PassController extends Controller
         }
         $passes = $passesQuery->orderBy('building_id')->orderBy('pass_number')->get();
 
-        return view('passes.index', compact('buildings', 'passes'));
+        return view('passes.index', compact('buildings', 'passes', 'displayBuildings'));
     }
 
     public function register(Request $request)
@@ -117,6 +127,7 @@ class PassController extends Controller
         if (! $pass) {
             $nextNumber = (int) (VisitorPass::query()
                 ->where('building_id', $northGateId)
+                ->where('is_multi_building', true)
                 ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')
                 ->first()
                 ?->max_num ?? 0) + 1;
