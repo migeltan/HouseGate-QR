@@ -341,12 +341,10 @@ h3,
 /* Cohesive serif titles across hero, section headers, building cards, and modals */
 .building-card-frame h3,
 .card-header-title,
-#buildingModalTitle,
 #registerModal h3 {
     font-family: "PT Serif", "Source Serif 4", Georgia, serif;
     font-weight: 700;
 }
-
 .hero-inner-panel {
     position: relative;
     z-index: 3;

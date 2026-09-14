@@ -15,6 +15,15 @@
         'MB'    => 'main.png',
         'SWA'   => 'swa.jpg',
     ];
+
+    $buildingColorNames = [
+        'MB'  => 'Blue',
+        'NG'  => 'Pink',
+        'NW'  => 'Red',
+        'SW'  => 'Orange',
+        'RVM' => 'Green',
+        'SWA' => 'Yellow',
+    ];
 @endphp
 
 {{-- Hero — reuses the exact segmented-border treatment from scanner/index.blade.php and logs/index.blade.php --}}
@@ -47,7 +56,9 @@
 
 <div class="gov-legend">
     <span class="gov-legend-item"><span class="gov-legend-dot is-active"></span> Active Passes</span>
+
     <span class="gov-legend-item"><span class="gov-legend-dot is-available"></span> Available Passes</span>
+    <span class="gov-legend-item"><span class="gov-legend-dot is-inactive"></span> Inactive Passes</span>
 </div>
 
 {{-- Building grid — click a building to view/manage its passes. When the
@@ -64,15 +75,17 @@
     // deliberately excluded rather than counted.
         $buildingPasses = $passes->where('building_id', $b->id)
             ->where('is_multi_building', $b->code === 'NG');
-        $activeCount = $buildingPasses->whereNotNull('visitor_name')->count();
-        $availableCount = $buildingPasses->whereNull('visitor_name')->count();
+        $activeCount = $buildingPasses->where('status', 'active')->count();
+        $availableCount = $buildingPasses->where('status', 'available')->count();
+        $inactiveCount = $buildingPasses->whereIn('status', ['expired', 'revoked'])->count();
 @endphp
-        <button type="button" onclick="openBuildingModal({{ $b->id }})"
-                class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
+            <button type="button" onclick="openBuildingModal({{ $b->id }}, '{{ $b->name }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
+            class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
                 <h3>{{ $b->name }}</h3>
                 <p class="is-active">{{ $activeCount }} Active Passes</p>
                 <p class="is-available">{{ $availableCount }} Available Passes</p>
+                <p class="is-inactive">{{ $inactiveCount }} Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
                 <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"
@@ -95,11 +108,14 @@
         <div class="gov-corner-accent" aria-hidden="true"></div>
     </div>
     <div class="gov-card-body">
-        <div class="relative">
-            <img src="{{ asset('images/user-journey-diagram.svg') }}"
-                 alt="User journey: Visitor Registration, Pass Assignment, QR Code from Pass, Visitor Presents Pass"
-                 class="w-full h-auto">
-            <button type="button" class="gov-journey-nav" aria-label="Next step">
+        <div class="relative max-w-2xl mx-auto">
+            <img id="journeyImage" src="{{ asset('images/carousel/step1.svg') }}"
+                alt="User journey step"
+                class="w-full h-auto">
+            <button type="button" id="journeyPrevBtn" class="gov-journey-nav is-prev" aria-label="Previous step" onclick="prevJourneyStep()" disabled>
+                <i class="fa-solid fa-caret-left"></i>
+            </button>
+            <button type="button" id="journeyNextBtn" class="gov-journey-nav" aria-label="Next step" onclick="nextJourneyStep()">
                 <i class="fa-solid fa-caret-right"></i>
             </button>
         </div>
@@ -110,13 +126,16 @@
 <div id="buildingPassesModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="modal-govt-panel rounded-2xl shadow-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col bg-white">
         {{-- Color-coded accent strip, set per-building via JS in openBuildingModal() --}}
-        <div id="buildingModalAccent" class="h-1.5 w-full flex-shrink-0"></div>
+        
 
-        <div class="p-6 pb-4 flex-shrink-0 border-b border-slate-100">
+                <div class="p-6 pb-4 flex-shrink-0 border-b border-slate-100">
             <div class="flex justify-between items-start gap-4">
-                <div>
-                    <h3 id="buildingModalTitle" class="font-bold text-slate-800 text-lg"></h3>
-                    <p id="buildingModalCount" class="text-xs text-slate-400 mt-0.5"></p>
+                <div class="flex items-center gap-3">
+                    <span id="buildingModalSwatch" class="gov-pass-modal-swatch"></span>
+                    <div>
+                        <span class="gov-eyebrow">Visitor Passes</span>
+                        <h3 id="buildingModalTitle" class="gov-pass-modal-title"></h3>
+                    </div>
                 </div>
                 <button type="button" onclick="closeBuildingModal()"
                         class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full p-2.5 transition-colors leading-none flex-shrink-0">
@@ -127,8 +146,9 @@
             <div class="flex flex-wrap items-center justify-between gap-3 mt-4">
                 <div class="flex gap-2">
                     <button type="button" onclick="filterModalPasses('all')" class="modal-filter-pill is-active" data-filter="all">All</button>
-                    <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active</button>
                     <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available</button>
+                    <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active</button>
+                    <button type="button" onclick="filterModalPasses('inactive')" class="modal-filter-pill" data-filter="inactive">Inactive</button>        
                 </div>
                 <div class="gov-modal-search">
                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -143,61 +163,85 @@
                      class="hidden flex flex-col gap-2"
                      data-building-color="{{ $b->color_hex }}">
                     @forelse ($passes->where('building_id', $b->id)->where('is_multi_building', $b->code === 'NG') as $p)
-                        @php
+                       
+                                                @php
                             $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
-                            $buildingLabel = $p->is_multi_building ? 'North Gate Access' : $b->name;
-                            $statusKey = $p->visitor_name ? 'active' : 'available';
                             $searchText = strtolower($p->pass_number . ' ' . ($p->visitor_name ?? 'unassigned'));
+                            $badgeMap = [
+                                'active'    => ['is-active', 'Active'],
+                                'available' => ['is-available', 'Available'],
+                                'expired'   => ['is-expired', 'Expired'],
+                                'revoked'   => ['is-revoked', 'Revoked'],
+                            ];
+                            [$badgeClass, $badgeLabel] = $badgeMap[$p->status] ?? ['is-available', 'Available'];
+                            $infoPayload = [
+                                'pass_number' => $p->pass_number,
+                                'visitor_name' => $p->visitor_name,
+                                'gender' => $p->gender,
+                                'contact_no' => $p->contact_no,
+                                'visitor_email' => $p->visitor_email,
+                                'id_type' => $p->id_type,
+                                'id_ref' => $p->id_ref,
+                                'office_to_visit' => $p->office_to_visit,
+                                'purpose' => $p->purpose,
+                                'vehicle' => $p->vehicle,
+                                'registered_by' => $p->registered_by,
+                                'pass_class' => $p->pass_class,
+                                'issued_at' => $p->issued_at?->format('M j, Y g:i A'),
+                                'expected_return_date' => $p->expected_return_date?->format('M j, Y'),
+                                'photo_url' => $p->photo_path ? asset('storage/' . $p->photo_path) : null,
+                                'id_photo_url' => $p->id_photo_path ? asset('storage/' . $p->id_photo_path) : null,
+                            ];
                         @endphp
-                        <div class="gov-pass-row" data-status="{{ $statusKey }}" data-search="{{ $searchText }}"
-                             style="border-left-color: {{ $cardColor }};">
-                            <div class="gov-pass-row-number">{{ $p->pass_number }}</div>
-
-                            <div class="gov-pass-row-main">
-                                <div class="gov-pass-row-visitor">
+                        <div class="gov-pass-card" data-status="{{ $p->status }}" data-search="{{ $searchText }}">
+                            <div class="gov-pass-card-info">
+                                <span class="gov-pass-card-number">#{{ $p->pass_number }}</span>
+                                <div class="gov-pass-card-details">
                                     @if ($p->visitor_name)
-                                        {{ $p->visitor_name }}
-                                    @else
-                                        <span class="gov-pass-row-unassigned">Unassigned</span>
-                                    @endif
-                                </div>
-                                <div class="gov-pass-row-sub">
-                                    @if ($p->is_multi_building)
-                                        @if ($p->buildings->isEmpty())
-                                            Awaiting building assignment
+                                        <div class="gov-pass-card-name">{{ $p->visitor_name }}</div>
+                                        @if ($p->pass_class === 'day')
+                                            <div class="gov-pass-card-meta">1 Day Access</div>
                                         @else
-                                            {{ $buildingLabel }} &middot; {{ $p->buildings->pluck('name')->join(', ') }}
+                                            <div class="gov-pass-card-meta">{{ $p->issued_at?->format('n/j/Y') }} - {{ $p->expected_return_date?->format('n/j/Y') }}</div>
+                                        @endif
+                                        @if ($p->is_multi_building)
+                                            <div class="gov-pass-card-buildings">
+                                                @if ($p->buildings->isEmpty())
+                                                    Awaiting building assignment
+                                                @elseif ($p->buildings->count() >= $buildings->count())
+                                                    All Buildings
+                                                @else
+                                                    {{ $p->buildings->pluck('name')->join(', ') }}
+                                                @endif
+                                            </div>
                                         @endif
                                     @else
-                                        {{ $buildingLabel }} &middot; Visitor pass
+                                        <span class="gov-pass-card-unassigned">Unassigned</span>
                                     @endif
                                 </div>
                             </div>
 
-                            <div class="gov-pass-row-badges">
-                                @if ($statusKey === 'active')
-                                    <span class="gov-pass-badge is-active">Active</span>
-                                @else
-                                    <span class="gov-pass-badge is-available">Available</span>
-                                @endif
-                                @if ($p->pass_class === 'long_term' && $statusKey === 'active')
-                                    <span class="badge-neutral">Long-term &middot; {{ $p->daysRemaining() }}d left</span>
-                                @endif
-                            </div>
+                            <div class="gov-pass-card-right">
+                                <span class="gov-pass-badge {{ $badgeClass }}">{{ $badgeLabel }}</span>
 
-                            <div class="gov-pass-row-actions">
-                                @if ($p->visitor_name)
-                                    <form method="POST" action="{{ route('passes.unassign', $p) }}"
-                                          onsubmit="return confirm('Unassign {{ $p->visitor_name }} from Pass #{{ $p->pass_number }}? The card will be reset and returned to available stock.');">
-                                        @csrf
-                                        <button type="submit" class="gov-pass-row-btn is-ghost">
-                                            <i class="fa-solid fa-user-xmark"></i> Unassign
-                                        </button>
-                                    </form>
-                                @endif
-                                <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn" style="background: {{ $cardColor }};">
-                                    <i class="fa-solid fa-qrcode"></i> View QR
-                                </a>
+                                <div class="gov-pass-card-actions">
+                                    @if ($p->visitor_name)
+                                        <form method="POST" action="{{ route('passes.unassign', $p) }}"
+                                              onsubmit="return confirm('Unassign {{ $p->visitor_name }} from Pass #{{ $p->pass_number }}? The card will be reset and returned to available stock.');">
+                                            @csrf
+                                            <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-link-slash"></i> Unassign</button>
+                                        </form>
+                                        <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
+                                        <form method="POST" action="{{ route('passes.revoke', $p) }}"
+                                              onsubmit="return confirm('Revoke Pass #{{ $p->pass_number }}? {{ $p->visitor_name }} will be denied on their next scan.');">
+                                            @csrf
+                                            <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-ban"></i> Revoke</button>
+                                        </form>
+                                        <button type="button" class="gov-pass-row-btn is-ghost" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
+                                    @else
+                                        <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     @empty
@@ -210,6 +254,32 @@
     </div>
 </div>
 
+<div id="passInfoModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="gov-info-modal-panel">
+        <div class="gov-info-modal-header">
+            <div>
+                <span class="gov-eyebrow">Pass Information</span>
+                <h3 id="infoModalTitle" class="gov-pass-modal-title"></h3>
+            </div>
+            <button type="button" onclick="closePassInfoModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full p-2.5 transition-colors leading-none">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="gov-info-modal-body">
+            <div class="gov-info-photos">
+                <div>
+                    <span class="gov-meta-label">Visitor Photo</span>
+                    <img id="infoPhoto" class="gov-info-photo" alt="Visitor photo">
+                </div>
+                <div>
+                    <span class="gov-meta-label">ID Photo</span>
+                    <img id="infoIdPhoto" class="gov-info-photo" alt="ID photo">
+                </div>
+            </div>
+            <div class="gov-info-modal-grid" id="infoFieldsGrid"></div>
+        </div>
+    </div>
+</div>
 
 <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
     <section class="reg-modal">
@@ -369,7 +439,7 @@
                         </div>
 
                         <div class="reg-field full">
-                            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access(Multi-Access Pass))</span></label>
+                            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access (Multi-Access Pass))</span></label>
                             <div class="reg-building-grid" id="regBuildingGrid">
                                 @foreach ($buildings as $b)
                                    
@@ -437,6 +507,39 @@ function updateBuildingSelection() {
 
     submitBtn.disabled = checked === 0;
     submitBtn.style.opacity = submitBtn.disabled ? '0.5' : '1';
+}
+
+const journeySteps = [
+    "{{ asset('images/carousel/step1.svg') }}",
+    "{{ asset('images/carousel/step2.svg') }}",
+    "{{ asset('images/carousel/step3.svg') }}"
+];
+let journeyIndex = 0;
+
+function updateJourneyImage() {
+    const img = document.getElementById('journeyImage');
+    img.classList.add('is-fading');
+    setTimeout(() => {
+        img.src = journeySteps[journeyIndex];
+        img.classList.remove('is-fading');
+    }, 150);
+
+    document.getElementById('journeyPrevBtn').disabled = journeyIndex === 0;
+    document.getElementById('journeyNextBtn').disabled = journeyIndex === journeySteps.length - 1;
+}
+
+function nextJourneyStep() {
+    if (journeyIndex < journeySteps.length - 1) {
+        journeyIndex++;
+        updateJourneyImage();
+    }
+}
+
+function prevJourneyStep() {
+    if (journeyIndex > 0) {
+        journeyIndex--;
+        updateJourneyImage();
+    }
 }
 
 function setPassClass(passClass) {
@@ -608,21 +711,15 @@ function closeRegisterModal() {
 
        let currentModalFilter = 'all';
 
-    function openBuildingModal(buildingId) {
+        function openBuildingModal(buildingId, buildingName, colorName) {
         document.querySelectorAll('[id^="buildingPassGroup-"]').forEach(el => el.classList.add('hidden'));
         const group = document.getElementById('buildingPassGroup-' + buildingId);
         group.classList.remove('hidden');
 
-        const card = document.querySelector('[onclick="openBuildingModal(' + buildingId + ')"] h3');
-        const buildingName = card ? card.innerText : 'Building';
-        document.getElementById('buildingModalTitle').innerText = buildingName + ' — Visitor Passes';
-
-        const total = group.querySelectorAll('.gov-pass-row').length;
-        document.getElementById('buildingModalCount').innerText =
-            total + (total === 1 ? ' pass total' : ' passes total');
+        document.getElementById('buildingModalTitle').innerText = `${buildingName} - ${colorName} Pass`;
 
         const color = group.dataset.buildingColor || '#1e3a8a';
-        document.getElementById('buildingModalAccent').style.background = color;
+        document.getElementById('buildingModalSwatch').style.background = color;
 
         document.getElementById('buildingModalSearch').value = '';
         currentModalFilter = 'all';
@@ -636,6 +733,44 @@ function closeRegisterModal() {
 
     function closeBuildingModal() {
         document.getElementById('buildingPassesModal').classList.add('hidden');
+    }
+
+    function openPassInfoModal(info) {
+        document.getElementById('infoModalTitle').innerText = info.visitor_name ? `Pass #${info.pass_number} — ${info.visitor_name}` : `Pass #${info.pass_number}`;
+
+        const photo = document.getElementById('infoPhoto');
+        photo.src = info.photo_url || '';
+        photo.style.display = info.photo_url ? '' : 'none';
+
+        const idPhoto = document.getElementById('infoIdPhoto');
+        idPhoto.src = info.id_photo_url || '';
+        idPhoto.style.display = info.id_photo_url ? '' : 'none';
+
+        const rows = [
+            ['Gender', info.gender],
+            ['Contact No.', info.contact_no],
+            ['Email', info.visitor_email],
+            ['ID Type', info.id_type],
+            ['ID Number', info.id_ref],
+            ['Office to Visit', info.office_to_visit],
+            ['Reason', info.purpose],
+            ['Vehicle', info.vehicle],
+            ['Registered By', info.registered_by],
+            ['Pass Class', info.pass_class === 'long_term' ? 'Long-term' : 'Day'],
+            ['Issued', info.issued_at],
+            ['Expected Return', info.expected_return_date],
+        ];
+
+        document.getElementById('infoFieldsGrid').innerHTML = rows
+            .filter(([, value]) => value)
+            .map(([label, value]) => `<div><span class="gov-meta-label">${label}</span><div class="gov-meta-value">${value}</div></div>`)
+            .join('');
+
+        document.getElementById('passInfoModal').classList.remove('hidden');
+    }
+
+    function closePassInfoModal() {
+        document.getElementById('passInfoModal').classList.add('hidden');
     }
 
     function filterModalPasses(status) {
@@ -653,8 +788,8 @@ function closeRegisterModal() {
         const query = document.getElementById('buildingModalSearch').value.trim().toLowerCase();
         let anyVisible = false;
 
-        visibleGroup.querySelectorAll('.gov-pass-row').forEach(row => {
-            const matchesStatus = currentModalFilter === 'all' || row.dataset.status === currentModalFilter;
+            visibleGroup.querySelectorAll('.gov-pass-card').forEach(row => {
+            const matchesStatus = currentModalFilter === 'all'|| (currentModalFilter === 'inactive' ? ['expired', 'revoked'].includes(row.dataset.status) : row.dataset.status === currentModalFilter);
             const matchesSearch = !query || (row.dataset.search || '').includes(query);
             const show = matchesStatus && matchesSearch;
             row.style.display = show ? '' : 'none';
@@ -663,7 +798,7 @@ function closeRegisterModal() {
 
         const emptyState = visibleGroup.querySelector('.gov-pass-row-empty');
         if (emptyState) {
-            emptyState.classList.toggle('hidden', anyVisible || visibleGroup.querySelectorAll('.gov-pass-row').length === 0);
+            emptyState.classList.toggle('hidden', anyVisible || visibleGroup.querySelectorAll('.gov-pass-card').length === 0);
         }
     }
 

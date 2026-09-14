@@ -32,7 +32,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/passes/{pass}', [PassController::class, 'show'])->name('passes.show');
         Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');
         Route::post('/passes/{pass}/unassign', [PassController::class, 'unassign'])->name('passes.unassign');
-
+        Route::post('/passes/{pass}/revoke', [PassController::class, 'revoke'])->name('passes.revoke');
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/export', [LogController::class, 'export'])->name('logs.export');
         Route::get('/logs/registrations/export', [LogController::class, 'exportRegistrations'])->name('logs.registrations.export');

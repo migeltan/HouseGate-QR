@@ -39,20 +39,23 @@
 
             <div class="flex flex-wrap items-center gap-5">
                 @auth
-                    <nav class="gov-nav flex gap-5">
+                    <nav class="gov-nav flex gap-7">
                         <a href="{{ route('scanner.index') }}" class="gov-nav-link {{ request()->routeIs('scanner.*') ? 'is-active' : '' }}">Scanner</a>
                         <a href="{{ route('passes.index') }}" class="gov-nav-link {{ request()->routeIs('passes.*') ? 'is-active' : '' }}">Passes</a>
                         <a href="{{ route('logs.index') }}" class="gov-nav-link {{ request()->routeIs('logs.*') ? 'is-active' : '' }}">Logs</a>
                     </nav>
 
                     <div class="flex items-center gap-3 text-xs gov-header-meta">
-                        <span>{{ auth()->user()->name }} ({{ auth()->user()->role }})</span>
+                        <span class="gov-account-chip">
+                            <i class="fa-solid fa-circle-user"></i>
+                            {{ auth()->user()->name }} <span class="gov-account-role">({{ auth()->user()->role }})</span>
+                        </span>
                         @if (auth()->user()->isGuard() && session('assigned_building_id'))
                             <span class="gov-badge-neutral">{{ \App\Models\Building::find(session('assigned_building_id'))?->name }}</span>
                         @endif
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit" class="gov-btn-ghost px-3 py-1.5 rounded-lg">Logout</button>
+                            <button type="submit" class="gov-btn-ghost px-3 py-1.5 rounded-full">Logout</button>
                         </form>
                     </div>
                 @endauth

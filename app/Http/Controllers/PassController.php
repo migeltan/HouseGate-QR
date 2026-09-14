@@ -213,6 +213,28 @@ class PassController extends Controller
             ->with('success', "Pass #{$pass->pass_number} unassigned and returned to available stock.");
     }
 
+
+        /**
+     * Immediately deny a pass without closing out the visit the way
+     * unassign() does — visitor data, dates, and building assignment stay
+     * intact so the record remains visible/auditable; only status changes
+     * and any current building presence is cleared. Unassign remains the
+     * action that actually returns the pass to available stock.
+     */
+    public function revoke(Request $request, VisitorPass $pass)
+    {
+        $this->authorizeGuardScope($request, $pass);
+
+        $pass->update([
+            'status' => 'revoked',
+            'current_building_id' => null,
+            'checked_in_at' => null,
+        ]);
+
+        return redirect()->route('passes.index')
+            ->with('success', "Pass #{$pass->pass_number} revoked.");
+    }
+    
     /**
      * A guard may only unassign/view passes homed in their own building.
      * North Gate Access (multi-building) passes are never guard-actionable,

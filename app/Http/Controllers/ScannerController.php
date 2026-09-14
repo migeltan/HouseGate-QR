@@ -27,11 +27,28 @@ class ScannerController extends Controller
         return view('scanner.index', compact('buildings', 'passes', 'recentLogs', 'lockedBuilding'));
     }
 
+    private function storeVerificationPhoto(string $base64, ScanLog $log, ?VisitorPass $pass): void
+{
+        if (! preg_match('/^data:image\/(\w+);base64,/', $base64, $m)) {
+            return;
+        }
+        $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+        $raw = base64_decode(substr($base64, strpos($base64, ',') + 1));
+        $path = 'verification-photos/' . $log->id . '_' . uniqid() . '.' . $ext;
+        Storage::disk('public')->put($path, $raw);
+
+        \App\Models\ScanVerificationPhoto::create([
+            'scan_log_id' => $log->id,
+            'visitor_pass_id' => $pass?->id,
+            'photo_path' => $path,
+        ]);
+    }
+
     public function scan(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $data = $request->validate(['token' => 'required|string']);
+        $data = $request->validate([ 'token' => 'required|string', 'verification_photo' => 'nullable|string',]);
 
         if ($user->isGuard()) {
             // Guard's building is locked server-side — ignore whatever the client sent.
@@ -106,6 +123,9 @@ class ScannerController extends Controller
             'direction' => $direction,
             'scanned_by_user_id' => $user->id,
         ]);
+        if (! empty($data['verification_photo'])) {
+            $this->storeVerificationPhoto($data['verification_photo'], $log, $pass);
+        }
 
         // Recent in/out history for this specific pass, so the guard can see
         // the visitor's movement pattern at a glance. Only AUTHORIZED scans

@@ -35,19 +35,27 @@
 
                 <div>
                     <span class="gov-eyebrow">Camera</span>
-                    <span class="gov-card-title">Live Scanner</span>
+                    <span class="gov-card-title">Live Feed</span>
                 </div>
             </div>
 
-            <button onclick="toggleCamera()" id="toggleCamBtn" class="gov-btn-camera">
-                <i class="fa-solid fa-play"></i> Start Camera
-            </button>
+            <div class="flex items-center gap-3">
+                <label class="gov-qr-fallback-toggle" style="font-size:0.8rem; display:flex; align-items:center; gap:0.35rem;">
+                    <input type="checkbox" id="qrFallbackMode"> QR fallback mode
+                </label>
+                <button onclick="toggleCamera()" id="toggleCamBtn" class="gov-btn-camera">
+                    <i class="fa-solid fa-play"></i> Start Camera
+                </button>
+            </div>
+
 
         </div>
 
         <div class="gov-card-body flex-grow flex flex-col">
             <div class="gov-scanner-viewport">
                 <div id="reader" class="w-full h-full"></div>
+                <video id="securityCamVideo" autoplay playsinline muted class="hidden w-full h-full object-cover"></video>
+                <canvas id="securityCamCanvas" class="hidden"></canvas>
 
                 <div id="scanTargetOverlay" class="gov-scan-overlay hidden">
                     <span class="gov-scan-corner gov-scan-corner-tl"></span>
@@ -110,6 +118,7 @@
             style="display: none;">
 
             <!-- Status -->
+                        <!-- Status -->
             <div id="statusHeader" class="gov-status-banner">
                 <div>
                     <div class="gov-status-title-row">
@@ -117,6 +126,8 @@
                         <span id="resDirectionBadge" class="gov-direction-badge hidden"></span>
                     </div>
                     <div id="statusSubtitle" class="gov-status-subtitle"></div>
+                    <div id="statusEntryLine" class="gov-status-extra-line"></div>
+                    <div id="advisoryText" class="gov-status-extra-line"></div>
                 </div>
 
                 <div id="scanTimestamp" class="gov-status-timestamp"></div>
@@ -223,11 +234,6 @@
 </div>
 --}}
 
-  <!-- Confirmation -->
-    <div id="securityAdvisory" class="gov-advisory">
-        <i class="fa-solid fa-circle-check"></i>
-        <span id="advisoryText"></span>
-    </div>
 
 </div>
         </div>
@@ -249,11 +255,14 @@
         <div class="gov-corner-accent" aria-hidden="true"></div>
     </div>
     <div class="gov-card-body">
-        <div class="relative">
-            <img src="{{ asset('images/user-journey-diagram.svg') }}"
-                 alt="User journey: Visitor Registration, Pass Assignment, QR Code from Pass, Visitor Presents Pass"
-                 class="w-full h-auto">
-            <button type="button" class="gov-journey-nav" aria-label="Next step">
+        <div class="relative max-w-2xl mx-auto">
+            <img id="journeyImage" src="{{ asset('images/carousel/step1.svg') }}"
+                alt="User journey step"
+                class="w-full h-auto">
+            <button type="button" id="journeyPrevBtn" class="gov-journey-nav is-prev" aria-label="Previous step" onclick="prevJourneyStep()" disabled>
+                <i class="fa-solid fa-caret-left"></i>
+            </button>
+            <button type="button" id="journeyNextBtn" class="gov-journey-nav" aria-label="Next step" onclick="nextJourneyStep()">
                 <i class="fa-solid fa-caret-right"></i>
             </button>
         </div>
@@ -263,6 +272,32 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+const journeySteps = [
+    "{{ asset('images/carousel/step1.svg') }}",
+    "{{ asset('images/carousel/step2.svg') }}",
+    "{{ asset('images/carousel/step3.svg') }}"
+];
+let journeyIndex = 0;
+
+function updateJourneyImage() {
+    const img = document.getElementById('journeyImage');
+    img.classList.add('is-fading');
+    setTimeout(() => {
+        img.src = journeySteps[journeyIndex];
+        img.classList.remove('is-fading');
+    }, 150);
+    document.getElementById('journeyPrevBtn').disabled = journeyIndex === 0;
+    document.getElementById('journeyNextBtn').disabled = journeyIndex === journeySteps.length - 1;
+}
+
+function nextJourneyStep() {
+    if (journeyIndex < journeySteps.length - 1) { journeyIndex++; updateJourneyImage(); }
+}
+
+function prevJourneyStep() {
+    if (journeyIndex > 0) { journeyIndex--; updateJourneyImage(); }
+}
+
 let html5QrcodeScanner = null;
 let isCameraActive = false;
 let lastScannedToken = null;
@@ -278,6 +313,7 @@ document.addEventListener('keydown', (e) => {
     const now = Date.now();
 
     if (e.key === 'Enter') {
+        e.preventDefault();
         if (hwBuffer.length >= HW_SCAN_MIN_LENGTH && (now - hwLastKeyTime) <= HW_SCAN_MAX_GAP_MS) {
             const token = hwBuffer;
             hwBuffer = '';
@@ -326,14 +362,41 @@ function playAudioFeedback(authorized) {
 async function processScanToken(token) {
     if (!token) return;
     const buildingId = document.getElementById('scannerBuildingId').value;
+    const verificationPhoto = captureSecurityFrame();
+    flashCaptureFeedback();
 
-    const res = await fetch('{{ route('scanner.scan') }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-        body: JSON.stringify({ token: token, scanned_building_id: buildingId })
-    });
-    const data = await res.json();
-    displayScanResultUI(data);
+    try {
+        const res = await fetch('{{ route('scanner.scan') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ token, scanned_building_id: buildingId, verification_photo: verificationPhoto })
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.error('Scan request failed', res.status, text);
+            alert('Scan failed (server error ' + res.status + '). Check console/logs.');
+            return;
+        }
+
+        const data = await res.json();
+        displayScanResultUI(data);
+    } catch (err) {
+        console.error('Scan processing error', err);
+        alert('Scan failed to process — see console for details.');
+    }
+}
+
+function flashCaptureFeedback() {
+    if (!securityCamStream) return;
+    const video = document.getElementById('securityCamVideo');
+    video.classList.add('gov-capture-flash');
+    setTimeout(() => video.classList.remove('gov-capture-flash'), 200);
 }
 
 function displayScanResultUI(data) {
@@ -401,19 +464,20 @@ function displayScanResultUI(data) {
 
     const header = document.getElementById('statusHeader');
     const advisory = document.getElementById('advisoryText');
-    const advisoryBox = document.getElementById('securityAdvisory');
+    const entryLine = document.getElementById('statusEntryLine');
 
     if (data.result === 'AUTHORIZED') {
-    header.className = 'gov-status-banner is-authorized anim-fade-in-up';
-    document.getElementById('statusText').innerText = 'Access Authorized';
-    document.getElementById('statusSubtitle').innerText = data.reason;
-    advisoryBox.className = 'gov-advisory is-authorized anim-fade-in-up anim-delay-2';
-    advisory.innerText = `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`;
+        header.className = 'gov-status-banner is-authorized anim-fade-in-up';
+        document.getElementById('statusText').innerHTML = 'Access <span class="gov-status-title-accent">Authorized</span>';
+        document.getElementById('statusSubtitle').innerText = data.reason;
+        entryLine.innerText = (data.direction === 'out' ? 'Exited' : 'Entered') + ' at ' + data.timestamp;
+        advisory.innerText = `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`;
     } else {
         header.className = 'gov-status-banner is-denied anim-fade-in-up';
-        document.getElementById('statusText').innerText = 'Denied Access: ' + data.result.charAt(0) + data.result.slice(1).toLowerCase();
+        const label = data.result.charAt(0) + data.result.slice(1).toLowerCase();
+        document.getElementById('statusText').innerHTML = `Access <span class="gov-status-title-accent">${label}</span>`;
         document.getElementById('statusSubtitle').innerText = data.reason;
-        advisoryBox.className = 'gov-advisory is-denied anim-fade-in-up anim-delay-2';
+        entryLine.innerText = '';
         advisory.innerText = data.reason;
     }
 
@@ -468,45 +532,77 @@ document.addEventListener('fullscreenchange', () => {
     });
 });
 
+let securityCamStream = null;
+
 function toggleCamera() {
     const btn = document.getElementById('toggleCamBtn');
     const placeholder = document.getElementById('camPlaceholder');
     const targetOverlay = document.getElementById('scanTargetOverlay');
+    const qrMode = document.getElementById('qrFallbackMode').checked;
+
     if (!isCameraActive) {
-        html5QrcodeScanner = new Html5Qrcode("reader");
-        html5QrcodeScanner.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 220, height: 220 } },
-            (decodedText) => {
-                if (scanCooldownActive) return;
-                if (decodedText === lastScannedToken) return;
-                lastScannedToken = decodedText;
-                scanCooldownActive = true;
-                processScanToken(decodedText);
-                setTimeout(() => {
-                    scanCooldownActive = false;
-                    lastScannedToken = null;
-                }, 3000);
-            },
-            () => {}
-        ).then(() => {
-            isCameraActive = true;
-            btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
-            btn.className = 'gov-btn-camera is-recording';
-            placeholder.classList.add('hidden');
-            targetOverlay.classList.remove('hidden');
-        }).catch(err => alert("Camera error: " + err));
+        if (qrMode) {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 220, height: 220 } },
+                (decodedText) => {
+                    if (scanCooldownActive) return;
+                    if (decodedText === lastScannedToken) return;
+                    lastScannedToken = decodedText;
+                    scanCooldownActive = true;
+                    processScanToken(decodedText);
+                    setTimeout(() => { scanCooldownActive = false; lastScannedToken = null; }, 3000);
+                },
+                () => {}
+            ).then(() => {
+                isCameraActive = true;
+                btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
+                btn.className = 'gov-btn-camera is-recording';
+                placeholder.classList.add('hidden');
+                targetOverlay.classList.remove('hidden');
+            }).catch(err => alert("Camera error: " + err));
+        } else {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    securityCamStream = stream;
+                    const video = document.getElementById('securityCamVideo');
+                    video.srcObject = stream;
+                    video.classList.remove('hidden');
+                    isCameraActive = true;
+                    btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
+                    btn.className = 'gov-btn-camera is-recording';
+                    placeholder.classList.add('hidden');
+                }).catch(err => alert("Camera error: " + err));
+        }
     } else {
-        html5QrcodeScanner.stop().then(() => {
-            html5QrcodeScanner.clear();
-            isCameraActive = false;
-            btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Camera';
-            btn.className = 'gov-btn-camera';
-            placeholder.classList.remove('hidden');
-            targetOverlay.classList.add('hidden');
-        });
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => html5QrcodeScanner.clear());
+            html5QrcodeScanner = null;
+        }
+        if (securityCamStream) {
+            securityCamStream.getTracks().forEach(t => t.stop());
+            securityCamStream = null;
+            document.getElementById('securityCamVideo').classList.add('hidden');
+        }
+        isCameraActive = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Camera';
+        btn.className = 'gov-btn-camera';
+        placeholder.classList.remove('hidden');
+        targetOverlay.classList.add('hidden');
     }
 }
+
+function captureSecurityFrame() {
+    if (!securityCamStream) return null;
+    const video = document.getElementById('securityCamVideo');
+    const canvas = document.getElementById('securityCamCanvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.85);
+}
+
 </script>
 @endsection{{-- resources/views/scanner/index.blade.php --}}
 
