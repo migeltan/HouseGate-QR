@@ -1,5 +1,5 @@
 {{-- ============================= SCANS PANE ============================= --}}
-    <div id="scansPane" class="records-pane">
+    <form id="scansPane" class="records-pane">
 
 
     {{-- ======================================================================== --}}
@@ -15,68 +15,49 @@
                 <div class="w-[50%] h-auto flex ">
                     <div class="relative w-full">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input type="text" id="logSearchInput" name="search" value="{{ request('search') }}"
-                            placeholder="Search by name, pass #, etc..." autocomplete="off"
-                            class="w-full rounded-[8.1px] border border-slate-400 bg-slate-50 py-3  .5 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                <input type="text" id="logSearchInput" name="search" value="{{ request('search') }}"
+                    placeholder="Search by name, pass #, etc..." autocomplete="off"
+                    class="w-full h-11 rounded-[8.1px] border border-slate-400 bg-slate-50 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                     </div>
                 </div>
 
                 {{-- ========================= --}}
-                {{-- BUILDING DROPDOWN OPTIONS --}}
+                {{-- BUILDING FILTER --}}
                 {{-- ========================= --}}
-                <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex">
-                    <div class="relative w-full">
-                        <select name="building" onchange="this.form.submit()"
-                            class="peer relative w-full appearance-none rounded-lg bg-blue-600 py-2.5 pl-9 pr-4 text-sm sm:text-base font-semibold text-transparent shadow-sm outline-none transition-colors duration-150 hover:bg-blue-500 focus:bg-blue-700 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-1">
-                            <option value="ALL" class="bg-white text-slate-900 font-medium text-left">Building</option>
-                            @foreach ($buildings as $b)
-                                <option value="{{ $b->id }}" class="bg-white text-slate-900 font-medium text-left" {{ (string) request('building') === (string) $b->id ? 'selected' : '' }}>
-                                    {{ $b->name }}
-                                </option>
-                            @endforeach
-                        </select>
-
-                        {{-- Centered label overlay --}}
-                        <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm sm:text-base font-semibold text-white">
-                            {{ $buildings->firstWhere('id', request('building'))->name ?? 'Building' }}
+                <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
+                    @if (auth()->user()->isGuard())
+                        <span class="gov-location-badge h-11">
+                            <i class="fa-solid fa-building-circle-check"></i> {{ $buildings->first()->name ?? '—' }}
                         </span>
-
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-transform duration-150 peer-focus:rotate-180">
-                            <span class="block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] border-t-white"></span>
-                        </span>
-                    </div>
+                    @else
+                        <div class="gov-location-wrap w-full">
+                            <select name="building" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+                               <option value="ALL">Building</option>
+                                @foreach ($buildings as $b)
+                                    <option value="{{ $b->id }}" {{ (string) request('building') === (string) $b->id ? 'selected' : '' }}>
+                                        {{ $b->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+                        </div>
+                    @endif
                 </div>
 
                 {{-- ========================= --}}
                 {{-- RESULTS DROPDOWN OPTIONS --}}
                 {{-- ========================= --}}
-                <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex">
-                    <div class="relative w-full">
-                        <select name="result" onchange="this.form.submit()"
-                            class="peer relative w-full appearance-none rounded-lg bg-blue-600 py-2.5 pl-9 pr-4 text-sm sm:text-base font-semibold text-transparent shadow-sm outline-none transition-colors duration-150 hover:bg-blue-500 focus:bg-blue-700 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-1">
-                            <option value="ALL" class="bg-white text-slate-900 font-medium text-left">Results</option>
-                            <option value="AUTHORIZED" class="bg-white text-slate-900 font-medium text-left" {{ request('result') === 'AUTHORIZED' ? 'selected' : '' }}>Authorized</option>
-                            <option value="UNAUTHORIZED" class="bg-white text-slate-900 font-medium text-left" {{ request('result') === 'UNAUTHORIZED' ? 'selected' : '' }}>Unauthorized</option>
-                            <option value="INVALID" class="bg-white text-slate-900 font-medium text-left" {{ request('result') === 'INVALID' ? 'selected' : '' }}>Invalid</option>
-                        </select>
-
-                        {{-- Centered label overlay --}}
-                        <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm sm:text-base font-semibold text-white">
-                            @php
-                                $resultLabels = [
-                                    'AUTHORIZED' => 'Authorized',
-                                    'UNAUTHORIZED' => 'Unauthorized',
-                                    'INVALID' => 'Invalid',
-                                ];
-                            @endphp
-                            {{ $resultLabels[request('result')] ?? 'Results' }}
-                        </span>
-
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-transform duration-150 peer-focus:rotate-180">
-                            <span class="block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] border-t-white"></span>
-                        </span>
-                    </div>
+                <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
+                <div class="gov-location-wrap w-full">
+                   <select name="result" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+                        <option value="ALL">Results</option>
+                        <option value="AUTHORIZED" {{ request('result') === 'AUTHORIZED' ? 'selected' : '' }}>Authorized</option>
+                        <option value="UNAUTHORIZED" {{ request('result') === 'UNAUTHORIZED' ? 'selected' : '' }}>Unauthorized</option>
+                        <option value="INVALID" {{ request('result') === 'INVALID' ? 'selected' : '' }}>Invalid</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
                 </div>
+            </div>
 
 
 
@@ -112,6 +93,7 @@
                                     data-scanned-at="{{ $l->scannedBuilding->name ?? '' }}"
                                     data-result="{{ ucfirst(strtolower($l->result)) }}"
                                     data-reason="{{ $l->reason }}"
+                                    data-photo="{{ $l->verificationPhoto ? \Illuminate\Support\Facades\Storage::disk('public')->url($l->verificationPhoto->photo_path) : '' }}"
                                     onclick="openRowModal(this)">
                                     <td class="border-r border-slate-100 py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $l->visitor_name_snapshot }}</td>
@@ -164,17 +146,17 @@
                     </nav>
                 @endif
 
-            <a href="{{ route('logs.export', request()->query()) }}"
-                class="inline-flex items-center gap-2 rounded-[7px] bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
-                    <img src="{{ asset('images/icons/Policy.svg') }}" alt="" class="h-3.5 w-3.5"> Export CSV
+                <a href="{{ route('logs.export', request()->query()) }}"
+                    class="inline-flex items-center gap-2 rounded-[8px] bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
+                    <i class="fa-solid fa-file-csv text-sm"></i> Export CSV
                 </a>
                 @if (auth()->user()->isAdmin())
                     <button type="button" onclick="openDeleteModal()"
-                            class="inline-flex items-center gap-2 rounded-[7px] bg-red-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition-colors">
-                        <img src="{{ asset('images/icons/Policy.svg') }}" alt="" class="h-3.5 w-3.5"> Delete Logs
+                            class="inline-flex items-center gap-2 rounded-[8px] bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors">
+                        <i class="fa-solid fa-trash-can text-xs"></i> Delete Logs
                     </button>
                 @endif
             </div>
         </div>
-    </div>
+    </form>
     {{-- =========================== END SCANS PANE ============================ --}}

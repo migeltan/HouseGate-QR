@@ -1,5 +1,5 @@
 {{-- ======================= PASS REGISTRATION RECORDS PANE ======================= --}}
-<div id="registrationsPane" class="records-pane hidden">
+<form id="registrationsPane" method="GET" class="records-pane hidden">
 
 {{-- ======================================================================== --}}
 {{-- =====>>> FILTERS ===== --}}
@@ -11,43 +11,47 @@
             {{-- ============ --}}
             {{-- INPUT FIELDS --}}
             {{-- ============ --}}
-            <div class="w-[75%] h-auto flex ">
-                <div class="relative w-full">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="regSearchInput" name="reg_search" value="{{ request('reg_search') }}"
-                        placeholder="Search by visitor name or ID #..." autocomplete="off"
-                        class="w-full rounded-[8.1px] border border-slate-400 bg-slate-50 py-3  .5 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
-                </div>
-            </div>
+            <div class="w-[50%] h-auto flex ">
+    <div class="relative w-full">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+       <input type="text" id="regSearchInput" name="reg_search" value="{{ request('reg_search') }}"
+           placeholder="Search by visitor name or ID #..." autocomplete="off"
+              class="w-full h-11 rounded-[8.1px] border border-slate-400 bg-slate-50 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+    </div>
+</div>
 
-            {{-- ========================= --}}
-            {{-- STATUS DROPDOWN OPTIONS --}}
-            {{-- ========================= --}}
-            <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex">
-                <div class="relative w-full">
-                    <select name="reg_status" onchange="this.form.submit()"
-                        class="peer relative w-full appearance-none rounded-lg bg-blue-600 py-2.5 pl-9 pr-4 text-sm sm:text-base font-semibold text-transparent shadow-sm outline-none transition-colors duration-150 hover:bg-blue-500 focus:bg-blue-700 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-1">
-                        <option value="ALL" class="bg-white text-slate-900 font-medium text-left">Status</option>
-                        <option value="open" class="bg-white text-slate-900 font-medium text-left" {{ request('reg_status') === 'open' ? 'selected' : '' }}>Currently assigned</option>
-                        <option value="closed" class="bg-white text-slate-900 font-medium text-left" {{ request('reg_status') === 'closed' ? 'selected' : '' }}>Returned / expired</option>
-                    </select>
-
-                    {{-- Centered label overlay --}}
-                    <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm sm:text-base font-semibold text-white">
-                        @php
-                            $regStatusLabels = [
-                                'open' => 'Currently assigned',
-                                'closed' => 'Returned / expired',
-                            ];
-                        @endphp
-                        {{ $regStatusLabels[request('reg_status')] ?? 'Status' }}
-                    </span>
-
-                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-transform duration-150 peer-focus:rotate-180">
-                        <span class="block w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] border-t-white"></span>
-                    </span>
-                </div>
-            </div>
+<div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
+    @if (auth()->user()->isGuard())
+        <span class="gov-location-badge h-11">
+            <i class="fa-solid fa-building-circle-check"></i> {{ $buildings->first()->name ?? '—' }}
+        </span>
+    @else
+        <div class="gov-location-wrap w-full">
+            <select name="reg_building" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+                <option value="ALL">Building</option>
+                @foreach ($buildings as $b)
+                    <option value="{{ $b->id }}" {{ (string) request('reg_building') === (string) $b->id ? 'selected' : '' }}>
+                        {{ $b->name }}
+                    </option>
+                @endforeach
+            </select>
+            <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+        </div>
+    @endif
+</div>
+{{-- ========================= --}}
+{{-- STATUS DROPDOWN OPTIONS --}}
+{{-- ========================= --}}
+<div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
+    <div class="gov-location-wrap w-full">
+        <select name="reg_status" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+            <option value="ALL">Status</option>
+            <option value="open" {{ request('reg_status') === 'open' ? 'selected' : '' }}>Currently assigned</option>
+            <option value="closed" {{ request('reg_status') === 'closed' ? 'selected' : '' }}>Returned / expired</option>
+        </select>
+        <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+    </div>
+</div>
 
         </div>
 
@@ -156,8 +160,8 @@
             @endif
 
             <a href="{{ route('logs.registrations.export', request()->query()) }}"
-             class="inline-flex items-center gap-2 rounded-[7px] bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
-                <img src="{{ asset('images/icons/Policy.svg') }}" alt="" class="h-3.5 w-3.5"> Export CSV
+                class="inline-flex items-center gap-2 rounded-[8px] bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
+                <i class="fa-solid fa-file-csv text-sm"></i> Export CSV
             </a>
         </div>
     </div>

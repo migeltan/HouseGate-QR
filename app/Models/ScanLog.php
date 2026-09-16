@@ -22,4 +22,9 @@ class ScanLog extends Model
     {
         return $this->belongsTo(Building::class, 'scanned_building_id');
     }
+
+    public function verificationPhoto(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ScanVerificationPhoto::class);
+    }
 }

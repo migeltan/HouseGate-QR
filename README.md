@@ -173,13 +173,10 @@ php artisan serve                 # run the app locally
 
 Carried over from the last review pass and re-verified against this codebase, plus new findings from this pass. None of these are fixed yet in the uploaded code.
 
-1. Exiting does not show the result, it leaves the result grid blank. Only the first scan or the in, shows the results and captures through the live photo grid.
-2. Although the photo grid does show some feedback of flashing in the screen, I'm not sure about the storage of this, it is not shown in the logs, that is the whole purpose of the scan -> capture person workflow of this feature which is to see in the audit if the person actually scanned it.
-3. UI changes, the results panel still does not look the same with the Figma mockup. Also, add when the pass will expire.
-4. Emails on late returns, reminders, or even unreturned, does it really work? I want to check this.
-5. UI on logs still not updated. Waiting on the push.
-6. UI on QR fallback mode still looks like it does not belong there.
-7. UI on the header, improvements and also improve the admin/personnel information there.
+1. Emails on late returns, reminders, or even unreturned, does it really work? I want to check this.
+2. UI on PURGE needs to be fixed.
+3. UI on QR fallback mode still looks like it does not belong there.
+4. UI on the header, improvements and also improve the admin/personnel information there.
 
 ---
 

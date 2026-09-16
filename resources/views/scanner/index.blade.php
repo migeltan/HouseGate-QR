@@ -466,20 +466,26 @@ function displayScanResultUI(data) {
     const advisory = document.getElementById('advisoryText');
     const entryLine = document.getElementById('statusEntryLine');
 
-    if (data.result === 'AUTHORIZED') {
-        header.className = 'gov-status-banner is-authorized anim-fade-in-up';
-        document.getElementById('statusText').innerHTML = 'Access <span class="gov-status-title-accent">Authorized</span>';
-        document.getElementById('statusSubtitle').innerText = data.reason;
-        entryLine.innerText = (data.direction === 'out' ? 'Exited' : 'Entered') + ' at ' + data.timestamp;
-        advisory.innerText = `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`;
-    } else {
-        header.className = 'gov-status-banner is-denied anim-fade-in-up';
-        const label = data.result.charAt(0) + data.result.slice(1).toLowerCase();
-        document.getElementById('statusText').innerHTML = `Access <span class="gov-status-title-accent">${label}</span>`;
-        document.getElementById('statusSubtitle').innerText = data.reason;
-        entryLine.innerText = '';
-        advisory.innerText = data.reason;
-    }
+    const statusClassMap = {
+        AUTHORIZED: 'is-authorized',
+        UNAUTHORIZED: 'is-denied',
+        EXPIRED: 'is-expired',
+        REVOKED: 'is-revoked',
+        BLOCKED: 'is-blocked',
+        INVALID: 'is-invalid',
+    };
+    const statusClass = statusClassMap[data.result] || 'is-invalid';
+    header.className = `gov-status-banner ${statusClass} anim-fade-in-up`;
+
+    const label = data.result.charAt(0) + data.result.slice(1).toLowerCase();
+    document.getElementById('statusText').innerHTML = `Access <span class="gov-status-title-accent">${label}</span>`;
+    document.getElementById('statusSubtitle').innerText = data.reason;
+    entryLine.innerText = data.result === 'AUTHORIZED'
+        ? (data.direction === 'out' ? 'Exited' : 'Entered') + ' at ' + data.timestamp
+        : '';
+    advisory.innerText = data.result === 'AUTHORIZED'
+        ? `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`
+        : data.reason;
 
     const directionBadge = document.getElementById('resDirectionBadge');
     if (data.direction === 'in') {

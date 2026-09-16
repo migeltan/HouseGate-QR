@@ -43,26 +43,26 @@
         {{-- Scan Audit Trail --}}
         {{-- ++++++++++++++++ --}}
         <button type="button" id="tabBtn-scans" data-tab="scans" onclick="showRecordsTab('scans')"
-                class="gov-btn-cameratab-btn w-[clamp(160px,42cqw,300.5px)] h-[clamp(48px,10cqw,64px)] shrink-0 relative z-10 -mb-px flex items-center justify-center rounded-t-xl border border-b-0 border-slate-300 bg-white px-4 transition-colors">
+                class="gov-btn-cameratab-btn group w-[clamp(180px,42cqw,300.5px)] h-[clamp(52px,10cqw,64px)] shrink-0 relative z-10 -mb-px flex items-center justify-center gap-2 rounded-t-xl border border-b-0 border-slate-300 bg-white px-5 transition-colors">
+            <i class="fa-solid fa-clipboard-list text-blue-600 text-sm"></i>
             <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,20px)] font-bold text-slate-900">Scan Audit Trail</span>
         </button>
 
-        {{-- ++++++++++++++++++++ --}}
-        {{-- Registration Records --}}
-        {{-- ++++++++++++++++++++ --}}
         <button type="button" id="tabBtn-registrations" data-tab="registrations" onclick="showRecordsTab('registrations')"
-                class="tab-btn w-[clamp(160px,42cqw,320.5px)] h-[clamp(48px,10cqw,64px)] shrink-0 flex items-center justify-center rounded-t-xl border border-b-0 border-transparent px-4 transition-colors">
+                class="tab-btn group w-[clamp(180px,42cqw,320.5px)] h-[clamp(52px,10cqw,64px)] shrink-0 flex items-center justify-center gap-2 rounded-t-xl border border-b-0 border-transparent px-5 transition-colors hover:bg-white/70">
+            <i class="fa-solid fa-id-card text-slate-400 text-sm"></i>
             <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,20px)] font-semibold text-slate-400">Registration Records</span>
         </button>
+
     </div>
 
     {{-- +++++++++++++ --}}
     {{--  Folder Body --}}
     {{-- ++++++++++++++++++++ --}}
-    <form method="GET" id="logsFilterForm" class="relative overflow-hidden rounded-xl rounded-tl-none border border-slate-300 bg-white shadow-[200px]">
+    <div class="relative overflow-hidden rounded-xl rounded-tl-none border border-slate-300 bg-white shadow-[200px]">
         @include('logs.scans-table')
         @include('logs.registrations-table')
-    </form>
+    </div>
 </div>
 {{-- ========================= END FLAT TABS + CARD ========================= --}}
 
@@ -72,20 +72,32 @@
 @if (auth()->user()->isAdmin())
 <div id="purgeModalOverlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4"
      onclick="if(event.target === this) closeDeleteModal()">
-    <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center gap-2 border-b border-slate-200 px-6 py-4">
-            <h3 class="flex items-center gap-2 text-base font-bold text-slate-900">
-                <i class="fa-solid fa-trash-can text-red-500"></i> Purge Logs
-            </h3>
+    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+
+        <div class="gov-card-header">
+            <div class="flex items-start gap-3">
+                <i class="fa-solid fa-trash-can gov-card-header-icon"></i>
+                <div>
+                    <span class="gov-eyebrow">Admin Action</span>
+                    <h3 class="gov-card-title">Purge Audit Logs</h3>
+                </div>
+            </div>
+            <button type="button" onclick="closeDeleteModal()" class="text-slate-400 hover:text-slate-700 mt-1">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
 
-        <div class="space-y-5 px-6 py-5">
+        <div class="divide-y divide-slate-200">
             {{-- Option A --}}
-            <form method="POST" action="{{ route('logs.purge.range') }}">
+            <form method="POST" action="{{ route('logs.purge.range') }}" class="px-6 py-5">
                 @csrf
                 @method('DELETE')
-                <p class="text-sm font-semibold text-slate-700">Option A — Clear a date range</p>
-                <div class="mt-2 grid grid-cols-2 gap-3">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold">A</span>
+                    <p class="text-sm font-semibold text-slate-800">Clear a date range</p>
+                </div>
+                <p class="text-xs text-slate-500 mb-3 ml-8">Deletes only the scan logs recorded between these two dates.</p>
+                <div class="grid grid-cols-2 gap-3 ml-8">
                     <label class="block text-xs font-medium text-slate-500">
                         <span class="mb-1 block">Start date</span>
                         <input type="date" name="start_date" required
@@ -99,29 +111,35 @@
                 </div>
                 <button type="submit"
                         onclick="return confirm('Delete all logs in this date range? This cannot be undone.');"
-                        class="mt-3 w-full rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600 transition-colors">
+                        class="mt-3 ml-8 w-[calc(100%-2rem)] rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600 transition-colors">
                     Delete Logs In Range
                 </button>
             </form>
 
-            <hr class="border-slate-200">
-
             {{-- Option B --}}
-            <form method="POST" action="{{ route('logs.purge.all') }}">
+            <form method="POST" action="{{ route('logs.purge.all') }}" class="px-6 py-5">
                 @csrf
                 @method('DELETE')
-                <p class="text-sm font-semibold text-red-600">Option B — Purge all logs</p>
-                <p class="mt-1 text-xs text-slate-500">
-                    This permanently deletes every audit log. Type <strong>PURGE</strong> to confirm.
-                </p>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-bold">B</span>
+                    <p class="text-sm font-semibold text-red-700">Purge all logs</p>
+                </div>
+                <p class="text-xs text-slate-500 mb-3 ml-8">Permanently deletes every scan log in the system. Type <strong>PURGE</strong> below to confirm.</p>
                 <input type="text" name="confirm" required placeholder="Type PURGE to confirm"
-                       class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none">
+                       class="ml-8 w-[calc(100%-2rem)] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none">
                 <button type="submit"
                         onclick="return confirm('This deletes ALL audit logs permanently. Continue?');"
-                        class="mt-3 w-full rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-700 transition-colors">
+                        class="mt-3 ml-8 w-[calc(100%-2rem)] rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-700 transition-colors">
                     Delete All Logs
                 </button>
             </form>
+        </div>
+
+        <div class="flex justify-end border-t border-slate-200 px-6 py-3">
+            <button type="button" onclick="closeDeleteModal()"
+                    class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                Cancel
+            </button>
         </div>
     </div>
 </div>
@@ -167,6 +185,7 @@
     // Inactive tab: no border, muted gray text.
     function setTabState(btn, active) {
         const title = btn.querySelector('.tab-title');
+        const icon = btn.querySelector('i');
 
         btn.classList.toggle('relative', active);
         btn.classList.toggle('z-10', active);
@@ -179,6 +198,11 @@
         title.classList.toggle('font-bold', active);
         title.classList.toggle('text-slate-400', !active);
         title.classList.toggle('font-semibold', !active);
+
+        if (icon) {
+            icon.classList.toggle('text-blue-600', active);
+            icon.classList.toggle('text-slate-400', !active);
+        }
     }
 
     function showRecordsTab(tab) {

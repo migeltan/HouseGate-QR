@@ -139,7 +139,7 @@ class LogController extends Controller
      */
     private function scopedLogsQuery(Request $request): Builder
     {
-        $query = ScanLog::with(['scannedBuilding']);
+        $query = ScanLog::with(['scannedBuilding', 'verificationPhoto']);
 
         if ($request->user()->isGuard()) {
             $query->where('scanned_building_id', session('assigned_building_id'));
@@ -200,7 +200,7 @@ class LogController extends Controller
             $s = $request->reg_search;
             $query->where(function ($q) use ($s) {
                 $q->where('visitor_name', 'like', "%{$s}%")
-                  ->orWhere('id_ref', 'like', "%{$s}%");
+                ->orWhere('id_ref', 'like', "%{$s}%");
             });
         }
 
@@ -208,6 +208,10 @@ class LogController extends Controller
             $request->reg_status === 'open'
                 ? $query->whereNull('unassigned_at')
                 : $query->whereNotNull('unassigned_at');
+        }
+
+        if ($request->filled('reg_building') && $request->reg_building !== 'ALL') {
+            $query->whereHas('visitorPass', fn ($q) => $q->where('building_id', $request->reg_building));
         }
 
         return $query;

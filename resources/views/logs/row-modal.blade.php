@@ -1,95 +1,33 @@
 {{-- ============================= UNIVERSAL ROW DETAILS MODAL ============================= --}}
 
-
-
 <div id="rowDetailsModalOverlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4"
      onclick="if(event.target === this) closeRowModal()">
 
-
-
-    <div class="w-full max-w-[900.5px] max-h-[1500.5px] rounded-2xl bg-white shadow-2xl  overflow-y-auto">
-
-        <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-6 py-4">
-            <h3 id="rowModalTitle" class="flex items-center gap-2 text-base font-bold text-slate-900">
-                <i class="fa-solid fa-circle-info text-blue-500"></i> Record Details
-            </h3>
-            <button type="button" onclick="closeRowModal()" class="text-slate-400 hover:text-slate-700">
+    <div class="gov-info-modal-panel">
+        <div class="gov-info-modal-header">
+            <div>
+                <span class="gov-eyebrow" id="rowModalEyebrow">Record Details</span>
+                <h3 id="rowModalTitle" class="gov-pass-modal-title"></h3>
+            </div>
+            <button type="button" onclick="closeRowModal()"
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full p-2.5 transition-colors leading-none flex-shrink-0">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
 
-        {{-- Photos (registrations only) --}}
-        <div id="rowModalPhotos" class="hidden items-center justify-center gap-6 px-6 pt-5">
-            <div class="text-center">
-                <img id="rowModalPhoto" src="" alt="Visitor photo" class="hidden h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200 mx-auto">
-                <span class="mt-1 block text-[11px] font-medium text-slate-400">Visitor</span>
-            </div>
-            <div class="text-center">
-                <img id="rowModalIdPhoto" src="" alt="ID photo" class="hidden h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200 mx-auto">
-                <span class="mt-1 block text-[11px] font-medium text-slate-400">ID</span>
-            </div>
-        </div>
-
-        <dl class="space-y-3 px-6 py-5 text-sm">
-            <div class="flex justify-between gap-4">
-                <dt class="font-medium text-slate-500">Timestamp</dt>
-                <dd id="rowModalTimestamp" class="font-mono text-slate-800"></dd>
-            </div>
-            <div class="flex justify-between gap-4">
-                <dt class="font-medium text-slate-500">Visitor</dt>
-                <dd id="rowModalVisitor" class="font-semibold text-slate-900"></dd>
-            </div>
-
-            {{-- Scan-only fields --}}
-            <div id="rowModalScanFields" class="hidden space-y-3">
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Pass #</dt>
-                    <dd id="rowModalPassNumber" class="font-mono font-semibold text-slate-800"></dd>
+        <div class="gov-info-modal-body">
+            <div id="rowModalPhotos" class="gov-info-photos hidden">
+                <div>
+                    <span class="gov-meta-label">Visitor Photo</span>
+                    <img id="rowModalPhoto" class="gov-info-photo hidden" alt="Visitor photo">
                 </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Scanned at</dt>
-                    <dd id="rowModalScannedAt" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Result</dt>
-                    <dd id="rowModalResult" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Reason</dt>
-                    <dd id="rowModalReason" class="text-right text-slate-700"></dd>
+                <div id="rowModalIdPhotoWrap">
+                    <span class="gov-meta-label">ID Photo</span>
+                    <img id="rowModalIdPhoto" class="gov-info-photo hidden" alt="ID photo">
                 </div>
             </div>
 
-            {{-- Registration-only fields --}}
-            <div id="rowModalRegFields" class="hidden space-y-3">
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">ID type / ref</dt>
-                    <dd id="rowModalIdRef" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Pass class</dt>
-                    <dd id="rowModalPassClass" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Expected return</dt>
-                    <dd id="rowModalExpectedReturn" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Registered by</dt>
-                    <dd id="rowModalRegisteredBy" class="text-slate-700"></dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="font-medium text-slate-500">Status</dt>
-                    <dd id="rowModalStatus" class="text-slate-700"></dd>
-                </div>
-            </div>
-        </dl>
-
-        <div class="flex justify-end border-t border-slate-200 px-6 py-4">
-            <button type="button" onclick="closeRowModal()"
-                    class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                Close
-            </button>
+            <div class="gov-info-modal-grid" id="rowModalFieldsGrid"></div>
         </div>
     </div>
 </div>
@@ -99,56 +37,77 @@
         const type = row.dataset.type;
         const overlay = document.getElementById('rowDetailsModalOverlay');
         const title = document.getElementById('rowModalTitle');
+        const eyebrow = document.getElementById('rowModalEyebrow');
+        const photosBlock = document.getElementById('rowModalPhotos');
+        const photoImg = document.getElementById('rowModalPhoto');
+        const idPhotoImg = document.getElementById('rowModalIdPhoto');
+        const idPhotoWrap = document.getElementById('rowModalIdPhotoWrap');
+        const fieldsGrid = document.getElementById('rowModalFieldsGrid');
 
-        document.getElementById('rowModalScanFields').classList.add('hidden');
-        document.getElementById('rowModalRegFields').classList.add('hidden');
-        document.getElementById('rowModalPhotos').classList.add('hidden');
-        document.getElementById('rowModalPhotos').classList.remove('flex');
+        photosBlock.classList.add('hidden');
+        photosBlock.classList.remove('is-single');
+        photoImg.classList.add('hidden');
+        idPhotoImg.classList.add('hidden');
+        idPhotoWrap.classList.remove('hidden');
 
-        document.getElementById('rowModalTimestamp').textContent = row.dataset.timestamp || '—';
-        document.getElementById('rowModalVisitor').textContent = row.dataset.visitor || '—';
+        let rows = [];
 
         if (type === 'scan') {
-            title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500"></i> Scan Details';
-            document.getElementById('rowModalScanFields').classList.remove('hidden');
-            document.getElementById('rowModalPassNumber').textContent = row.dataset.passNumber || '—';
-            document.getElementById('rowModalScannedAt').textContent = row.dataset.scannedAt || '—';
-            document.getElementById('rowModalResult').textContent = row.dataset.result || '—';
-            document.getElementById('rowModalReason').textContent = row.dataset.reason || '—';
+            eyebrow.textContent = 'Scan Details';
+            title.textContent = row.dataset.visitor || 'Unassigned Card';
+
+            rows = [
+                ['Timestamp', row.dataset.timestamp],
+                ['Visitor', row.dataset.visitor],
+                ['Pass #', row.dataset.passNumber],
+                ['Scanned At', row.dataset.scannedAt],
+                ['Result', row.dataset.result],
+                ['Reason', row.dataset.reason],
+            ];
+
+            const photo = row.dataset.photo;
+            if (photo) {
+                photosBlock.classList.remove('hidden');
+                photosBlock.classList.add('is-single');
+                idPhotoWrap.classList.add('hidden');
+                photoImg.src = photo;
+                photoImg.classList.remove('hidden');
+            }
         } else if (type === 'registration') {
-            title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500"></i> Registration Details';
-            document.getElementById('rowModalRegFields').classList.remove('hidden');
-            document.getElementById('rowModalIdRef').textContent = row.dataset.idRef || '—';
-            document.getElementById('rowModalPassClass').textContent = row.dataset.passClass || '—';
-            document.getElementById('rowModalExpectedReturn').textContent = row.dataset.expectedReturn || '—';
-            document.getElementById('rowModalRegisteredBy').textContent = row.dataset.registeredBy || '—';
-            document.getElementById('rowModalStatus').textContent = row.dataset.status || '—';
+            eyebrow.textContent = 'Registration Details';
+            title.textContent = row.dataset.visitor || '—';
+
+            rows = [
+                ['Timestamp', row.dataset.timestamp],
+                ['Visitor', row.dataset.visitor],
+                ['ID type / ref', row.dataset.idRef],
+                ['Pass class', row.dataset.passClass],
+                ['Expected return', row.dataset.expectedReturn],
+                ['Registered by', row.dataset.registeredBy],
+                ['Status', row.dataset.status],
+            ];
 
             const photo = row.dataset.photo;
             const idPhoto = row.dataset.idPhoto;
             if (photo || idPhoto) {
-                const photosBlock = document.getElementById('rowModalPhotos');
                 photosBlock.classList.remove('hidden');
-                photosBlock.classList.add('flex');
-
-                const photoImg = document.getElementById('rowModalPhoto');
-                const idPhotoImg = document.getElementById('rowModalIdPhoto');
-
                 if (photo) {
                     photoImg.src = photo;
                     photoImg.classList.remove('hidden');
-                } else {
-                    photoImg.classList.add('hidden');
                 }
-
                 if (idPhoto) {
                     idPhotoImg.src = idPhoto;
                     idPhotoImg.classList.remove('hidden');
                 } else {
-                    idPhotoImg.classList.add('hidden');
+                    idPhotoWrap.classList.add('hidden');
                 }
             }
         }
+
+        fieldsGrid.innerHTML = rows
+            .filter(([, value]) => value)
+            .map(([label, value]) => `<div><span class="gov-meta-label">${label}</span><div class="gov-meta-value">${value}</div></div>`)
+            .join('');
 
         overlay.classList.remove('hidden');
     }
