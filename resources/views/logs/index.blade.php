@@ -8,9 +8,6 @@
     .font-source-sans {
         font-family: 'Source Sans Pro', sans-serif;
     }
-    .font-times {
-        font-family: 'Times New Roman', Times, serif;
-    }
     .no-scrollbar {
         scrollbar-width: none;
     }
@@ -19,7 +16,7 @@
     }
 </style>
 
-@include('logs._header')
+@include('logs.header')
 
 {{-- ============================= ALERTS ============================= --}}
 @if (session('success'))
@@ -34,64 +31,40 @@
     </div>
 @endif
 
-{{-- ============================= FOLDER-STYLE TABS + CARD ============================= --}}
+{{-- ============================= FLAT TABS + CARD ============================= --}}
 <div class="relative">
 
     {{-- --------------------------------------------------------------------- --}}
+    {{-- Tabs: flat, uniform-size tabs sitting flush on top of the card below --}}
     {{-- --------------------------------------------------------------------- --}}
-    {{-- Tabs: active tab pops up as a folder "tab" attached to the card below --}}
-    {{-- --------------------------------------------------------------------- --}}
-    {{-- --------------------------------------------------------------------- --}}
-    <div class="flex items-end gap-1 pl-6 overflow-x-auto no-scrollbar [container-type:inline-size]">
-
+    <div class="flex items-end gap-2 overflow-x-auto no-scrollbar [container-type:inline-size]">
 
         {{-- ++++++++++++++++ --}}
         {{-- Scan Audit Trail --}}
         {{-- ++++++++++++++++ --}}
         <button type="button" id="tabBtn-scans" data-tab="scans" onclick="showRecordsTab('scans')"
-                class="tab-btn w-[clamp(160px,42cqw,300.5px)] h-[clamp(60px,14cqw,90.5px)] shrink-0 relative z-10 -mb-px flex items-center gap-3 rounded-t-xl border border-slate-300 bg-white px-4 pt-3 pb-4 transition-colors">
-
-            <div class="w-auto h-auto shrink-0 flex">
-                <span class="tab-icon grid h-auto w-auto shrink-0 place-items-center bg-white pr-[10.5px]">
-                    <img src="{{ asset('images/icons/Folder.svg') }}" alt="Table Logs" class="h-[clamp(24px,6cqw,48px)] w-[clamp(24px,6cqw,48px)] shrink-0">
-                </span>
-                <span class="text-left min-w-0">
-                    <span class="tab-eyebrow block truncate font-times text-[clamp(11px,2.2cqw,17px)] font-semibold text-blue-700">Table Logs</span>
-                    <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,25px)] font-bold text-slate-1000">Scan Audit Trail</span>
-                </span>
-            </div>
-
+                class="gov-btn-cameratab-btn w-[clamp(160px,42cqw,300.5px)] h-[clamp(48px,10cqw,64px)] shrink-0 relative z-10 -mb-px flex items-center justify-center rounded-t-xl border border-b-0 border-slate-300 bg-white px-4 transition-colors">
+            <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,20px)] font-bold text-slate-900">Scan Audit Trail</span>
         </button>
 
         {{-- ++++++++++++++++++++ --}}
         {{-- Registration Records --}}
         {{-- ++++++++++++++++++++ --}}
         <button type="button" id="tabBtn-registrations" data-tab="registrations" onclick="showRecordsTab('registrations')"
-                class="tab-btn w-[clamp(160px,42cqw,320.5px)] h-[clamp(60px,14cqw,90.5px)] shrink-0 self-end flex items-center gap-3 rounded-t-lg px-3 pb-3 transition-colors">
-
-            <div class="w-auto h-auto shrink-0 flex">
-                <span class="tab-icon hidden h-auto w-auto shrink-0 place-items-center bg-white pr-[10.5px]">
-                    <img src="{{ asset('images/icons/Folder.svg') }}" alt="Table Logs" class="h-[clamp(24px,6cqw,48px)] w-[clamp(24px,6cqw,48px)] shrink-0">
-                </span>
-                <span class="text-left min-w-0">
-                    <span class="tab-eyebrow hidden truncate font-times text-[clamp(11px,2.2cqw,17px)] font-semibold text-blue-700">Table Logs</span>
-                    <span class="tab-title block whitespace-nowrap leading-tight font-source-sans text-[clamp(14px,3.2cqw,25px)] font-semibold text-slate-400">Registration Records</span>
-                </span>
-            </div>
-
+                class="tab-btn w-[clamp(160px,42cqw,320.5px)] h-[clamp(48px,10cqw,64px)] shrink-0 flex items-center justify-center rounded-t-xl border border-b-0 border-transparent px-4 transition-colors">
+            <span class="tab-title block whitespace-nowrap font-source-sans text-[clamp(14px,3.2cqw,20px)] font-semibold text-slate-400">Registration Records</span>
         </button>
     </div>
 
-
-        {{-- +++++++++++++ --}}
-        {{--  Folder Body --}}
-        {{-- ++++++++++++++++++++ --}}
-        <form method="GET" id="logsFilterForm" class="relative overflow-hidden rounded-xl rounded-tr-xl border border-slate-300 bg-white shadow-[200px] ">
-            @include('logs._scans-table')
-            @include('logs._registrations-table')
-        </form>
+    {{-- +++++++++++++ --}}
+    {{--  Folder Body --}}
+    {{-- ++++++++++++++++++++ --}}
+    <form method="GET" id="logsFilterForm" class="relative overflow-hidden rounded-xl rounded-tl-none border border-slate-300 bg-white shadow-[200px]">
+        @include('logs.scans-table')
+        @include('logs.registrations-table')
+    </form>
 </div>
-{{-- ========================= END FOLDER-STYLE TABS + CARD ========================= --}}
+{{-- ========================= END FLAT TABS + CARD ========================= --}}
 
 {{-- ============================= PURGE MODAL (scans only) ============================= --}}
 {{-- Entire modal is admin-only markup, not just the trigger button,
@@ -155,7 +128,7 @@
 @endif
 
 {{-- ============================= UNIVERSAL ROW DETAILS MODAL ============================= --}}
-@include('logs._row-modal')
+@include('logs.row-modal')
 
 @endsection
 
@@ -188,35 +161,20 @@
         if (overlay) overlay.classList.add('hidden');
     }
 
-    // ---- Folder-tab toggle ----
-    // Active tab: raised "folder tab" look (icon + eyebrow + bold title, white bg,
-    // border on 3 sides, sits flush against the card via -mb-px).
-    // Inactive tab: flat plain-text label, no icon/eyebrow, muted color.
+    // ---- Flat-tab toggle ----
+    // Active tab: white bg, border on top/left/right (flush against the card
+    // via -mb-px), bold dark text.
+    // Inactive tab: no border, muted gray text.
     function setTabState(btn, active) {
-        const icon = btn.querySelector('.tab-icon');
-        const eyebrow = btn.querySelector('.tab-eyebrow');
         const title = btn.querySelector('.tab-title');
 
         btn.classList.toggle('relative', active);
         btn.classList.toggle('z-10', active);
         btn.classList.toggle('-mb-px', active);
-        btn.classList.toggle('border', active);
-        btn.classList.toggle('border-b-0', active);
-        btn.classList.toggle('border-slate-300', active);
         btn.classList.toggle('bg-white', active);
-        btn.classList.toggle('rounded-t-xl', active);
-        btn.classList.toggle('pt-3', active);
-        btn.classList.toggle('pb-4', active);
-        btn.classList.toggle('px-4', active);
+        btn.classList.toggle('border-slate-300', active);
+        btn.classList.toggle('border-transparent', !active);
 
-        btn.classList.toggle('self-end', !active);
-        btn.classList.toggle('rounded-t-lg', !active);
-        btn.classList.toggle('pb-3', !active);
-        btn.classList.toggle('px-3', !active);
-
-        icon.classList.toggle('hidden', !active);
-        icon.classList.toggle('grid', active);
-        eyebrow.classList.toggle('hidden', !active);
         title.classList.toggle('text-slate-900', active);
         title.classList.toggle('font-bold', active);
         title.classList.toggle('text-slate-400', !active);
