@@ -47,10 +47,11 @@ class GenerateMultiBuildingPasses extends Command
         // what the visitor_passes_building_id_pass_number_unique
         // constraint actually enforces uniqueness against.
         $startingNumber = (int) (VisitorPass::query()
-            ->where('building_id', $multiBuildingId)
-            ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')
-            ->first()
-            ?->max_num ?? 0);
+    ->where('building_id', $multiBuildingId)
+    ->where('is_multi_building', true)
+    ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')
+    ->first()
+    ?->max_num ?? 0);
 
         for ($i = 1; $i <= $count; $i++) {
             $number = $startingNumber + $i;
@@ -64,20 +65,14 @@ class GenerateMultiBuildingPasses extends Command
             }
 
             $pass = VisitorPass::create([
-                'building_id' => $multiBuildingId, // nominal/primary building; pivot below is source of truth
+                'building_id' => $multiBuildingId,
                 'pass_number' => $passNumber,
                 'qr_token' => $qrToken,
-                'visitor_name' => "Multi-Access Visitor {$i}",
-                'id_ref' => "TEST-ID-{$i}",
-                'purpose' => 'Multi-building access test',
-                'status' => 'active',
-                'issued_at' => now(),
+                'status' => 'available',
                 'is_multi_building' => true,
             ]);
 
-            $pass->buildings()->sync($assigned->pluck('id'));
-
-            $this->info("Created pass #{$passNumber} ({$qrToken}) — authorized for: " . $assigned->pluck('name')->join(', '));
+            $this->info("Created pass #{$passNumber} ({$qrToken}) — available");
         }
 
         return self::SUCCESS;

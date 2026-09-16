@@ -173,35 +173,19 @@ php artisan serve                 # run the app locally
 
 Carried over from the last review pass and re-verified against this codebase, plus new findings from this pass. None of these are fixed yet in the uploaded code.
 
-**Still open from before:**
-vvv
-- **`app/console/commands` is lowercase, but the classes inside declare `namespace App\Console\Commands;`.** Laravel's default command auto-discovery scans the literal path `app/Console/Commands` and silently registers nothing if it's missing — it doesn't error. On any case-sensitive filesystem (every real Linux server, including this sandbox), `php artisan passes:daily-sweep` and `php artisan passes:seed-multi` will both fail as "Command not defined," and the `Schedule::command('passes:daily-sweep')` line in `routes/console.php` will fail at schedule-run time. This will have tested fine on Windows/macOS (case-insensitive filesystems) but breaks in production. Fix: rename the directory to `app/Console/Commands`.
-- **`DatabaseSeeder::run()` never calls `UserSeeder`.** A fresh `php artisan db:seed` (the exact command this README's setup section tells you to run) seeds buildings and passes but creates zero login accounts — `admin@lsb.local` / `guard@lsb.local` only exist if you separately run `php artisan db:seed --class=UserSeeder`. Fix: add `$this->call([UserSeeder::class]);` to `DatabaseSeeder::run()`.
-- **`Building::$fillable` is still missing `template_image` and `qr_color_hex`**, even though both columns exist and `DatabaseSeeder` tries to set them via `updateOrCreate()`. Laravel silently drops any field not in `$fillable` on mass assignment (no strict mode is enabled in `AppServiceProvider::boot()`), so every building's badge template image and QR color are likely never actually being saved — which would show up as a missing/blank background on the printable pass badge (`passes/show.blade.php` reads exactly those two columns). Fix: add both to `Building::$fillable`.
-
-**New findings this pass:**
-
-- **North Gate leaks into three UI pickers it was explicitly designed to be hidden from.** `PassController::index()` and `ScannerController::index()` both correctly filter it out (`Building::where('code', '!=', 'NG')`, with an explicit comment: _"North Gate is internal bookkeeping only — never shown as a selectable/visible building anywhere in the UI"_). But `AuthController::showLogin()`, `BuildingSelectController::show()`, and `LogController::index()` all still query the full building list with no exclusion. A guard could end up assigned to "North Gate" as their scanning building (which no longer functions as a real scan location — it exists solely as the nominal home for North Gate Access/multi-building passes), and admins can filter logs by it. Fix: add the same `where('code', '!=', 'NG')` filter to all three, or better, centralize it as a scope/accessor on `Building` so it can't be forgotten again.
-- **`hrep_id` is used as the actual login credential, despite its own migration comment saying otherwise.** The migration that adds it says _"reference only, not used for auth"_, but `AuthController::login()` passes it straight into `Auth::attempt(['hrep_id' => ..., 'password' => ...])`. It also has no unique constraint and is nullable — two users sharing (or both lacking) an `hrep_id` would make `Auth::attempt` match unpredictably. Decide which it is: either add a unique index and treat it as the real username, or keep it reference-only and authenticate on `email` instead.
-- **Day-pass auto-expiry doesn't clear occupancy state, which can strand a visitor "inside" a building with no way out.** `DailyPassSweep` step 1 sets `status = 'expired'` on active day passes at the 7pm cutoff but never touches `current_building_id`/`checked_in_at`. If a visitor is still checked in when their pass expires, `ScannerController::scan()` checks `status === 'expired'` _before_ it ever reaches the occupancy/direction logic — so that visitor can't scan out, and the system will keep showing them as inside the building until `hasStaleOccupancy()`'s 16-hour window quietly self-heals it on their next scan attempt (regardless of building). Fix: have the sweep also clear `current_building_id`/`checked_in_at` (and probably log a system-generated "auto scan-out" event) when it expires a checked-in pass.
-- **Missing-egress reminders ignore `STALE_OCCUPANCY_HOURS` entirely.** `DailyPassSweep` step 3 emails `MissingEgressReminder` to _anyone_ with `current_building_id` set and an email on file, every night at 7pm — including a visitor who checked in five minutes before the sweep ran. The 16-hour staleness threshold that the rest of the system uses (`VisitorPass::hasStaleOccupancy()`, referenced in `ScannerController`) isn't applied here. Fix: only send the reminder when `checked_in_at` is older than `STALE_OCCUPANCY_HOURS` (or some other explicit threshold), not unconditionally on every sweep.
-- **`PassController::unassign()` doesn't reset `egress_reminder_sent_on` / `expiry_reminder_sent_on`.** Every other visitor-specific field gets cleared when a pass is returned to available stock, but these two survive. If the same physical pass is reassigned to a new visitor the same day (or before the sweep's date comparison rolls over), the new visitor could silently miss a reminder they should get, because the flag from the previous visitor is still sitting there. Fix: add both to the reset array in `unassign()`.
-
-**Minor / cleanup:**
-
-- `app/Http/Controllers/Filler.php` is not valid PHP (no `<?php` tag, no class/namespace) — looks like stray placeholder content that ended up in `app/Http/Controllers/`. Composer's autoload classmap generation will just skip it silently since it declares no class, so it's harmless at runtime, but it should be deleted.
-- `resources.zip` sits at the project root — looks like a leftover archive, not something that should be committed.
+1. Exiting does not show the result, it leaves the result grid blank. Only the first scan or the in, shows the results and captures through the live photo grid.
+2. Although the photo grid does show some feedback of flashing in the screen, I'm not sure about the storage of this, it is not shown in the logs, that is the whole purpose of the scan -> capture person workflow of this feature which is to see in the audit if the person actually scanned it.
+3. UI changes, the results panel still does not look the same with the Figma mockup. Also, add when the pass will expire.
+4. Emails on late returns, reminders, or even unreturned, does it really work? I want to check this.
+5. UI on logs still not updated. Waiting on the push.
+6. UI on QR fallback mode still looks like it does not belong there.
+7. UI on the header, improvements and also improve the admin/personnel information there.
 
 ---
 
 ## A Note on File Structure
 
 This is a lower priority than the bugs above, but a few things would make the repo easier to navigate as it grows:
-
-- **`app/console/commands` → `app/Console/Commands`** — beyond fixing the bug above, matching Laravel's conventional casing means future contributors (and IDEs/static analysis tools) won't be confused about where commands live.
-- **Split `resources/views/passes/`** — the registry, the registration form/modal, and the printable badge are three fairly different concerns currently living close together; as the UI work continues, consider `passes/index.blade.php`, `passes/registration-modal.blade.php` (partial), and `passes/badge.blade.php` (renamed from `show.blade.php` for clarity, since "show" reads more like a generic detail page than a printable badge).
-- **`app/Mail/`** is fine as-is, but once there are more than two mail classes, grouping by purpose (`app/Mail/Reminders/`) may help.
-- Consider moving the two CSS files in `public/css/` into `resources/css/` and importing them through Vite like `app.css` already is, rather than mixing Vite-managed and directly-served stylesheets — this also means they'd get versioned/cache-busted automatically in production.
 
 ---
 

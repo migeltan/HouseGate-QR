@@ -17,7 +17,7 @@ class UserSeeder extends Seeder
             ['email' => 'admin@lsb.local'],
             [
                 'name' => 'Admin Account',
-                'password' => bcrypt('changeme123'),
+                'password' => 'changeme123',
                 'role' => 'admin',
                 'hrep_id' => 'HREP-2020-0012',
             ]
@@ -27,7 +27,7 @@ class UserSeeder extends Seeder
             ['email' => 'guard@lsb.local'],
             [
                 'name' => 'Juan Dela Cruz',
-                'password' => bcrypt('changeme123'),
+                'password' => 'changeme123',
                 'role' => 'guard',
                 'hrep_id' => 'HREP-2024-0451',
             ]
