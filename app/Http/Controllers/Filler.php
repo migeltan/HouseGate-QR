@@ -1,9 +1,0 @@
-adadadad
-ada
-da
-da
-d
-ada
-d
-ada
-da

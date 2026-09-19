@@ -74,66 +74,78 @@
      onclick="if(event.target === this) closeDeleteModal()">
     <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
 
-        <div class="gov-card-header">
-            <div class="flex items-start gap-3">
-                <i class="fa-solid fa-trash-can gov-card-header-icon"></i>
-                <div>
-                    <span class="gov-eyebrow">Admin Action</span>
-                    <h3 class="gov-card-title">Purge Audit Logs</h3>
-                </div>
-            </div>
-            <button type="button" onclick="closeDeleteModal()" class="text-slate-400 hover:text-slate-700 mt-1">
-                <i class="fa-solid fa-xmark"></i>
+        <div class="gov-card-header flex items-start justify-between gap-3" style="padding: 1.25rem 1.5rem;">
+    <div class="flex items-start gap-3">
+        <i class="fa-solid fa-trash-can gov-card-header-icon"></i>
+        <div>
+            <span class="gov-eyebrow">Admin Action</span>
+            <h3 class="gov-card-title">Purge Audit Logs</h3>
+        </div>
+    </div>
+    <button type="button" onclick="closeDeleteModal()" class="text-slate-400 hover:text-slate-700 mt-1">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+</div>
+
+<div id="confirmPurgeOverlay" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 px-4">
+    <div class="w-full max-w-sm rounded-xl bg-white shadow-2xl p-6 text-center">
+        <p id="confirmPurgeMessage" class="text-sm text-slate-700 mb-5"></p>
+        <div class="flex justify-center gap-3">
+            <button type="button" onclick="document.getElementById('confirmPurgeOverlay').classList.add('hidden')"
+                    class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Cancel
+            </button>
+            <button type="button" id="confirmPurgeSubmitBtn"
+                    class="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
+                Confirm
             </button>
         </div>
+    </div>
+</div>
 
-        <div class="divide-y divide-slate-200">
-            {{-- Option A --}}
-            <form method="POST" action="{{ route('logs.purge.range') }}" class="px-6 py-5">
-                @csrf
-                @method('DELETE')
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold">A</span>
-                    <p class="text-sm font-semibold text-slate-800">Clear a date range</p>
-                </div>
-                <p class="text-xs text-slate-500 mb-3 ml-8">Deletes only the scan logs recorded between these two dates.</p>
-                <div class="grid grid-cols-2 gap-3 ml-8">
-                    <label class="block text-xs font-medium text-slate-500">
-                        <span class="mb-1 block">Start date</span>
-                        <input type="date" name="start_date" required
-                               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
-                    </label>
-                    <label class="block text-xs font-medium text-slate-500">
-                        <span class="mb-1 block">End date</span>
-                        <input type="date" name="end_date" required
-                               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
-                    </label>
-                </div>
-                <button type="submit"
-                        onclick="return confirm('Delete all logs in this date range? This cannot be undone.');"
-                        class="mt-3 ml-8 w-[calc(100%-2rem)] rounded-lg bg-amber-500 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600 transition-colors">
-                    Delete Logs In Range
-                </button>
-            </form>
-
-            {{-- Option B --}}
-            <form method="POST" action="{{ route('logs.purge.all') }}" class="px-6 py-5">
-                @csrf
-                @method('DELETE')
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-bold">B</span>
-                    <p class="text-sm font-semibold text-red-700">Purge all logs</p>
-                </div>
-                <p class="text-xs text-slate-500 mb-3 ml-8">Permanently deletes every scan log in the system. Type <strong>PURGE</strong> below to confirm.</p>
-                <input type="text" name="confirm" required placeholder="Type PURGE to confirm"
-                       class="ml-8 w-[calc(100%-2rem)] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none">
-                <button type="submit"
-                        onclick="return confirm('This deletes ALL audit logs permanently. Continue?');"
-                        class="mt-3 ml-8 w-[calc(100%-2rem)] rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-700 transition-colors">
-                    Delete All Logs
-                </button>
-            </form>
+<div class="px-6 pt-2">
+    {{-- Option A: neutral, scoped action --}}
+    <form method="POST" action="{{ route('logs.purge.range') }}" style="padding: 1.25rem 0;">
+        @csrf
+        @method('DELETE')
+        <p class="text-sm font-semibold text-slate-800 mb-1">Clear a date range</p>
+        <p class="text-xs text-slate-500 mb-3">Deletes only the scan logs recorded between these two dates.</p>
+        <div class="grid grid-cols-2 gap-3">
+            <label class="block text-xs font-medium text-slate-500">
+                <span class="mb-1 block">Start date</span>
+                <input type="date" name="start_date" required
+                       style="width:100%; border-radius:0.5rem; border:1px solid #cbd5e1; padding:0.5rem 0.75rem; font-size:0.875rem; color:#1e293b; outline:none;">
+            </label>
+            <label class="block text-xs font-medium text-slate-500">
+                <span class="mb-1 block">End date</span>
+                <input type="date" name="end_date" required
+                       style="width:100%; border-radius:0.5rem; border:1px solid #cbd5e1; padding:0.5rem 0.75rem; font-size:0.875rem; color:#1e293b; outline:none;">
+            </label>
         </div>
+        <button type="submit"
+                onclick="event.preventDefault(); confirmPurge(this.form, 'Delete all logs in this date range? This cannot be undone.');"
+                style="margin-top:0.75rem; width:100%; border-radius:0.5rem; border:1px solid #cbd5e1; background:#fff; padding:0.625rem 0; font-size:0.875rem; font-weight:600; color:#334155;">
+            Delete Logs In Range
+        </button>
+    </form>
+
+    <div style="margin: 0; border-top: 1px solid #f1f5f9;"></div>
+
+    {{-- Option B: the only destructive-red action in the modal --}}
+    <form method="POST" action="{{ route('logs.purge.all') }}" style="padding: 1.25rem 0;">
+        @csrf
+        @method('DELETE')
+        <p class="text-sm font-semibold text-red-700 mb-1">Purge all logs</p>
+        <p class="text-xs text-slate-500 mb-3">Permanently deletes every scan log in the system. Type <strong>PURGE</strong> below to confirm.</p>
+        <input type="text" name="confirm" required placeholder="Type PURGE to confirm"
+               style="width:100%; border-radius:0.5rem; border:1px solid #fecaca; padding:0.5rem 0.75rem; font-size:0.875rem; outline:none;">
+        <button type="submit"
+                onclick="event.preventDefault(); confirmPurge(this.form, 'This deletes ALL audit logs permanently. Continue?');"
+                style="margin-top:0.75rem; width:100%; border-radius:0.5rem; background:#dc2626; padding:0.625rem 0; font-size:0.875rem; font-weight:700; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+            Delete All Logs
+        </button>
+    </form>
+</div>
 
         <div class="flex justify-end border-t border-slate-200 px-6 py-3">
             <button type="button" onclick="closeDeleteModal()"
@@ -177,6 +189,14 @@
     function closeDeleteModal() {
         const overlay = document.getElementById('purgeModalOverlay');
         if (overlay) overlay.classList.add('hidden');
+    }
+
+    function confirmPurge(form, message) {
+    document.getElementById('confirmPurgeMessage').textContent = message;
+    document.getElementById('confirmPurgeOverlay').classList.remove('hidden');
+    document.getElementById('confirmPurgeSubmitBtn').onclick = function () {
+        form.submit();
+    };
     }
 
     // ---- Flat-tab toggle ----
