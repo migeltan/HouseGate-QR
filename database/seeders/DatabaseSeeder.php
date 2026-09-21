@@ -38,5 +38,7 @@ class DatabaseSeeder extends Seeder
                 );
             }
         }
+
+        $this->call([CongressmanSeeder::class]); // needs the buildings above to exist
     }
 }

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Building;
+use App\Models\Congressman;
 use App\Models\VisitorPass;
 use App\Models\PassRegistration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class PassController extends Controller
 {
@@ -38,7 +40,21 @@ class PassController extends Controller
         }
         $passes = $passesQuery->orderBy('building_id')->orderBy('pass_number')->get();
 
-        return view('passes.index', compact('buildings', 'passes', 'displayBuildings'));
+        // Congressman roster for the registration modal. $buildings is already
+        // guard-scoped and excludes North Gate, so guards only get their own building.
+        $roster = Congressman::inBuildings($buildings->pluck('id')->all())
+            ->orderBy('name')
+            ->get(['id', 'name', 'rep_detail', 'room', 'building_id'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'detail' => $c->rep_detail,
+                'room' => $c->room,
+                'b' => $c->building_id,
+            ])
+            ->values();
+
+        return view('passes.index', compact('buildings', 'passes', 'displayBuildings', 'roster'));
     }
 
     public function register(Request $request)
@@ -59,7 +75,9 @@ class PassController extends Controller
             'visitor_email' => 'nullable|email|max:255',
             'id_type' => 'required|string|max:255',
             'id_ref' => 'required|string|max:255',
-            'office_to_visit' => 'required|string|max:255',
+            'congressman_ids' => 'nullable|array',
+            'congressman_ids.*' => 'integer|exists:congressmen,id',
+            'office_other' => 'nullable|string|max:255',
             'purpose' => 'required|string|max:255',
             'vehicle' => 'nullable|string|max:255',
             'registered_by' => 'nullable|string|max:255',
@@ -72,6 +90,27 @@ class PassController extends Controller
         if (count($data['building_ids']) > 1) {
             abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a North Gate Access (multi-building) pass.');
         }
+
+                // Building lock: every chosen congressman must sit in one of the submitted
+        // buildings (for guards, building_ids was already forced to their own).
+        $congressmanIds = array_values(array_unique($data['congressman_ids'] ?? []));
+        $other = trim($data['office_other'] ?? '');
+
+        $congressmen = Congressman::inBuildings($data['building_ids'])
+            ->whereIn('id', $congressmanIds)
+            ->get();
+
+        if ($congressmen->count() !== count($congressmanIds)) {
+            return back()->withErrors('One or more selected congressmen are not in the selected building(s).')->withInput();
+        }
+
+        if ($congressmen->isEmpty() && $other === '') {
+            return back()->withErrors('Choose at least one congressman, or fill in "Other".')->withInput();
+        }
+
+        $data['congressman_ids'] = $congressmen->pluck('id')->all();
+        $data['office_other'] = $other !== '' ? $other : null;
+        $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other']);
 
         if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
             $cap = VisitorPass::addWorkingDays(now(), VisitorPass::MAX_LONG_TERM_WORKING_DAYS);
@@ -170,6 +209,23 @@ class PassController extends Controller
 
         return redirect()->route('passes.index')
             ->with('success', "Updated authorized buildings for Pass #{$pass->pass_number}.");
+
+        
+        // Buildings removed → drop those buildings' congressmen from the open registration
+        // and rebuild the summary so it no longer names people the pass doesn't cover.
+        if ($registration = $pass->openRegistration()) {
+            $stale = $registration->congressmen()
+                ->whereNotIn('congressmen.building_id', $data['building_ids'])
+                ->pluck('congressmen.id');
+
+            if ($stale->isNotEmpty()) {
+                $registration->congressmen()->detach($stale->all());
+
+                $summary = $this->officeSummary($registration->congressmen()->get(), $registration->office_other);
+                $registration->update(['office_to_visit' => $summary]);
+                $pass->update(['office_to_visit' => $summary]);
+            }
+        }
     }
 
     public function show(Request $request, VisitorPass $pass)
@@ -279,7 +335,7 @@ class PassController extends Controller
             'registered_by' => $data['registered_by'] ?? null,
         ]);
 
-        PassRegistration::create([
+        $registration = PassRegistration::create([
             'visitor_pass_id' => $pass->id,
             'visitor_name' => $fullName,
             'first_name' => $data['first_name'],
@@ -298,8 +354,29 @@ class PassController extends Controller
             'registered_by' => $data['registered_by'] ?? null,
             'pass_class' => $data['pass_class'],
             'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
+            'office_other' => $data['office_other'] ?? null,
             'registered_at' => now(),
         ]);
+
+        $registration->congressmen()->sync($data['congressman_ids'] ?? []);
+    }
+
+    /**
+     * One-line "who they're visiting" text kept in office_to_visit so the info
+     * modal and pre-existing passes keep working. The pivot holds the real data.
+     */
+    private function officeSummary(\Illuminate\Support\Collection $congressmen, ?string $other): string
+    {
+        $parts = $congressmen->sortBy('name')
+            ->map(fn ($c) => $c->name . ($c->room ? " ({$c->room})" : ''))
+            ->values()
+            ->all();
+
+        if ($other) {
+            $parts[] = "Other: {$other}";
+        }
+
+        return Str::limit(implode('; ', $parts), 254, '…'); // column is 255 chars
     }
 
     private function storeVisitorPhoto(Request $request): ?string

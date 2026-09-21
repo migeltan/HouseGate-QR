@@ -21,7 +21,7 @@ class ScannerController extends Controller
         $recentLogs = ScanLog::with(['visitorPass', 'scannedBuilding'])->latest()->limit(50)->get();
 
         // Admin still picks freely; guard's building comes from their locked session value.
-        $lockedBuildingId = auth()->user()->isGuard() ? session('assigned_building_id') : null;
+        $lockedBuildingId = request()->user()->isGuard() ? session('assigned_building_id') : null;
         $lockedBuilding = $lockedBuildingId ? Building::find($lockedBuildingId) : null;
 
         return view('scanner.index', compact('buildings', 'passes', 'recentLogs', 'lockedBuilding'));
@@ -83,7 +83,9 @@ class ScannerController extends Controller
             $passNumber = $pass->pass_number;
             $authorizedBuildingName = $pass->authorizedBuildingNames();
             $colorHex = $pass->is_multi_building ? self::BADGE_MULTI_COLOR : $pass->building->color_hex;
-            $photoUrl = $pass->photo_path ? Storage::disk('public')->url($pass->photo_path) : null;
+                        /** @var \Illuminate\Filesystem\FilesystemAdapter $publicDisk */
+            $publicDisk = Storage::disk('public');
+            $photoUrl = $pass->photo_path ? $publicDisk->url($pass->photo_path) : null;
 
             if ($pass->status === 'expired') {
                 $result = 'EXPIRED';
@@ -148,6 +150,21 @@ class ScannerController extends Controller
                 ->values();
         }
 
+                // Who this visitor is here to see (from the pass's open registration).
+        // Shows every congressman on the pass, plus any free-text "Other" office.
+        $visiting = [];
+        if ($pass && ($registration = $pass->openRegistration())) {
+            $visiting = $registration->congressmen()
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($c) => ['name' => $c->name, 'room' => $c->room])
+                ->all();
+
+            if ($registration->office_other) {
+                $visiting[] = ['name' => $registration->office_other, 'room' => null];
+            }
+        }
+
         return response()->json([
             'result' => $result,
             'reason' => $reason,
@@ -163,6 +180,7 @@ class ScannerController extends Controller
             'stale_notice' => $staleNotice,
             'direction' => $direction,
             'recent_activity' => $recentActivity,
+            'visiting' => $visiting,
         ]);
     }
 }

@@ -429,11 +429,7 @@
                     </div>
 
                     <div class="reg-form-grid">
-                        <div class="reg-field half">
-                            <label>Office to Visit/Manager <span class="reg-required">*</span></label>
-                            <input type="text" name="office_to_visit" required placeholder="e.g. Congressman Dela Cruz">
-                        </div>
-                        <div class="reg-field half">
+                        <div class="reg-field full">
                             <label>Reason for Visiting <span class="reg-required">*</span></label>
                             <input type="text" name="purpose" required>
                         </div>
@@ -453,6 +449,18 @@
                             <p class="reg-north-gate-hint" id="northGateHint">
                                 2 or more buildings selected — this will be issued as a <strong>North Gate Access</strong> pass, valid at all selected buildings.
                             </p>
+                        </div>
+
+                        <div class="reg-field full" id="congressmanField">
+                            <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen from the selected building(s) are listed)</span></label>
+                            <div class="cong-picker" id="congPicker">
+                                <div class="cong-chips" id="congChips"></div>
+                                <input type="text" id="congSearch" autocomplete="off" disabled placeholder="Select a building first…">
+                                <div class="cong-list" id="congList"></div>
+                            </div>
+                            <div id="congHiddenInputs"></div>
+                            <label class="optional" style="margin-top:10px;">Other <span class="optional">(office or person not in the list — required if no congressman is chosen)</span></label>
+                            <input type="text" name="office_other" id="officeOther" maxlength="255" required placeholder="e.g. HR Office, Secretariat">
                         </div>
 
                         <div class="reg-field half">
@@ -507,7 +515,129 @@ function updateBuildingSelection() {
 
     submitBtn.disabled = checked === 0;
     submitBtn.style.opacity = submitBtn.disabled ? '0.5' : '1';
+
+    refreshCongPicker();
 }
+
+// ---- Congressman picker (filtered by the ticked building(s)) ----
+const CONGRESSMEN = @json($roster);
+const BUILDING_NAMES = @json($buildings->pluck('name', 'id'));
+const selectedCong = new Map();
+
+function checkedBuildingIds() {
+    return Array.from(document.querySelectorAll('input[name="building_ids[]"]:checked')).map(c => Number(c.value));
+}
+
+function refreshCongPicker() {
+    const ids = checkedBuildingIds();
+
+    // A building was unticked → its congressmen drop out of the selection.
+    for (const [id, c] of selectedCong) {
+        if (!ids.includes(c.b)) selectedCong.delete(id);
+    }
+
+    const search = document.getElementById('congSearch');
+    search.disabled = ids.length === 0;
+    search.placeholder = ids.length ? 'Search name, district or room…' : 'Select a building first…';
+    if (!ids.length) search.value = '';
+
+    renderCongChips();
+    renderCongList();
+}
+
+function renderCongChips() {
+    const chips = document.getElementById('congChips');
+    const hidden = document.getElementById('congHiddenInputs');
+    chips.innerHTML = '';
+    hidden.innerHTML = '';
+
+    selectedCong.forEach(c => {
+        const chip = document.createElement('span');
+        chip.className = 'cong-chip';
+        chip.textContent = c.name + (c.room ? ' · ' + c.room : '');
+
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.setAttribute('aria-label', 'Remove ' + c.name);
+        x.onclick = () => { selectedCong.delete(c.id); renderCongChips(); renderCongList(); };
+        chip.appendChild(x);
+        chips.appendChild(chip);
+
+        const h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = 'congressman_ids[]';
+        h.value = c.id;
+        hidden.appendChild(h);
+    });
+
+    // "Other" is only mandatory when no congressman is picked.
+    document.getElementById('officeOther').required = selectedCong.size === 0;
+}
+
+function renderCongList() {
+    const list = document.getElementById('congList');
+    const ids = checkedBuildingIds();
+    const q = document.getElementById('congSearch').value.trim().toLowerCase();
+    list.innerHTML = '';
+    if (!ids.length) return;
+
+    const multi = ids.length > 1;
+    const matches = CONGRESSMEN
+        .filter(c => ids.includes(c.b) && !selectedCong.has(c.id) &&
+            (!q || (c.name + ' ' + (c.detail || '') + ' ' + (c.room || '')).toLowerCase().includes(q)))
+        .sort((a, b) => (multi ? String(BUILDING_NAMES[a.b]).localeCompare(String(BUILDING_NAMES[b.b])) : 0)
+            || a.name.localeCompare(b.name));
+
+    if (!matches.length) {
+        const empty = document.createElement('div');
+        empty.className = 'cong-empty';
+        empty.textContent = 'No matching congressman.';
+        list.appendChild(empty);
+        return;
+    }
+
+    let lastB = null;
+    matches.forEach(c => {
+        if (multi && c.b !== lastB) {
+            const g = document.createElement('div');
+            g.className = 'cong-group';
+            g.textContent = BUILDING_NAMES[c.b];
+            list.appendChild(g);
+            lastB = c.b;
+        }
+        const item = document.createElement('div');
+        item.className = 'cong-item';
+        const label = document.createElement('span');
+        label.textContent = c.name + (c.detail ? ' — ' + c.detail : '');
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = c.room || '';
+        item.append(label, meta);
+        // mousedown (not click) so the search box doesn't blur before we register the pick
+        item.addEventListener('mousedown', e => {
+            e.preventDefault();
+            selectedCong.set(c.id, c);
+            document.getElementById('congSearch').value = '';
+            renderCongChips();
+            renderCongList();
+        });
+        list.appendChild(item);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const search = document.getElementById('congSearch');
+    const list = document.getElementById('congList');
+    const open = () => { renderCongList(); list.classList.add('is-open'); };
+    search.addEventListener('focus', open);
+    search.addEventListener('input', open);
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#congPicker')) list.classList.remove('is-open');
+    });
+    refreshCongPicker();
+});
+// ---- End congressman picker ----
 
 const journeySteps = [
     "{{ asset('images/carousel/step1.svg') }}",
@@ -706,6 +836,8 @@ function closeRegisterModal() {
     resetPhotoCapture();
     resetIdPhotoCapture();
     setPassClass('day');
+    setPassClass('day');
+    selectedCong.clear();
     updateBuildingSelection();
 }
 

@@ -382,3 +382,88 @@
         min-width: 0;
     }
 }
+
+/* Congressman picker (Step 3) */
+.cong-picker {
+    position: relative;
+}
+.cong-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.cong-chips:empty {
+    display: none;
+}
+.cong-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #eef4fc;
+    border: 1px solid #245ba6;
+    border-radius: 999px;
+}
+.cong-chip button {
+    padding: 0 4px;
+    font-size: 15px;
+    line-height: 1;
+    color: #475569;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+.cong-list {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    z-index: 20;
+    max-height: 240px;
+    overflow-y: auto;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid #b8c2cf;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+}
+.cong-list.is-open {
+    display: block;
+}
+.cong-group {
+    position: sticky;
+    top: 0;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #475569;
+    background: #f1f5f9;
+}
+.cong-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.cong-item:hover {
+    background: #eef4fc;
+}
+.cong-item .meta {
+    color: #64748b;
+    white-space: nowrap;
+}
+.cong-empty {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #64748b;
+}

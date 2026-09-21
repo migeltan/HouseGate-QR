@@ -42,9 +42,11 @@ This prototype implements a simple core mechanism: every visitor pass is tied to
 - **Scan-time verification photo capture** — in addition to the visitor/ID photos captured at registration, the scanner can capture and store a live webcam snapshot _at the moment of each scan_ (`ScanVerificationPhoto`, linked to both the `scan_log` row and the pass), giving guards a photo taken at the actual point of entry/exit, not just at registration.
 - **Reminder emails** — if a visitor supplied an email, the daily sweep queues a "you're still checked in" reminder (`MissingEgressReminder`) and, for long-term passes nearing their return date, a "your pass is expiring soon" reminder (`PassExpiringSoon`). **Note:** these are queued, not sent synchronously — see Known Issues for what that means for local testing.
 - **Visitor photo + ID photo capture** — webcam snapshots for both the visitor and their ID can be captured at registration time and stored per-pass, returned by the scanner endpoint for the guard to visually confirm identity.
-- **ID type + reference tracking, structured name/gender/contact fields** — registration records first/middle/last name, gender, contact number, ID type/reference, office to visit, and vehicle info, not just a single free-text name.
+- **ID type + reference tracking, structured name/gender/contact fields** — registration records first/middle/last name, gender, contact number, ID type/reference, destination (congressman(s) and/or another office), and vehicle info, not just a single free-text name.
 - **Guard scanning terminal** — a live scanner page where a guard (building locked server-side to their session) or admin (free choice) scans a visitor's QR (webcam, USB scanner, or manual token paste) to get an instant AUTHORIZED/UNAUTHORIZED/BLOCKED/EXPIRED/REVOKED/INVALID decision.
 - **Pass registry** — view all passes (guards see only their own building's single-building passes), register a visitor to an available pass, edit authorized buildings on a North Gate Access pass, unassign/return a pass to available stock, revoke a pass, and view/print an individual pass's QR badge.
+- **Congressman directory & per-building destination picker** — the registration form's destination is chosen from a roster of House members (`congressmen` table, loaded from `database/data/congressmen.csv` by `CongressmanSeeder`, keyed on the directory's `member_id`) instead of typed as free text. Each member belongs to the building their office room is in (room prefixes `NW`, `SW`, `SWA`, `RVM`, `MB`), and the picker only lists members from the building(s) ticked for the pass — for a North Gate Access pass, the union of the ticked buildings, grouped by building. A visitor can be going to one or several congressmen, or to an **Other** free-text office if the destination isn't a member. The building rule is enforced server-side in `PassController::register` (not just by the UI filter), and guards inherit it through their locked building. Picks are stored on the pass's registration (`pass_registration_congressman` pivot), so unassigning a pass leaves the history intact, and removing a building from a North Gate Access pass automatically drops that building's congressmen. `office_to_visit` is still filled with a readable one-line summary for the pass info modal.
+- **Who they're visiting, at scan time** — the scanner status panel lists each congressman and room the visitor is going to (e.g. `Aquino, Jose II S. — SWA-113`), plus any "Other" office, read live from the pass's open registration (`ScannerController::scan()` returns it as `visiting`).
 - **Audit log** — two parallel, searchable/filterable trails: scan attempts (`scan_logs`, includes which logged-in user performed the scan) and pass registrations (`pass_registrations`, an append-only history of who was ever assigned to a pass and when/why it was released). Both export to CSV. Admin-only tools purge scan logs by date range or purge everything, guarded by a typed confirmation keyword (`PURGE`, case-insensitive, checked server-side); registrations are intentionally never purgeable.
 
 ---
@@ -55,10 +57,9 @@ This prototype implements a simple core mechanism: every visitor pass is tied to
 
 - **AuthController** — login (HREP ID + password + role, with guard building selection), logout.
 - **BuildingSelectController** — the "pick your building" screen shown to guards (not admins) after login if they haven't locked one in yet this session.
-- **ScannerController** — powers the guard/admin scanning terminal. Looks up the scanned QR token, checks pass status, building authorization, and current in/out state, decides the result, writes it to the audit log, and optionally stores a live verification photo.
-- **PassController** — handles the pass registry: registering single-building and North Gate Access passes, editing a multi pass's authorized buildings, unassigning or revoking a pass, capturing/storing the visitor + ID photos, and rendering the printable QR badge view. Also enforces guard-vs-admin scoping (a guard only ever sees/acts on their own building's passes).
+- **ScannerController** — powers the guard/admin scanning terminal. Looks up the scanned QR token, checks pass status, building authorization, and current in/out state, decides the result, writes it to the audit log, and optionally stores a live verification photo. It also returns a `visiting` list (the congressmen and rooms on the pass's open registration, plus any "Other" office) for the status panel.
+- **PassController** — handles the pass registry: registering single-building and North Gate Access passes, editing a multi pass's authorized buildings, unassigning or revoking a pass, capturing/storing the visitor + ID photos, and rendering the printable QR badge view. Also enforces guard-vs-admin scoping (a guard only ever sees/acts on their own building's passes). It also passes the congressman roster to the registration modal, validates that every chosen congressman belongs to a submitted building, and keeps `office_to_visit` in sync as a summary of the picks (dropping congressmen from removed buildings when a North Gate Access pass is edited).
 - **LogController** — handles viewing, searching/filtering, CSV-exporting, and purging (by date range or entirely) the scan-log audit trail, plus the separate read-only pass-registration history.
-- **Filler.php** — **not a real controller and not valid PHP** (it's literal placeholder text with no `<?php` opening tag — see Known Issues). Safe to delete; it isn't referenced by any route.
 
 ### `app/Http/Middleware/`
 
@@ -68,25 +69,27 @@ This prototype implements a simple core mechanism: every visitor pass is tied to
 ### `app/Models/`
 
 - **Building** — the seeded HOR buildings, each with a code, name, color, and badge template/QR-color design fields.
+- **Congressman** — one House member from the directory: `member_id`, name, representation type/detail (district or party-list), the building their office is in, floor, room, and an `is_active` flag (members dropped from a newer roster CSV are deactivated, not deleted, so old registrations still resolve).
 - **VisitorPass** — an individual pass: visitor info, ID type/reference, status, `pass_class` (day/long_term), QR token, current building (for in/out tracking), photo paths, reminder-sent flags, and (for North Gate Access passes) a many-to-many link to its authorized buildings.
-- **PassRegistration** — an append-only record of one visitor's assignment to a pass: who they were, when they were registered, and when/why they were later unassigned. A pass can have many of these over its lifetime; `VisitorPass::openRegistration()` finds the currently-active one.
+- **PassRegistration** — an append-only record of one visitor's assignment to a pass: who they were, when they were registered, and when/why they were later unassigned. A pass can have many of these over its lifetime; `VisitorPass::openRegistration()` finds the currently-active one. Each registration also links to the congressmen the visitor is going to (`congressmen()`), plus an optional free-text `office_other`.
 - **ScanLog** — a permanent, immutable-by-design record of every scan attempt (a snapshot of the visitor/pass/building at scan time), its result, reason, direction (in/out), and which authenticated user performed the scan.
 - **ScanVerificationPhoto** — the optional live photo captured at the moment of a specific scan, linked to that `ScanLog` row and (if matched) the `VisitorPass`.
 - **User** — `admin` or `guard` role, plus an `hrep_id` reference field. Password is hash-cast automatically (`'password' => 'hashed'`), so seeders/forms can pass plaintext and it's stored hashed.
 
-### `app/console/Commands/` _(see Known Issues re: folder casing)_
+### `app/console/commands/` _(lowercase folder names — see Known Issues #5)_
 
 - **DailyPassSweep** — `php artisan passes:daily-sweep`, scheduled nightly at 19:00 (`routes/console.php`). Auto-expires due day/long-term passes and queues the two reminder emails.
 - **GenerateMultiBuildingPasses** — `php artisan passes:seed-multi {count=5}`, a dev utility that generates sample North Gate Access passes (each randomly authorized for 2–3 buildings) for testing scanner validation logic.
 
 ### `database/migrations/`
 
-Version-controlled schema changes, applied in order via `php artisan migrate`. Beyond the original buildings/passes/scan-logs tables, later migrations added: building design fields, multi-building pivot support, occupancy tracking, visitor photo storage, ID type tracking, `pass_class`/long-term/reminder fields, the `pass_registrations` table, retiring the old dedicated "MULTI" building into North Gate, user roles/`hrep_id`, `scanned_by_user_id` on scan logs, structured visitor detail fields (first/middle/last name, gender, contact, office, vehicle), and the `scan_verification_photos` table.
+Version-controlled schema changes, applied in order via `php artisan migrate`. Beyond the original buildings/passes/scan-logs tables, later migrations added: building design fields, multi-building pivot support, occupancy tracking, visitor photo storage, ID type tracking, `pass_class`/long-term/reminder fields, the `pass_registrations` table, retiring the old dedicated "MULTI" building into North Gate, user roles/`hrep_id`, `scanned_by_user_id` on scan logs, structured visitor detail fields (first/middle/last name, gender, contact, office, vehicle), the `scan_verification_photos` table, the `congressmen` roster table, and the `pass_registration_congressman` pivot (plus `office_other` on `pass_registrations`).
 
 ### `database/seeders/`
 
-- **DatabaseSeeder** — calls `UserSeeder` first, then seeds the 6 real buildings (with colors and badge templates) and 5 available passes each with pre-formatted QR tokens (e.g. `HOR-20TH-NW-0001-SEC2026`). Safe to re-run — it updates existing rows rather than duplicating them (`updateOrCreate`).
+- **DatabaseSeeder** — calls `UserSeeder` first, then seeds the 6 real buildings (with colors and badge templates) and 5 available passes each with pre-formatted QR tokens (e.g. `HOR-20TH-NW-0001-SEC2026`). Safe to re-run — it updates existing rows rather than duplicating them (`updateOrCreate`). It finishes by calling `CongressmanSeeder`.
 - **UserSeeder** — seeds the two demo accounts, `admin@lsb.local` / `guard@lsb.local` (password `changeme123` for both). **It is wired into `DatabaseSeeder::run()`** — a plain `php artisan db:seed` seeds both users and buildings/passes in one command. (Earlier drafts of this README said it wasn't wired in yet; that's since been fixed in the code and the Setup section below no longer lists it as a separate step.)
+- **CongressmanSeeder** — loads `database/data/congressmen.csv` (columns: `member_id, name, rep_type, rep_detail, building_code, floor, room`) into the `congressmen` table, upserting by `member_id`, so re-running it after a room change updates rather than duplicates. Members missing from a newer CSV are marked inactive. It needs the buildings to exist first, which is why `DatabaseSeeder` calls it last. Run it alone with `php artisan db:seed --class=CongressmanSeeder`.
 
 ### `resources/views/`
 
@@ -123,7 +126,7 @@ Laravel's working directory — application logs (`storage/logs/laravel.log`), c
 
 ## Core Flow (How a Scan Actually Works)
 
-1. A visitor is registered under **Passes** — assigned to an available single-building pass, or (admin only) issued a North Gate Access pass authorized for several buildings — capturing a visitor photo and ID photo.
+1. A visitor is registered under **Passes** — assigned to an available single-building pass, or (admin only) issued a North Gate Access pass authorized for several buildings — choosing the congressman(s) (or an "Other" office) they're visiting from a list limited to the selected building(s), and capturing a visitor photo and ID photo.
 2. A guard opens the **Scanner** (building locked to their session) or an admin opens it and picks any building.
 3. The guard/admin scans the visitor's QR code (webcam, USB scanner, or manual token entry), optionally capturing a live verification photo of the visitor at that moment.
 4. The scan is checked against the pass's status, its authorized building(s), and where it's currently checked in:
@@ -132,7 +135,7 @@ Laravel's working directory — application logs (`storage/logs/laravel.log`), c
     - Not authorized for this building → **UNAUTHORIZED**
     - Currently checked into a _different_ building → **BLOCKED** (must scan out first)
     - Otherwise → **AUTHORIZED**, and the visitor is checked **in** (if not currently inside anywhere) or checked **out** (if currently inside this building)
-5. The result, reason, and (if available) the visitor's photo are shown instantly and written to `scan_logs`, tagged with the authenticated user who performed the scan.
+5. The result, reason, and (if available) the visitor's photo are shown instantly and written to `scan_logs`, tagged with the authenticated user who performed the scan. The status panel also lists the congressman(s) and room(s) the visitor is going to (shown live, not stored in `scan_logs`).
 6. **Logs** shows the full searchable/filterable history for both scans and registrations, exportable to CSV, with optional purge tools (admin only).
 
 ---
@@ -148,7 +151,7 @@ php artisan key:generate
 touch database/database.sqlite
 
 php artisan migrate
-php artisan db:seed              # seeds both demo users AND buildings/passes in one go
+php artisan db:seed              # seeds demo users, buildings/passes AND the congressman roster in one go
 php artisan storage:link         # needed for visitor/ID/verification photo uploads to be publicly viewable
 
 npm install
@@ -163,7 +166,8 @@ php artisan serve
 
 ```bash
 php artisan migrate               # apply database schema changes
-php artisan db:seed               # populate/update demo users + buildings + passes
+php artisan db:seed               # populate/update demo users + buildings + passes + congressman roster
+php artisan db:seed --class=CongressmanSeeder   # reload just the roster after editing database/data/congressmen.csv
 php artisan passes:seed-multi 5   # generate sample North Gate Access passes for testing
 php artisan passes:daily-sweep    # manually run the expiry/reminder sweep (normally scheduled at 19:00)
 php artisan queue:work            # process queued reminder emails (needed for emails to actually go out)
@@ -182,9 +186,50 @@ Re-verified against the current codebase this pass. Findings marked **(new)** we
 2. UI on PURGE needs to be fixed.
 3. UI on QR fallback mode still looks like it does not belong there.
 4. UI on the header, improvements and also improve the admin/personnel information there.
-5. **`Filler.php` is dead placeholder text, not code.** `app/Http/Controllers/Filler.php` contains no `<?php` tag at all — it's literal filler text ("adadadad..."). It isn't autoloaded as a class or referenced by any route, so it's harmless, but it should just be deleted. **(new)**
-6. **Two stray files at the repo root:** `laravel` (a 0-byte empty file — likely an accidental `php artisan` typo committed by mistake, e.g. running `php artisan` with a typo that created a file named `laravel`) and `resources.zip` (a ~10 KB zip that appears to be a stale duplicate of the `resources/` folder). Neither is referenced anywhere; both are safe to delete. **(new)**
-7. **The default scaffold test is stale and will fail if run.** `tests/Feature/ExampleTest.php` still asserts `GET /` returns `200`, but `/` (the scanner page) now requires `auth` + `building.selected` middleware, so an unauthenticated request will redirect (302), not return 200. It should be replaced with real feature tests (login flow, scan decision logic, expiry sweep) or at minimum updated to hit `/login` instead. **(new)**
+5. **Folder casing: `app/console/commands/`.** The scheduled commands live in an all-lowercase path, but their namespace is `App\Console\Commands`. This works on Windows/macOS (case-insensitive) and will break autoloading on a case-sensitive Linux server. Rename both folders to `app/Console/Commands/` (on Windows use a two-step `git mv` through a temporary name, since git won't see a case-only rename).
+6. **Two stray files at the repo root:** `laravel` (a 0-byte empty file) and `resources.zip` (a ~10 KB stale duplicate of `resources/`). Neither is referenced anywhere; both are safe to delete.
+7. **Only scaffold tests exist.** `ExampleTest` now checks `/login`, but nothing covers scan decision logic, the expiry sweep, login/role scoping, or the congressman building lock.
+8. **Visit destination — known gaps.** (a) The visit list is shown live at scan time but not snapshotted into `scan_logs`, so the Logs panel/CSV don't show it and a past scan loses it once the pass is reassigned. (b) Passes registered before this feature have no congressmen attached, so the scanner's "Visiting" line is blank for them. (c) The roster is CSV-only (no admin screen), and a few rows were assigned by hand: one member has no room, and three rooms are shared by two members each.
+
+---
+
+## Planned Features / To-Do
+
+> Not implemented yet — this section documents intent and design options.
+
+### Government ID scanning (auto-fill from the ID)
+
+**Goal.** When a guard captures the visitor's ID photo at registration (already supported), the system reads the card and pre-fills the visitor's basic details — full name (first/middle/last), ID type, ID number, date of birth, sex, and where present the address and expiry date — so the guard confirms instead of typing. Target the government-issued types already offered in the ID Type field first: Driver's License, UMID, Passport, SSS ID, PhilHealth ID, and PhilSys (National ID).
+
+**How it would work.**
+
+1. The registration modal already produces the ID photo as a base64 image. After capture, the browser POSTs it to a new endpoint (e.g. `POST /passes/scan-id`, handled by an `IdScanController`) that returns the extracted fields as JSON, each with a confidence score.
+2. The modal fills the matching inputs (`first_name`, `middle_name`, `last_name`, `gender`, `id_type`, `id_ref`) and highlights low-confidence fields. The guard reviews and edits; nothing is auto-submitted, and manual entry always stays available.
+3. The original ID photo is stored exactly as today. Raw OCR text is not persisted beyond the extracted fields.
+
+**Technology options** (decide before building):
+
+| Option                           | What it is                                                                                                   | Pros                                           | Cons                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Machine-readable codes           | Decode the passport MRZ, or the QR/barcode on IDs that carry one (e.g. PhilSys)                              | Far more reliable than OCR where a code exists | Not every ID has one; confirm what each code exposes and whether reading it is permitted |
+| Local OCR                        | Tesseract (via a PHP wrapper) or PaddleOCR/EasyOCR in a small Python service, plus per-ID-type parsing rules | Images never leave the LSB network             | Needs tuning per ID layout; accuracy depends on photo quality                            |
+| Cloud document/ID AI             | e.g. Google Document AI, AWS Textract (AnalyzeID), Azure Document Intelligence                               | Strong accuracy on supported document types    | ID images leave the local network; Philippine ID coverage may be limited or uneven       |
+| Hosted vision-language model API | Send the image with a structured-output prompt                                                               | Handles any layout without per-ID rules        | Same off-network concern, per-call cost, and occasional misreads that must be validated  |
+
+**Suggested path.** Local-first and hybrid: decode an MRZ/QR when the ID has one, otherwise run local OCR with per-ID-type parsers. Put it behind a small `IdExtractor` interface so a cloud or vision provider can be swapped in later if LSB approves.
+
+**Considerations.**
+
+- **Privacy/security:** government IDs are sensitive personal data, and this system is meant to run on a trusted local network. Prefer on-premise processing, and get LSB/data-protection sign-off (Data Privacy Act of 2012) before anything is processed off-network. ID photos are already stored unencrypted on local disk (see Status & Limitations), which matters more once data is extracted from them.
+- **Not identity verification:** reading text off a card does not detect fake or tampered IDs. The guard still compares the ID and the visitor's face.
+- **Accuracy:** benchmark on a small set of sample IDs per type (with consent or redacted) before choosing a tool; start with the 2–3 most commonly presented types.
+- **Capture quality:** add a framing guide and lighting hint to the existing ID camera step, since OCR quality depends heavily on the photo.
+
+### Other to-do items
+
+- Save the visit list (congressmen + rooms) as a snapshot on `scan_logs`, so the Logs panel and CSV export show who was visited.
+- Give admins a way to manage the congressman roster without editing the CSV and re-seeding.
+- Add real tests: login/roles, scan decision logic, the expiry sweep, and the congressman building lock.
 
 ---
 
@@ -193,8 +238,8 @@ Re-verified against the current codebase this pass. Findings marked **(new)** we
 The current layout is a standard, single-app Laravel structure (no dedicated `frontend/`/`backend/` split — Blade renders server-side and the scanner's client logic lives inline in its view). That's reasonable for a prototype this size, but as it grows, a few things would help:
 
 - Extract the scanner's inline `<script>` block into `resources/js/scanner.js` (or a small set of modules) so it's linted, versioned, and testable like the rest of the JS, instead of living inside a Blade file.
-- Fix the `app/console/Commands/` casing (see Known Issues #6).
-- Delete the dead/stray files (`Filler.php`, `laravel`, `resources.zip` — Known Issues #5 and #7).
+- Fix the `app/console/commands/` casing (see Known Issues #5).
+- Delete the stray files (`laravel`, `resources.zip` — Known Issues #6).
 - Add indexes to `visitor_passes.status` and `visitor_passes.current_building_id`, and a composite index on `scan_logs (result, created_at)`, since both are hit on nearly every request and will matter once the audit log grows.
 
 A fuller breakdown of restructuring options (including an optional frontend/backend split and a TypeScript migration path) is covered in the companion planning document, since that's a bigger design decision than a README should carry.

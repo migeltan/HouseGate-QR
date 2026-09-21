@@ -128,6 +128,7 @@
                     <div id="statusSubtitle" class="gov-status-subtitle"></div>
                     <div id="statusEntryLine" class="gov-status-extra-line"></div>
                     <div id="advisoryText" class="gov-status-extra-line"></div>
+                    <div id="statusVisiting" class="gov-status-extra-line"></div>
                 </div>
 
                 <div id="scanTimestamp" class="gov-status-timestamp"></div>
@@ -487,6 +488,12 @@ function displayScanResultUI(data) {
         ? `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`
         : data.reason;
 
+    // Congressman(s) / offices the visitor is going to, one per line.
+    const visiting = data.visiting || [];
+    document.getElementById('statusVisiting').innerText = visiting.length
+        ? 'Visiting:\n' + visiting.map(v => v.room ? `${v.name} — ${v.room}` : v.name).join('\n')
+        : '';
+        
     const directionBadge = document.getElementById('resDirectionBadge');
     if (data.direction === 'in') {
         directionBadge.textContent = 'IN';
