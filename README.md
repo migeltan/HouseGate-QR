@@ -205,6 +205,10 @@ Re-verified against the current codebase this pass. Findings marked **(new)** we
 
 1. The registration modal already produces the ID photo as a base64 image. After capture, the browser POSTs it to a new endpoint (e.g. `POST /passes/scan-id`, handled by an `IdScanController`) that returns the extracted fields as JSON, each with a confidence score.
 2. The modal fills the matching inputs (`first_name`, `middle_name`, `last_name`, `gender`, `id_type`, `id_ref`) and highlights low-confidence fields. The guard reviews and edits; nothing is auto-submitted, and manual entry always stays available.
+
+
+
+
 3. The original ID photo is stored exactly as today. Raw OCR text is not persisted beyond the extracted fields.
 
 **Technology options** (decide before building):
