@@ -67,18 +67,19 @@ class PassController extends Controller
         }
 
         $data = $request->validate([
-            'first_name' => 'required|string|max:255',
+                        'first_name' => 'nullable|string|max:255',
             'middle_name' => 'nullable|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'gender' => 'required|in:Male,Female,PNS',
-            'contact_no' => 'required|string|max:50',
+            'last_name' => 'nullable|string|max:255',
+            'gender' => 'nullable|in:Male,Female,PNS',
+            'contact_no' => 'nullable|string|max:50',
             'visitor_email' => 'nullable|email|max:255',
-            'id_type' => 'required|string|max:255',
+            'id_type' => 'nullable|string|max:255',
             'id_ref' => 'nullable|string|max:255',
             'congressman_ids' => 'nullable|array',
             'congressman_ids.*' => 'integer|exists:congressmen,id',
             'office_other' => 'nullable|string|max:255',
-            'purpose' => 'required|string|max:255',
+            'purpose_choice' => 'required|in:Official Business,Financial/Medical Assistance,Visit,Others',
+            'purpose_other' => 'required_if:purpose_choice,Others|nullable|string|max:255',
             'vehicle' => 'nullable|string|max:255',
             'registered_by' => 'nullable|string|max:255',
             'pass_class' => 'required|in:day,long_term',
@@ -86,6 +87,11 @@ class PassController extends Controller
             'building_ids' => 'required|array|min:1',
             'building_ids.*' => 'exists:buildings,id',
         ]);
+
+        // Reason is chosen from a fixed list; free text only applies when "Others" is picked.
+        $data['purpose'] = $data['purpose_choice'] === 'Others'
+            ? trim($data['purpose_other'])
+            : $data['purpose_choice'];
 
         if (count($data['building_ids']) > 1) {
             abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a North Gate Access (multi-building) pass.');
@@ -143,7 +149,9 @@ class PassController extends Controller
 
         $this->assignVisitorToPass($pass, $data, $request);
 
-        return redirect()->route('passes.index')->with('success', "Pass assigned to {$pass->visitor_name}.");
+                return redirect()->route('passes.index')
+            ->with('success', "Pass #{$pass->pass_number} assigned to {$pass->visitor_name} ({$pass->building->name}).")
+            ->with('success_pass_number', $pass->pass_number);
     }
 
     /**
@@ -186,7 +194,8 @@ class PassController extends Controller
 
         $buildingCount = count($data['building_ids']);
         return redirect()->route('passes.index')
-            ->with('success', "North Gate Access pass #{$pass->pass_number} issued to {$pass->visitor_name} for {$buildingCount} buildings.");
+            ->with('success', "North Gate Access pass #{$pass->pass_number} issued to {$pass->visitor_name} for {$buildingCount} buildings.")
+            ->with('success_pass_number', $pass->pass_number);
     }
 
     public function updateBuildings(Request $request, VisitorPass $pass)
@@ -306,22 +315,31 @@ class PassController extends Controller
         abort_unless((int) $pass->building_id === (int) session('assigned_building_id'), 403);
     }
 
-    private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): void
+       private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): void
     {
         $idPhotoPath = $this->storeIdPhoto($request) ?? $pass->id_photo_path;
-        $fullName = trim(preg_replace('/\s+/', ' ',
-            $data['first_name'] . ' ' . ($data['middle_name'] ?? '') . ' ' . $data['last_name']
-        ));
+        $fullName = trim(preg_replace('/\s+/', ' ', implode(' ', array_filter([
+            $data['first_name'] ?? null,
+            $data['middle_name'] ?? null,
+            $data['last_name'] ?? null,
+        ]))));
+        // Everything but building/reason/congressman is optional now, so a name can
+        // genuinely be blank. Store a real fallback string, never null — registerSingleBuilding()
+        // finds free passes via whereNull('visitor_name'), so null here would put an
+        // already-issued pass back in that pool.
+        if ($fullName === '') {
+            $fullName = 'Unnamed Visitor';
+        }
 
         $pass->update([
             'visitor_name' => $fullName,
-            'first_name' => $data['first_name'],
+            'first_name' => $data['first_name'] ?? null,
             'middle_name' => $data['middle_name'] ?? null,
-            'last_name' => $data['last_name'],
-            'gender' => $data['gender'],
-            'contact_no' => $data['contact_no'],
-            'id_ref' => $data['id_ref'],
-            'id_type' => $data['id_type'],
+            'last_name' => $data['last_name'] ?? null,
+            'gender' => $data['gender'] ?? null,
+            'contact_no' => $data['contact_no'] ?? null,
+            'id_ref' => $data['id_ref'] ?? null,
+            'id_type' => $data['id_type'] ?? null,
             'purpose' => $data['purpose'],
             'office_to_visit' => $data['office_to_visit'],
             'vehicle' => $data['vehicle'] ?? null,
@@ -338,13 +356,13 @@ class PassController extends Controller
         $registration = PassRegistration::create([
             'visitor_pass_id' => $pass->id,
             'visitor_name' => $fullName,
-            'first_name' => $data['first_name'],
+            'first_name' => $data['first_name'] ?? null,
             'middle_name' => $data['middle_name'] ?? null,
-            'last_name' => $data['last_name'],
-            'gender' => $data['gender'],
-            'contact_no' => $data['contact_no'],
-            'id_type' => $data['id_type'],
-            'id_ref' => $data['id_ref'],
+            'last_name' => $data['last_name'] ?? null,
+            'gender' => $data['gender'] ?? null,
+            'contact_no' => $data['contact_no'] ?? null,
+            'id_type' => $data['id_type'] ?? null,
+            'id_ref' => $data['id_ref'] ?? null,
             'photo_path' => $pass->photo_path,
             'id_photo_path' => $idPhotoPath,
             'purpose' => $data['purpose'],
@@ -359,8 +377,7 @@ class PassController extends Controller
         ]);
 
         $registration->congressmen()->sync($data['congressman_ids'] ?? []);
-    }
-
+}
     /**
      * One-line "who they're visiting" text kept in office_to_visit so the info
      * modal and pre-existing passes keep working. The pivot holds the real data.

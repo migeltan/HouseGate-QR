@@ -129,6 +129,7 @@
                     <div id="statusEntryLine" class="gov-status-extra-line"></div>
                     <div id="advisoryText" class="gov-status-extra-line"></div>
                     <div id="statusVisiting" class="gov-status-extra-line"></div>
+                    <div id="statusNoNameNotice" class="gov-status-extra-line hidden" style="color:#b45309; font-weight:700;">No name on file — verify identity via the ID photo.</div>
                 </div>
 
                 <div id="scanTimestamp" class="gov-status-timestamp"></div>
@@ -184,6 +185,10 @@
                  class="result-photo-placeholder">
                 <i class="fa-solid fa-user"></i>
             </div>
+
+            <button type="button" id="viewIdPhotoBtn" class="hidden" style="margin-top:8px; font-size:12.5px; width:100%;" onclick="showIdPhotoPopup()">
+                <i class="fa-solid fa-id-card"></i> View ID Photo
+            </button>
         </div>
 
         <div class="gov-meta-grid">
@@ -419,14 +424,7 @@ function displayScanResultUI(data) {
         el.classList.add('anim-fade-in-up');
     });
 
-    /*
     document.getElementById('scanTimestamp').innerText = data.timestamp;
-    document.getElementById('resVisitorName').innerText = data.visitor_name;
-    document.getElementById('resPassNum').innerText = data.pass_number;
-    document.getElementById('resPassBldg').innerText = data.authorized_building;
-    document.getElementById('resScanLoc').innerText = data.scanned_building;
-    */
-       document.getElementById('scanTimestamp').innerText = data.timestamp;
     document.getElementById('resVisitorName').innerText = data.visitor_name;
     document.getElementById('resPassNum').innerText = data.pass_number;
     document.getElementById('resPassBldg').innerText = data.authorized_building;
@@ -462,6 +460,10 @@ function displayScanResultUI(data) {
         photoImg.classList.add('hidden');
         photoPlaceholder.classList.remove('hidden');
     }
+
+    window.__lastIdPhotoUrl = data.id_photo_url || null;
+    document.getElementById('viewIdPhotoBtn').classList.toggle('hidden', !window.__lastIdPhotoUrl);
+    document.getElementById('statusNoNameNotice').classList.toggle('hidden', data.visitor_name !== 'Unnamed Visitor');
 
     const header = document.getElementById('statusHeader');
     const advisory = document.getElementById('advisoryText');
@@ -614,6 +616,21 @@ function captureSecurityFrame() {
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+function showIdPhotoPopup() {
+    if (!window.__lastIdPhotoUrl) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'gov-toast-container';
+    overlay.innerHTML = `
+        <div class="gov-toast" style="max-width:520px; padding:1rem;">
+            <img src="${window.__lastIdPhotoUrl}" alt="ID photo" style="width:100%; border-radius:0.6rem;">
+            <button type="button" class="gov-toast-action" style="margin-top:1rem;">Close</button>
+        </div>
+    `;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector('.gov-toast-action').addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
 }
 
 </script>

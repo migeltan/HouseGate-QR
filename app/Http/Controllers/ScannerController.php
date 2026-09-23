@@ -70,6 +70,7 @@ class ScannerController extends Controller
         $authorizedBuildingName = 'None';
         $colorHex = '#64748b';
         $photoUrl = null;
+        $idPhotoUrl = null;
 
         $staleNotice = null;
         if ($pass && $pass->hasStaleOccupancy()) {
@@ -86,6 +87,7 @@ class ScannerController extends Controller
                         /** @var \Illuminate\Filesystem\FilesystemAdapter $publicDisk */
             $publicDisk = Storage::disk('public');
             $photoUrl = $pass->photo_path ? $publicDisk->url($pass->photo_path) : null;
+            $idPhotoUrl = $pass->id_photo_path ? $publicDisk->url($pass->id_photo_path) : null;
 
             if ($pass->status === 'expired') {
                 $result = 'EXPIRED';
@@ -174,6 +176,7 @@ class ScannerController extends Controller
             'scanned_building' => $scannerBuilding->name,
             'color_hex' => $colorHex,
             'photo_url' => $photoUrl,
+            'id_photo_url' => $idPhotoUrl,
             'timestamp' => $log->created_at->format('h:i:s A'),
             'pass_class' => $pass?->pass_class,
             'days_remaining' => $pass?->daysRemaining(),

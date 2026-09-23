@@ -237,7 +237,7 @@
                                             @csrf
                                             <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-ban"></i> Revoke</button>
                                         </form>
-                                        <button type="button" class="gov-pass-row-btn is-ghost" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
+                                        <button type="button" class="gov-pass-row-btn is-ghost" data-pass-number="{{ $p->pass_number }}" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
                                     @else
                                         <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
                                     @endif
@@ -346,6 +346,29 @@
                                 <button type="button" id="captureIdBtn" class="reg-button reg-button-blue hidden" onclick="captureIdPhoto()">Capture</button>
                                 <button type="button" id="retakeIdBtn" class="reg-button hidden" onclick="retakeIdPhoto()">Retake</button>
                             </div>
+
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; cursor:pointer; margin-top:10px;">
+                                <input type="checkbox" id="idBackToggle" onchange="toggleIdBackCapture()">
+                                Also scan the back (e.g. PhilSys QR) for faster, more accurate autofill
+                            </label>
+                            <div class="reg-camera-col hidden" id="idBackSection" style="padding:0; margin-top:10px;">
+                                <div class="reg-camera-preview" id="idBackCaptureArea" style="aspect-ratio:1/1;">
+                                    <span class="reg-focus-corner tl"></span>
+                                    <span class="reg-focus-corner tr"></span>
+                                    <span class="reg-focus-corner bl"></span>
+                                    <span class="reg-focus-corner br"></span>
+                                    <video id="idBackVideo" autoplay playsinline class="hidden"></video>
+                                    <img id="idBackPreview" class="hidden" alt="Captured ID back">
+                                    <span id="idBackPlaceholderText">Awaiting ID Back</span>
+                                </div>
+                                <div class="reg-camera-actions">
+                                    <button type="button" id="startIdBackCameraBtn" class="reg-button reg-button-blue" onclick="startIdBackCamera()">
+                                        <span aria-hidden="true">&#9654;</span> Start Camera
+                                    </button>
+                                    <button type="button" id="captureIdBackBtn" class="reg-button reg-button-blue hidden" onclick="captureIdBackPhoto()">Capture</button>
+                                    <button type="button" id="retakeIdBackBtn" class="reg-button hidden" onclick="retakeIdBackPhoto()">Retake</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -354,6 +377,8 @@
                                         <canvas id="idPhotoCanvas" class="hidden"></canvas>
                     <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+                    <canvas id="idBackCanvas" class="hidden"></canvas>
                 </section>
 
                 {{-- Step 2: Visitor Information --}}
@@ -368,21 +393,21 @@
 
                     <div class="reg-form-grid">
                         <div class="reg-field">
-                            <label>First Name <span class="reg-required">*</span></label>
-                            <input type="text" name="first_name" required>
+                            <label class="optional">First Name</label>
+                            <input type="text" name="first_name">
                         </div>
                         <div class="reg-field">
                             <label class="optional">Middle Name</label>
                             <input type="text" name="middle_name">
                         </div>
                         <div class="reg-field">
-                            <label>Last Name <span class="reg-required">*</span></label>
-                            <input type="text" name="last_name" required>
+                            <label class="optional">Last Name</label>
+                            <input type="text" name="last_name">
                         </div>
 
                         <div class="reg-field">
-                            <label>Gender / Sex <span class="reg-required">*</span></label>
-                            <select name="gender" required>
+                            <label class="optional">Gender / Sex</label>
+                            <select name="gender">
                                 <option value="">Select</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -390,8 +415,8 @@
                             </select>
                         </div>
                         <div class="reg-field">
-                            <label>Contact No. <span class="reg-required">*</span></label>
-                            <input type="text" name="contact_no" required placeholder="+(63) ...">
+                            <label class="optional">Contact No.</label>
+                            <input type="text" name="contact_no" placeholder="+(63) ...">
                         </div>
                         <div class="reg-field">
                             <label class="optional">Email Address</label>
@@ -399,8 +424,8 @@
                         </div>
 
                         <div class="reg-field half">
-                            <label>Government ID Type <span class="reg-required">*</span></label>
-                            <select name="id_type" required>
+                            <label class="optional">Government ID Type</label>
+                            <select name="id_type">
                                 <option value="">Select ID type</option>
                                 <option value="Driver's License">Driver's License</option>
                                 <option value="UMID">UMID</option>
@@ -413,8 +438,8 @@
                             </select>
                         </div>
                         <div class="reg-field half">
-                            <label>ID Number <span class="reg-required">*</span></label>
-                            <input type="text" name="id_ref" required placeholder="e.g. N01-23-456789">
+                            <label class="optional">ID Number</label>
+                            <input type="text" name="id_ref" placeholder="e.g. N01-23-456789">
                         </div>
                     </div>
                 </section>
@@ -430,9 +455,16 @@
                     </div>
 
                     <div class="reg-form-grid">
-                        <div class="reg-field full">
+                                                <div class="reg-field full">
                             <label>Reason for Visiting <span class="reg-required">*</span></label>
-                            <input type="text" name="purpose" required>
+                            <select name="purpose_choice" id="purposeChoice" required onchange="document.getElementById('purposeOtherInput').classList.toggle('hidden', this.value !== 'Others'); document.getElementById('purposeOtherInput').required = (this.value === 'Others');">
+                                <option value="">Select reason</option>
+                                <option value="Official Business">Official Business</option>
+                                <option value="Financial/Medical Assistance">Financial/Medical Assistance</option>
+                                <option value="Visit">Visit</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <input type="text" name="purpose_other" id="purposeOtherInput" class="hidden" style="margin-top:8px;" placeholder="Please specify">
                         </div>
 
                         <div class="reg-field full">
@@ -854,19 +886,10 @@ function applyIdOcrText(rawText) {
     const idRef = idMatch ? idMatch[0].replace(/\s/g, '-') : null;
 
     const filled = [];
-    const setIfEmpty = (name, value, label) => {
-        if (!value) return;
-        const input = document.querySelector(`[name="${name}"]`);
-        if (input && !input.value.trim()) {
-            input.value = value;
-            filled.push(label);
-        }
-    };
-
-    setIfEmpty('last_name', lastName, 'Last Name');
-    setIfEmpty('first_name', firstName, 'First Name');
-    setIfEmpty('middle_name', middleName, 'Middle Name');
-    setIfEmpty('id_ref', idRef, 'ID Number');
+    setAutofillValue('last_name', lastName, 'Last Name', filled);
+    setAutofillValue('first_name', firstName, 'First Name', filled);
+    setAutofillValue('middle_name', middleName, 'Middle Name', filled);
+    setAutofillValue('id_ref', idRef, 'ID Number', filled);
 
     if (lastName || firstName) {
         const idTypeSelect = document.querySelector('[name="id_type"]');
@@ -878,6 +901,118 @@ function applyIdOcrText(rawText) {
     return filled;
 }
 // ---- End ID OCR auto-fill ----
+
+// Shared by OCR and QR autofill. A field an OCR/QR read filled in is marked
+// data-autofilled — the more reliable QR read is allowed to overwrite that
+// guess, but never something the guard typed by hand (the flag clears on input).
+function setAutofillValue(name, value, label, filledList) {
+    if (!value) return;
+    const input = document.querySelector(`[name="${name}"]`);
+    if (!input) return;
+    if (!input.value.trim() || input.dataset.autofilled === '1') {
+        input.value = value;
+        input.dataset.autofilled = '1';
+        if (filledList) filledList.push(label);
+    }
+}
+document.addEventListener('input', (e) => {
+    if (e.target.matches('[name="first_name"],[name="middle_name"],[name="last_name"],[name="id_ref"]')) {
+        delete e.target.dataset.autofilled;
+    }
+});
+document.addEventListener('change', (e) => {
+    if (e.target.matches('[name="gender"]')) delete e.target.dataset.autofilled;
+});
+
+// ---- ID Back QR (PhilSys, client-side via jsQR). Decoded and discarded —
+// the back-of-ID photo itself is never uploaded or stored. ----
+let idBackStream = null;
+
+function toggleIdBackCapture() {
+    const show = document.getElementById('idBackToggle').checked;
+    document.getElementById('idBackSection').classList.toggle('hidden', !show);
+    if (!show) stopIdBackCameraStream();
+}
+
+async function startIdBackCamera() {
+    const video = document.getElementById('idBackVideo');
+    try {
+        idBackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = idBackStream;
+        video.classList.remove('hidden');
+        document.getElementById('idBackPlaceholderText').classList.add('hidden');
+        document.getElementById('startIdBackCameraBtn').classList.add('hidden');
+        document.getElementById('captureIdBackBtn').classList.remove('hidden');
+    } catch (err) {
+        alert('Could not access camera: ' + err.message);
+    }
+}
+
+function captureIdBackPhoto() {
+    const video = document.getElementById('idBackVideo');
+    const canvas = document.getElementById('idBackCanvas');
+    const preview = document.getElementById('idBackPreview');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    preview.src = canvas.toDataURL('image/jpeg', 0.85);
+    preview.classList.remove('hidden');
+    video.classList.add('hidden');
+    document.getElementById('captureIdBackBtn').classList.add('hidden');
+    document.getElementById('retakeIdBackBtn').classList.remove('hidden');
+    stopIdBackCameraStream();
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+    if (qr) {
+        applyIdBackQr(qr.data);
+    } else {
+        showToast('No QR code detected — try again with better lighting/focus.', 'error');
+    }
+}
+
+function applyIdBackQr(rawText) {
+    let json;
+    try {
+        json = JSON.parse(rawText);
+    } catch (err) {
+        showToast('That QR did not contain readable ID data.', 'error');
+        return;
+    }
+    const subj = json.subject || {};
+    const filled = [];
+    setAutofillValue('last_name', subj.lName, 'Last Name', filled);
+    setAutofillValue('first_name', subj.fName, 'First Name', filled);
+    setAutofillValue('middle_name', subj.mName, 'Middle Name', filled);
+    setAutofillValue('id_ref', subj.PCN, 'ID Number', filled);
+
+    const genderSelect = document.querySelector('[name="gender"]');
+    const mapped = subj.sex === 'Male' ? 'Male' : subj.sex === 'Female' ? 'Female' : null;
+    if (genderSelect && mapped && (!genderSelect.value || genderSelect.dataset.autofilled === '1')) {
+        genderSelect.value = mapped;
+        genderSelect.dataset.autofilled = '1';
+        filled.push('Gender');
+    }
+
+    const idTypeSelect = document.querySelector('[name="id_type"]');
+    if (idTypeSelect && !idTypeSelect.value) idTypeSelect.value = 'PhilSys (National ID)';
+
+    showToast(filled.length ? `Auto-filled from ID QR: ${filled.join(', ')}. Please review.` : 'QR read, but no matching fields found.', filled.length ? 'success' : 'error');
+}
+
+function retakeIdBackPhoto() {
+    document.getElementById('idBackPreview').classList.add('hidden');
+    document.getElementById('retakeIdBackBtn').classList.add('hidden');
+    startIdBackCamera();
+}
+
+function stopIdBackCameraStream() {
+    if (idBackStream) { idBackStream.getTracks().forEach(t => t.stop()); idBackStream = null; }
+}
+// ---- End ID Back QR ----
 
 function retakeIdPhoto() {
     document.getElementById('idPhotoPreview').classList.add('hidden');
@@ -911,8 +1046,9 @@ function closeRegisterModal() {
     setPassClass('day');
     selectedCong.clear();
     updateBuildingSelection();
+    document.getElementById('idBackToggle').checked = false;
+    toggleIdBackCapture();
 }
-
        let currentModalFilter = 'all';
 
         function openBuildingModal(buildingId, buildingName, colorName) {

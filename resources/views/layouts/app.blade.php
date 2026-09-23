@@ -72,7 +72,7 @@
     </footer>
 
         <script>
-     function showToast(message, type = 'success', title = null) {
+      function showToast(message, type = 'success', title = null, action = null) {
     let container = document.getElementById('govToastContainer');
     if (!container) {
         container = document.createElement('div');
@@ -80,6 +80,10 @@
         container.className = 'gov-toast-container';
         document.body.appendChild(container);
     }
+
+    // Only one popup on screen at a time — a new call replaces whatever's showing
+    // instead of stacking beside it (e.g. "Reading ID…" then the result).
+    container.querySelectorAll('.gov-toast').forEach(t => t.remove());
 
     const toast = document.createElement('div');
     toast.className = `gov-toast is-${type}`;
@@ -90,9 +94,17 @@
         <div class="gov-toast-icon"><i class="fa-solid ${icon}"></i></div>
         <div class="gov-toast-title">${heading}</div>
         <div class="gov-toast-message">${message}</div>
+        ${action ? `<button type="button" class="gov-toast-action" style="margin-bottom:0.6rem; background:transparent; color:var(--ink); border:1.5px solid #cbd5e1;">${action.label}</button>` : ''}
         <button type="button" class="gov-toast-action">${buttonLabel}</button>
     `;
     container.appendChild(toast);
+
+    if (action) {
+        toast.querySelector('.gov-toast-action').addEventListener('click', () => {
+            action.onClick();
+            dismiss();
+        });
+    }
 
     const dismiss = () => {
         toast.classList.add('is-leaving');
@@ -111,7 +123,17 @@ function dismissAllToasts() {
 }
 
     @if (session('success'))
-        document.addEventListener('DOMContentLoaded', () => showToast(@json(session('success')), 'success'));
+        document.addEventListener('DOMContentLoaded', () => {
+            const passNumber = @json(session('success_pass_number'));
+            const action = passNumber ? {
+                label: 'View Pass',
+                onClick: () => {
+                    const btn = document.querySelector(`[data-pass-number="${passNumber}"][onclick^="openPassInfoModal"]`);
+                    if (btn) btn.click();
+                }
+            } : null;
+            showToast(@json(session('success')), 'success', null, action);
+        });
     @endif
     @if ($errors->any())
         document.addEventListener('DOMContentLoaded', () => showToast(@json($errors->first()), 'error'));
