@@ -72,7 +72,7 @@
     </footer>
 
         <script>
-   function showToast(message, type = 'success') {
+     function showToast(message, type = 'success', title = null) {
     let container = document.getElementById('govToastContainer');
     if (!container) {
         container = document.createElement('div');
@@ -83,12 +83,14 @@
 
     const toast = document.createElement('div');
     toast.className = `gov-toast is-${type}`;
-    const icon = type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation';
+    const icon = type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation';
+    const heading = title || (type === 'success' ? 'Success' : 'Something Went Wrong');
+    const buttonLabel = type === 'success' ? 'Continue' : 'Try Again';
     toast.innerHTML = `
-        <i class="fa-solid ${icon}"></i>
+        <div class="gov-toast-icon"><i class="fa-solid ${icon}"></i></div>
+        <div class="gov-toast-title">${heading}</div>
         <div class="gov-toast-message">${message}</div>
-        <button type="button" class="gov-toast-close" aria-label="Dismiss">&times;</button>
-        <div class="gov-toast-bar"></div>
+        <button type="button" class="gov-toast-action">${buttonLabel}</button>
     `;
     container.appendChild(toast);
 
@@ -99,10 +101,13 @@
 
     const timer = setTimeout(dismiss, 5000);
 
-    toast.querySelector('.gov-toast-close').addEventListener('click', () => {
+    toast.querySelector('.gov-toast-action').addEventListener('click', () => {
         clearTimeout(timer);
         dismiss();
     });
+}
+function dismissAllToasts() {
+    document.querySelectorAll('.gov-toast').forEach(t => t.querySelector('.gov-toast-close')?.click());
 }
 
     @if (session('success'))

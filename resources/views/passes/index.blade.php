@@ -351,8 +351,9 @@
 
                                        <canvas id="photoCanvas" class="hidden"></canvas>
                     <input type="hidden" name="photo_data" id="photoDataInput">
-                    <canvas id="idPhotoCanvas" class="hidden"></canvas>
+                                        <canvas id="idPhotoCanvas" class="hidden"></canvas>
                     <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
                 </section>
 
                 {{-- Step 2: Visitor Information --}}
@@ -804,8 +805,79 @@ function captureIdPhoto() {
     document.getElementById('captureIdBtn').classList.add('hidden');
     document.getElementById('retakeIdBtn').classList.remove('hidden');
     stopIdCameraStream();
+
+    runIdOcr(dataUrl);
 }
 
+// ---- ID OCR auto-fill (National ID / PhilSys, client-side via Tesseract.js) ----
+async function runIdOcr(dataUrl) {
+    showToast('Reading ID… this can take a few seconds.', 'success');
+    try {
+        const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
+        const filled = applyIdOcrText(text);
+        showToast(filled.length ? `Auto-filled from ID: ${filled.join(', ')}. Please review.` : 'Could not read the ID clearly — please fill in manually.', filled.length ? 'success' : 'error');
+    } catch (err) {
+        console.error('ID OCR failed:', err);
+        showToast('ID reading failed — please fill in manually.', 'error');
+    }
+}
+
+// Parses National ID (PhilSys) front-of-card text. Label appears on one line,
+// the value on the next — matches both the Filipino/English label and an
+// English-only fallback, since OCR sometimes drops one half of the pair.
+function applyIdOcrText(rawText) {
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    const allLabelPatterns = [/Apelyido/i, /Last\s*Name/i, /Mga\s*Pangalan/i, /Given\s*Name/i, /Gitnang\s*Apelyido/i, /Middle\s*Name/i, /Petsa|Date\s*of\s*Birth/i, /Tirahan|Address/i, /Republika|Philippines|Identification/i];
+    const looksLikeName = (line) => {
+        const clean = line.replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
+        return clean.length >= 2 && !allLabelPatterns.some(p => p.test(clean));
+    };
+    const findValueAfter = (labelPatterns) => {
+        for (let i = 0; i < lines.length; i++) {
+            if (!labelPatterns.some(p => p.test(lines[i]))) continue;
+            // The value is usually right below the label, but glare/spacing can
+            // push OCR to skip a line or two — scan a small window, not just +1.
+            for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
+                if (looksLikeName(lines[j])) {
+                    return lines[j].replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
+                }
+            }
+        }
+        return null;
+    };
+    
+    const lastName = findValueAfter([/Apelyido/i, /Last\s*Name/i]);
+    const firstName = findValueAfter([/Mga\s*Pangalan/i, /Given\s*Name/i]);
+    const middleName = findValueAfter([/Gitnang\s*Apelyido/i, /Middle\s*Name/i]);
+    // ID number: PhilSys format is 4 groups of 4 digits (e.g. 1234-5678-9101-1213).
+    const idMatch = rawText.match(/\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}/);
+    const idRef = idMatch ? idMatch[0].replace(/\s/g, '-') : null;
+
+    const filled = [];
+    const setIfEmpty = (name, value, label) => {
+        if (!value) return;
+        const input = document.querySelector(`[name="${name}"]`);
+        if (input && !input.value.trim()) {
+            input.value = value;
+            filled.push(label);
+        }
+    };
+
+    setIfEmpty('last_name', lastName, 'Last Name');
+    setIfEmpty('first_name', firstName, 'First Name');
+    setIfEmpty('middle_name', middleName, 'Middle Name');
+    setIfEmpty('id_ref', idRef, 'ID Number');
+
+    if (lastName || firstName) {
+        const idTypeSelect = document.querySelector('[name="id_type"]');
+        if (idTypeSelect && !idTypeSelect.value) {
+            idTypeSelect.value = 'PhilSys (National ID)';
+        }
+    }
+
+    return filled;
+}
+// ---- End ID OCR auto-fill ----
 
 function retakeIdPhoto() {
     document.getElementById('idPhotoPreview').classList.add('hidden');

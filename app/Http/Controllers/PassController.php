@@ -74,7 +74,7 @@ class PassController extends Controller
             'contact_no' => 'required|string|max:50',
             'visitor_email' => 'nullable|email|max:255',
             'id_type' => 'required|string|max:255',
-            'id_ref' => 'required|string|max:255',
+            'id_ref' => 'nullable|string|max:255',
             'congressman_ids' => 'nullable|array',
             'congressman_ids.*' => 'integer|exists:congressmen,id',
             'office_other' => 'nullable|string|max:255',
