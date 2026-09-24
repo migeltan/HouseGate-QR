@@ -7,11 +7,15 @@ use App\Models\Congressman;
 use App\Models\VisitorPass;
 use App\Models\PassRegistration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class PassController extends Controller
 {
+    // ID types whose numbers are not reliably unique across people (employee
+    // numbers etc.). An exact match on these is only a "possible" match.
+    private const WEAK_ID_TYPES = ['company id', 'other'];
     public function index(Request $request)
     {
         $user = $request->user();
@@ -78,6 +82,7 @@ class PassController extends Controller
             'congressman_ids' => 'nullable|array',
             'congressman_ids.*' => 'integer|exists:congressmen,id',
             'office_other' => 'nullable|string|max:255',
+            'contact_person' => 'nullable|string|max:255',
             'purpose_choice' => 'required|in:Official Business,Financial/Medical Assistance,Visit,Others',
             'purpose_other' => 'required_if:purpose_choice,Others|nullable|string|max:255',
             'vehicle' => 'nullable|string|max:255',
@@ -89,6 +94,25 @@ class PassController extends Controller
         ]);
 
         // Reason is chosen from a fixed list; free text only applies when "Others" is picked.
+                // Workflow 1: refuse a second pass for someone who already holds an active one.
+        // This is the real enforcement; the Step 2 warning is only a convenience.
+        if ($dup = $this->findActiveDuplicate(
+            $data['id_type'] ?? null, $data['id_ref'] ?? null,
+            $data['first_name'] ?? null, $data['last_name'] ?? null, $data['contact_no'] ?? null
+        )) {
+            $p = $dup['pass'];
+            if ($dup['level'] === 'exact') {
+                return back()->withErrors(
+                    "This ID already has an active pass (#{$p['pass_number']}, {$p['buildings']}). A new pass cannot be issued."
+                )->withInput();
+            }
+            if (! $request->boolean('confirm_different_person')) {
+                return back()->withErrors(
+                    "Possible match: {$p['holder']} already has active pass #{$p['pass_number']} ({$p['buildings']}). Confirm this is a different person to continue."
+                )->withInput();
+            }
+        }
+
         $data['purpose'] = $data['purpose_choice'] === 'Others'
             ? trim($data['purpose_other'])
             : $data['purpose_choice'];
@@ -133,6 +157,101 @@ class PassController extends Controller
             : $this->registerMultiBuilding($data, $request);
     }
 
+        /**
+     * Live duplicate check for the Step 2 form. System-wide on purpose:
+     * deliberately NOT scoped to the guard's building, and returns only the
+     * fields the warning needs.
+     */
+    public function checkDuplicate(Request $request)
+    {
+        return response()->json([
+            'match' => $this->findActiveDuplicate(
+                (string) $request->query('id_type'), (string) $request->query('id_ref'),
+                (string) $request->query('first_name'), (string) $request->query('last_name'),
+                (string) $request->query('contact_no')
+            ),
+        ]);
+    }
+
+    /**
+     * Returns null, or ['level' => 'exact'|'possible', 'more' => int, 'pass' => [...]].
+     *  - exact:    same (id_type, id_ref) on an active pass, government ID types only (hard stop)
+     *  - possible: everything else that matches (soft block, guard must confirm):
+     *      · same (id_type, id_ref) with a weak ID type (Company ID / Other)
+     *      · same first + last name        (runs regardless of whether an ID was given)
+     *      · same last name + contact no.  (covers a missing first name)
+     * 'more' = how many additional active passes also matched.
+     */
+    private function findActiveDuplicate(?string $idType, ?string $idRef, ?string $firstName, ?string $lastName, ?string $contactNo): ?array
+    {
+        $norm = fn (?string $v) => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $v));
+        $name = fn (?string $v) => mb_strtolower(preg_replace('/[^\p{L}]/u', '', (string) $v));
+        $phone = fn (?string $v) => substr(preg_replace('/\D/', '', (string) $v), -10);
+
+        $idType = strtolower(trim((string) $idType));
+        $idKey = $norm($idRef);
+        $first = $name($firstName);
+        $last = $name($lastName);
+        $phoneKey = $phone($contactNo);
+
+        $hasId = $idType !== '' && $idKey !== '';
+        $hasName = $first !== '' && $last !== '';
+        $hasContact = $last !== '' && strlen($phoneKey) >= 7;
+        if (! $hasId && ! $hasName && ! $hasContact) {
+            return null;
+        }
+
+        // "Active" = status active AND not past its own expiry. The day/long-term
+        // date guards cover a nightly sweep that hasn't run yet, so a stale pass
+        // can never block a returning visitor. System-wide: no building filter.
+        $today = now()->startOfDay();
+        $candidates = VisitorPass::with(['building', 'buildings', 'currentBuilding'])
+            ->where('status', 'active')
+            ->where(function ($q) use ($today) {
+                $q->where(fn ($d) => $d->where('pass_class', 'day')->where('issued_at', '>=', $today))
+                  ->orWhere(fn ($l) => $l->where('pass_class', 'long_term')->whereDate('expected_return_date', '>=', $today));
+            })
+            ->get();
+
+        $matches = [];
+        foreach ($candidates as $pass) {
+            $level = null;
+            if ($hasId && $norm($pass->id_ref) === $idKey && strtolower(trim((string) $pass->id_type)) === $idType) {
+                $level = in_array($idType, self::WEAK_ID_TYPES, true) ? 'possible' : 'exact';
+            } elseif (
+                ($hasName && $name($pass->first_name) === $first && $name($pass->last_name) === $last)
+                || ($hasContact && $name($pass->last_name) === $last && $phone($pass->contact_no) === $phoneKey)
+            ) {
+                $level = 'possible';
+            }
+            if ($level) {
+                $matches[] = [$level, $pass];
+            }
+        }
+
+        if (! $matches) {
+            return null;
+        }
+
+        // An exact match always outranks a possible one when choosing which pass to show.
+        usort($matches, fn ($a, $b) => ($a[0] === 'exact' ? 0 : 1) <=> ($b[0] === 'exact' ? 0 : 1));
+        [$level, $pass] = $matches[0];
+
+        return [
+            'level' => $level,
+            'more' => count($matches) - 1,
+            'pass' => [
+                'pass_number' => $pass->pass_number,
+                'buildings' => $pass->authorizedBuildingNames(),
+                'holder' => $pass->visitor_name,
+                'purpose' => $pass->purpose,
+                'pass_class' => $pass->pass_class,
+                'issued_at' => $pass->issued_at?->format('M j, g:i A'),
+                'checked_in_at' => $pass->currentBuilding?->name,
+            ],
+        ];
+    }
+
     private function registerSingleBuilding(array $data, Request $request)
     {
         $buildingId = $data['building_ids'][0];
@@ -147,7 +266,7 @@ class PassController extends Controller
             return back()->withErrors('No available passes left for that building. Please choose another building.')->withInput();
         }
 
-        $this->assignVisitorToPass($pass, $data, $request);
+        DB::transaction(fn () => $this->assignVisitorToPass($pass, $data, $request));
 
                 return redirect()->route('passes.index')
             ->with('success', "Pass #{$pass->pass_number} assigned to {$pass->visitor_name} ({$pass->building->name}).")
@@ -189,8 +308,10 @@ class PassController extends Controller
             ]);
         }
 
-        $this->assignVisitorToPass($pass, $data, $request);
-        $pass->buildings()->sync($data['building_ids']);
+           DB::transaction(function () use ($pass, $data, $request) {
+               $this->assignVisitorToPass($pass, $data, $request);
+               $pass->buildings()->sync($data['building_ids']);
+           });
 
         $buildingCount = count($data['building_ids']);
         return redirect()->route('passes.index')
@@ -215,6 +336,9 @@ class PassController extends Controller
         }
 
         $pass->buildings()->sync($data['building_ids']);
+        $pass->openRegistration()?->update([
+            'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
+        ]);
 
         return redirect()->route('passes.index')
             ->with('success', "Updated authorized buildings for Pass #{$pass->pass_number}.");
@@ -263,7 +387,7 @@ class PassController extends Controller
         $pass->update([
             'visitor_name' => null, 'first_name' => null, 'middle_name' => null, 'last_name' => null,
             'gender' => null, 'contact_no' => null, 'id_ref' => null, 'id_type' => null,
-            'purpose' => null, 'office_to_visit' => null, 'vehicle' => null,
+                        'purpose' => null, 'office_to_visit' => null, 'contact_person' => null, 'vehicle' => null,
             'status' => 'available', 'issued_at' => null,
             'photo_path' => null, 'id_photo_path' => null, 'pass_class' => 'day',
             'expected_return_date' => null, 'visitor_email' => null, 'registered_by' => null,
@@ -342,6 +466,7 @@ class PassController extends Controller
             'id_type' => $data['id_type'] ?? null,
             'purpose' => $data['purpose'],
             'office_to_visit' => $data['office_to_visit'],
+            'contact_person' => $data['contact_person'] ?? null,
             'vehicle' => $data['vehicle'] ?? null,
             'status' => 'active',
             'issued_at' => now(),
@@ -373,6 +498,9 @@ class PassController extends Controller
             'pass_class' => $data['pass_class'],
             'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
             'office_other' => $data['office_other'] ?? null,
+                        'contact_person' => $data['contact_person'] ?? null,
+            // Frozen at registration: multi-pass building links are wiped on unassign.
+            'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
             'registered_at' => now(),
         ]);
 

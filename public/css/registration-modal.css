@@ -467,3 +467,70 @@
     font-size: 13px;
     color: #64748b;
 }
+
+/* Workflow 1: duplicate active-pass warning */
+.reg-dup {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid #f5c2c0;
+    background: #fdf1f0;
+    color: #7a1f1a;
+}
+.reg-dup.is-possible {
+    border-color: #f0dca0;
+    background: #fdf8e6;
+    color: #6b4f00;
+}
+.reg-dup-title {
+    font-weight: 700;
+    font-size: 15px;
+    margin: 0 0 8px;
+}
+.reg-dup-details {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 14px;
+    margin: 0 0 8px;
+    font-size: 13.5px;
+}
+.reg-dup-details dt {
+    font-weight: 600;
+}
+.reg-dup-details dd {
+    margin: 0;
+}
+.reg-dup-note {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.reg-dup-confirm {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+.reg-dup .hidden {
+    display: none !important;
+}
+#registerSubmitBtn.is-dup-blocked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Checkbox inside the duplicate warning: undo the generic .reg-form-grid input sizing */
+.reg-form-grid .reg-dup-confirm input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    padding: 0;
+    margin: 0;
+    accent-color: #245ba6;
+    cursor: pointer;
+}
+
+#registerSubmitBtn:disabled {
+    cursor: not-allowed;
+}

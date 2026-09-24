@@ -35,11 +35,12 @@ class LogController extends Controller
 
         $callback = function () use ($logs) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Timestamp', 'Visitor Name', 'Pass Number', 'Authorized Building', 'Scanned Building', 'Result', 'Reason']);
+            fputcsv($handle, ['Timestamp', 'Visitor Name', 'Contact Person', 'Pass Number','Authorized Building', 'Scanned Building', 'Result', 'Reason']);
             foreach ($logs as $log) {
                 fputcsv($handle, [
                     $log->created_at->format('Y-m-d H:i:s'),
-                    $log->visitor_name_snapshot,
+                    $this->csvSafe($log->visitor_name_snapshot),
+                    $this->csvSafe($log->contact_person_snapshot),
                     $log->pass_number_snapshot,
                     $log->authorized_building_snapshot,
                     $log->scannedBuilding->name ?? '',
@@ -67,11 +68,14 @@ class LogController extends Controller
 
         $callback = function () use ($registrations) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Registered At', 'Visitor Name', 'ID Type', 'ID Ref', 'Pass Class', 'Expected Return', 'Registered By', 'Unassigned At', 'Reason']);
+            fputcsv($handle, ['Registered At', 'Visitor Name', 'Buildings to Visit', 'Congressman / Office', 'Contact Person', 'ID Type', 'ID Ref', 'Pass Class', 'Expected Return', 'Registered By', 'Unassigned At', 'Reason']);
             foreach ($registrations as $r) {
                 fputcsv($handle, [
                     $r->registered_at->format('Y-m-d H:i:s'),
-                    $r->visitor_name,
+                    $this->csvSafe($r->visitor_name),
+                    $this->csvSafe($r->buildings_snapshot),
+                    $this->csvSafe($r->office_to_visit),
+                    $this->csvSafe($r->contact_person),
                     $r->id_type,
                     $r->id_ref,
                     $r->pass_class,
@@ -89,10 +93,17 @@ class LogController extends Controller
         ]);
     }
 
-    /**
-     * Option A — delete logs whose created_at falls within [start_date, end_date] (inclusive).
-     * Reachable only by admin — locked out via the 'admin' route middleware.
+        /**
+     * Stops spreadsheet formula injection: a cell starting with = + - @ (typed by a
+     * guard or copied from an ID) would otherwise be executed when the CSV is opened.
      */
+    private function csvSafe(?string $value): ?string
+    {
+        return ($value !== null && preg_match('/^[=+\-@\t\r]/', $value)) ? "'" . $value : $value;
+    }
+
+    /**
+     * Option A — delete logs
     public function purgeRange(Request $request)
     {
         $validated = $request->validate([
@@ -200,7 +211,10 @@ class LogController extends Controller
             $s = $request->reg_search;
             $query->where(function ($q) use ($s) {
                 $q->where('visitor_name', 'like', "%{$s}%")
-                ->orWhere('id_ref', 'like', "%{$s}%");
+                ->orWhere('id_ref', 'like', "%{$s}%")
+                ->orWhere('office_to_visit', 'like', "%{$s}%")
+                ->orWhere('contact_person', 'like', "%{$s}%")
+                ->orWhere('buildings_snapshot', 'like', "%{$s}%");
             });
         }
 

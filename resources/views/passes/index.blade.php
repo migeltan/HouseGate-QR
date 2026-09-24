@@ -183,6 +183,7 @@
                                 'id_type' => $p->id_type,
                                 'id_ref' => $p->id_ref,
                                 'office_to_visit' => $p->office_to_visit,
+                                'contact_person' => $p->contact_person,
                                 'purpose' => $p->purpose,
                                 'vehicle' => $p->vehicle,
                                 'registered_by' => $p->registered_by,
@@ -226,14 +227,22 @@
 
                                 <div class="gov-pass-card-actions">
                                     @if ($p->visitor_name)
-                                        <form method="POST" action="{{ route('passes.unassign', $p) }}"
-                                              onsubmit="return confirm('Unassign {{ $p->visitor_name }} from Pass #{{ $p->pass_number }}? The card will be reset and returned to available stock.');">
+                                    <form method="POST" action="{{ route('passes.unassign', $p) }}"
+                                        data-confirm data-confirm-tone="warning"
+                                        data-confirm-title="Unassign this pass?"
+                                        data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $p->visitor_name }}"
+                                        data-confirm-message="The card will be reset and returned to available stock."
+                                        data-confirm-label="Unassign">
                                             @csrf
                                             <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-link-slash"></i> Unassign</button>
                                         </form>
                                         <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
                                         <form method="POST" action="{{ route('passes.revoke', $p) }}"
-                                              onsubmit="return confirm('Revoke Pass #{{ $p->pass_number }}? {{ $p->visitor_name }} will be denied on their next scan.');">
+                                            data-confirm data-confirm-tone="danger"
+                                            data-confirm-title="Revoke this pass?"
+                                            data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $p->visitor_name }}"
+                                            data-confirm-message="The visitor will be denied on their next scan."
+                                            data-confirm-label="Revoke pass">
                                             @csrf
                                             <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-ban"></i> Revoke</button>
                                         </form>
@@ -418,6 +427,20 @@
                             <label class="optional">ID Number</label>
                             <input type="text" name="id_ref" placeholder="e.g. N01-23-456789">
                         </div>
+
+                        {{-- Workflow 1: duplicate active-pass warning (filled by runDuplicateCheck) --}}
+                        <div class="reg-field full hidden" id="dupWarning" role="alert" aria-live="polite">
+                            <div class="reg-dup" id="dupBox">
+                                <p class="reg-dup-title" id="dupTitle"></p>
+                                <dl class="reg-dup-details" id="dupDetails"></dl>
+                                <p class="reg-dup-note" id="dupNote"></p>
+                                <button type="button" class="reg-button hidden" id="dupCancelBtn" onclick="closeRegisterModal()">Cancel registration</button>
+                                <label class="reg-dup-confirm hidden" id="dupConfirmWrap">
+                                    <input type="checkbox" name="confirm_different_person" value="1" id="dupConfirmCheck">
+                                    I have verified this is a different person.
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -472,6 +495,11 @@
                             <input type="text" name="office_other" id="officeOther" maxlength="255" required placeholder="e.g. HR Office, Secretariat">
                         </div>
 
+                        <div class="reg-field full">
+                            <label class="optional">Contact Person / Assistant <span class="optional">(optional — staff at the congressman's office who is sponsoring or expecting this visitor)</span></label>
+                            <input type="text" name="contact_person" maxlength="255" placeholder="e.g. Maria Santos, Chief of Staff">
+                        </div>
+
                         <div class="reg-field half">
                             <label class="optional">Vehicle</label>
                             <input type="text" name="vehicle" placeholder="Plate number, optional">
@@ -518,14 +546,10 @@
 function updateBuildingSelection() {
     const checked = document.querySelectorAll('input[name="building_ids[]"]:checked').length;
     const hint = document.getElementById('northGateHint');
-    const submitBtn = document.getElementById('registerSubmitBtn');
 
     hint.classList.toggle('is-active', checked >= 2);
 
-    submitBtn.disabled = checked === 0;
-    submitBtn.style.opacity = submitBtn.disabled ? '0.5' : '1';
-
-    refreshCongPicker();
+    refreshCongPicker(); // also re-evaluates the submit button
 }
 
 // ---- Congressman picker (filtered by the ticked building(s)) ----
@@ -582,6 +606,7 @@ function renderCongChips() {
 
     // "Other" is only mandatory when no congressman is picked.
     document.getElementById('officeOther').required = selectedCong.size === 0;
+    refreshSubmitState();
 }
 
 function renderCongList() {
@@ -735,7 +760,7 @@ async function startCamera() {
         document.getElementById('startCameraBtn').classList.add('hidden');
         document.getElementById('captureBtn').classList.remove('hidden');
     } catch (err) {
-        alert('Could not access camera: ' + err.message);
+                showToast(err.message, 'error', 'Camera Unavailable');
     }
 }
 
@@ -932,9 +957,10 @@ function setAutofillValue(name, value, label, filledList) {
     const input = document.querySelector(`[name="${name}"]`);
     if (!input) return;
     if (!input.value.trim() || input.dataset.autofilled === '1') {
-        input.value = value;
+                input.value = value;
         input.dataset.autofilled = '1';
         if (filledList) filledList.push(label);
+        scheduleDuplicateCheck(); // programmatic fills don't fire 'input' events
     }
 }
 document.addEventListener('input', (e) => {
@@ -974,9 +1000,130 @@ function applyIdBackQr(rawText) {
 }
 // ---- End ID capture ----
 
+// ---- Duplicate active-pass check (Workflow 1) ----
+const DUP_URL = @json(route('passes.check-duplicate'));
+let dupTimer = null;
+let dupSeq = 0;
+let dupState = null; // null | 'exact' | 'possible'
+
+function scheduleDuplicateCheck() {
+    clearTimeout(dupTimer);
+    dupTimer = setTimeout(runDuplicateCheck, 500);
+}
+
+async function runDuplicateCheck() {
+    const form = document.getElementById('registerForm');
+    const v = (n) => (form.elements[n]?.value || '').trim();
+    if (!(v('id_type') && v('id_ref')) && !(v('first_name') && v('last_name')) && !(v('last_name') && v('contact_no'))) {
+        dupSeq++;
+        renderDuplicate(null);
+        return;
+    }
+    const params = new URLSearchParams({
+        id_type: v('id_type'), id_ref: v('id_ref'),
+        first_name: v('first_name'), last_name: v('last_name'), contact_no: v('contact_no'),
+    });
+    const seq = ++dupSeq;
+    try {
+        const res = await fetch(`${DUP_URL}?${params}`, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (seq === dupSeq) renderDuplicate(data.match);
+    } catch (e) { /* the server re-checks on submit */ }
+}
+
+function dupBlocked() {
+    return dupState === 'exact'
+        || (dupState === 'possible' && !document.getElementById('dupConfirmCheck').checked);
+}
+
+// Every required piece of Step 3, mirrored from the server rules in register().
+function formReady() {
+    const f = document.getElementById('registerForm');
+    const v = (n) => (f.elements[n]?.value || '').trim();
+    if (checkedBuildingIds().length === 0) return false;
+    if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) return false;
+    if (selectedCong.size === 0 && !v('office_other')) return false;
+    if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) return false;
+    return true;
+}
+
+// Single owner of the Admit button's state: required fields AND duplicate warning.
+function refreshSubmitState() {
+    const btn = document.getElementById('registerSubmitBtn');
+    const blocked = dupBlocked();
+    btn.disabled = blocked || !formReady();
+    btn.style.opacity = btn.disabled ? '0.5' : '1';
+    btn.classList.toggle('is-dup-blocked', blocked);
+}
+
+function updateDupSubmitState() { refreshSubmitState(); }
+
+function renderDuplicate(match) {
+    dupState = match ? match.level : null;
+    document.getElementById('dupConfirmCheck').checked = false; // any new result must be re-confirmed
+    document.getElementById('dupWarning').classList.toggle('hidden', !match);
+    if (!match) { updateDupSubmitState(); return; }
+
+    const exact = match.level === 'exact';
+    const p = match.pass;
+    const box = document.getElementById('dupBox');
+    box.classList.toggle('is-exact', exact);
+    box.classList.toggle('is-possible', !exact);
+
+    document.getElementById('dupTitle').textContent = exact
+        ? 'This person already has an active pass'
+        : 'Possible match: this person may already have an active pass';
+
+    const dl = document.getElementById('dupDetails');
+    dl.replaceChildren();
+    [
+        ['Pass No.', '#' + p.pass_number],
+        ['Building(s)', p.buildings],
+        ['Holder', p.holder],
+        ['Purpose', p.purpose],
+        ['Pass type', p.pass_class === 'long_term' ? 'Long-term' : 'Day'],
+        ['Issued', p.issued_at],
+        ['Currently inside', p.checked_in_at],
+    ].forEach(([label, value]) => {
+        if (!value) return;
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value; // textContent: holder name comes from OCR
+        dl.append(dt, dd);
+    });
+
+    const more = match.more > 0 ? ` (+${match.more} more active pass${match.more > 1 ? 'es' : ''} matched)` : '';
+    document.getElementById('dupNote').textContent = (exact
+        ? 'The same ID cannot be issued a second pass. Cancel this registration.'
+        : 'Only continue if you have verified this is a different person.') + more;
+    document.getElementById('dupCancelBtn').classList.toggle('hidden', !exact);
+    document.getElementById('dupConfirmWrap').classList.toggle('hidden', exact);
+    updateDupSubmitState();
+}
+
+document.addEventListener('input', (e) => {
+    if (e.target.closest('#registerForm') && e.target.matches('[name="id_ref"],[name="first_name"],[name="last_name"],[name="contact_no"]')) scheduleDuplicateCheck();
+});
+document.addEventListener('change', (e) => {
+    if (!e.target.closest('#registerForm')) return;
+    if (e.target.matches('[name="id_type"]')) scheduleDuplicateCheck();
+    refreshSubmitState(); // any change (building, reason, dates, confirm box) can flip readiness
+});
+document.getElementById('registerForm').addEventListener('input', refreshSubmitState);
+document.getElementById('registerForm').addEventListener('submit', (e) => {
+    if (dupBlocked()) {
+        e.preventDefault();
+        document.getElementById('dupWarning').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+});
+// ---- End duplicate check ----
+
 function closeRegisterModal() {
     document.getElementById('registerModal').classList.add('hidden');
     document.getElementById('registerForm').reset();
+    clearTimeout(dupTimer);
+    dupSeq++;
+    renderDuplicate(null);
     resetPhotoCapture();
     resetIdPhotoCapture();
     setPassClass('day');
@@ -1028,6 +1175,7 @@ function closeRegisterModal() {
             ['ID Type', info.id_type],
             ['ID Number', info.id_ref],
             ['Office to Visit', info.office_to_visit],
+            ['Contact Person', info.contact_person],
             ['Reason', info.purpose],
             ['Vehicle', info.vehicle],
             ['Registered By', info.registered_by],
@@ -1036,10 +1184,16 @@ function closeRegisterModal() {
             ['Expected Return', info.expected_return_date],
         ];
 
-        document.getElementById('infoFieldsGrid').innerHTML = rows
+        document.getElementById('infoFieldsGrid').replaceChildren(...rows
             .filter(([, value]) => value)
-            .map(([label, value]) => `<div><span class="gov-meta-label">${label}</span><div class="gov-meta-value">${value}</div></div>`)
-            .join('');
+            .map(([label, value]) => {
+                // textContent, never innerHTML: names and contact persons are typed by guards.
+                const wrap = document.createElement('div');
+                const l = document.createElement('span'); l.className = 'gov-meta-label'; l.textContent = label;
+                const v = document.createElement('div'); v.className = 'gov-meta-value'; v.textContent = value;
+                wrap.append(l, v);
+                return wrap;
+            }));
 
         document.getElementById('passInfoModal').classList.remove('hidden');
     }

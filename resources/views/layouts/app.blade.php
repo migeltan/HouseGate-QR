@@ -122,6 +122,67 @@ function dismissAllToasts() {
     document.querySelectorAll('.gov-toast').forEach(t => t.querySelector('.gov-toast-close')?.click());
 }
 
+// Styled replacement for window.confirm(). Resolves true/false.
+// All text goes in via textContent, so visitor names can't inject markup.
+function confirmDialog({ title = 'Are you sure?', subject = '', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger' } = {}) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'gov-toast-container';
+        overlay.setAttribute('role', 'alertdialog');
+        overlay.setAttribute('aria-modal', 'true');
+        const icon = tone === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-question';
+        overlay.innerHTML = `
+            <div class="gov-toast gov-confirm is-${tone}">
+                <div class="gov-toast-icon"><i class="fa-solid ${icon}"></i></div>
+                <div class="gov-toast-title"></div>
+                <div class="gov-confirm-subject"></div>
+                <div class="gov-toast-message"></div>
+                <div class="gov-confirm-actions">
+                    <button type="button" class="gov-confirm-cancel"></button>
+                    <button type="button" class="gov-confirm-ok"></button>
+                </div>
+            </div>`;
+        const box = overlay.querySelector('.gov-confirm');
+        const q = (sel) => overlay.querySelector(sel);
+        q('.gov-toast-title').textContent = title;
+        q('.gov-confirm-subject').textContent = subject;
+        q('.gov-confirm-subject').hidden = !subject;
+        q('.gov-toast-message').textContent = message;
+        q('.gov-confirm-cancel').textContent = cancelLabel;
+        q('.gov-confirm-ok').textContent = confirmLabel;
+        overlay.setAttribute('aria-label', title);
+
+        const close = (result) => {
+            document.removeEventListener('keydown', onKey);
+            box.classList.add('is-leaving');
+            setTimeout(() => overlay.remove(), 180);
+            resolve(result);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') close(false); };
+        document.addEventListener('keydown', onKey);
+        overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(false); });
+        q('.gov-confirm-cancel').addEventListener('click', () => close(false));
+        q('.gov-confirm-ok').addEventListener('click', () => close(true));
+
+        document.body.appendChild(overlay);
+        q('.gov-confirm-cancel').focus(); // safe default for destructive actions
+    });
+}
+
+// <form data-confirm data-confirm-title="…" data-confirm-message="…"> gets a styled
+// confirmation before it submits. Values are HTML-escaped by Blade, never JS strings.
+document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) return;
+    e.preventDefault();
+    const d = form.dataset;
+    const ok = await confirmDialog({
+        title: d.confirmTitle, subject: d.confirmSubject, message: d.confirmMessage,
+        confirmLabel: d.confirmLabel, tone: d.confirmTone || 'danger',
+    });
+    if (ok) HTMLFormElement.prototype.submit.call(form); // .submit() skips this handler
+});
+
     @if (session('success'))
         document.addEventListener('DOMContentLoaded', () => {
             const passNumber = @json(session('success_pass_number'));

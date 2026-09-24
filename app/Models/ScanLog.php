@@ -9,7 +9,7 @@ class ScanLog extends Model
 {
     protected $fillable = [
     'visitor_pass_id', 'qr_token_scanned', 'scanned_building_id',
-    'visitor_name_snapshot', 'pass_number_snapshot', 'authorized_building_snapshot',
+        'visitor_name_snapshot', 'pass_number_snapshot', 'authorized_building_snapshot', 'contact_person_snapshot',
     'result', 'reason', 'direction',
 ];
 

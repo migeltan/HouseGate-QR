@@ -63,12 +63,15 @@
     <div class="px-10 pb-5">
         <div class="overflow-hidden rounded-xl border border-slate-400">
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[1000px] border-collapse text-center text-xs">
-                    <thead class="bg-slate-400 text-slate-800 uppercase tracking-wide">
+                <table class="w-full min-w-[1500px] border-collapse text-center text-xs">
+                                        <thead class="bg-slate-400 text-slate-800 uppercase tracking-wide">
                         <tr>
                             <th class="py-3 px-4 font-bold">Photos</th>
                             <th class="py-3 px-4 font-bold">Registered at</th>
                             <th class="py-3 px-4 font-bold">Visitor</th>
+                            <th class="py-3 px-4 font-bold">Buildings to visit</th>
+                            <th class="py-3 px-4 font-bold">Congressman / Office</th>
+                            <th class="py-3 px-4 font-bold">Contact person</th>
                             <th class="py-3 px-4 font-bold">ID type / ref</th>
                             <th class="py-3 px-4 font-bold">Pass class</th>
                             <th class="py-3 px-4 font-bold">Expected return</th>
@@ -88,6 +91,9 @@
                                 data-type="registration"
                                 data-timestamp="{{ $r->registered_at->format('Y-m-d h:i:s A') }}"
                                 data-visitor="{{ $r->visitor_name }}"
+                                data-buildings="{{ $r->buildings_snapshot ?? '—' }}"
+                                data-office="{{ $r->office_to_visit ?? '—' }}"
+                                data-contact-person="{{ $r->contact_person ?? '—' }}"
                                 data-id-ref="{{ $r->id_type }} · {{ $r->id_ref }}"
                                 data-pass-class="{{ $regPassClassLabel }}"
                                 data-expected-return="{{ $r->expected_return_date?->format('Y-m-d') ?? '—' }}"
@@ -108,6 +114,9 @@
                                 </td>
                                 <td class="border-r border-slate-100 py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</td>
                                 <td class="border-r border-slate-100 py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $r->visitor_name }}</td>
+                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
+                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 max-w-[260px] truncate" title="{{ $r->office_to_visit }}">{{ $r->office_to_visit ?? '—' }}</td>
+                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->contact_person ?? '—' }}</td>
                                 <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->id_type }} &middot; {{ $r->id_ref }}</td>
                                 <td class="border-r border-slate-100 py-3 px-4">
                                     <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700">{{ $regPassClassLabel }}</span>
@@ -121,7 +130,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="py-10 text-center text-slate-400">No pass registrations recorded yet.</td></tr>
+                            <tr><td colspan="11" class="py-10 text-center text-slate-400">No pass registrations recorded yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

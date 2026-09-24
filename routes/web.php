@@ -27,7 +27,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [ScannerController::class, 'index'])->name('scanner.index');
         Route::post('/scan', [ScannerController::class, 'scan'])->name('scanner.scan');
 
-        Route::get('/passes', [PassController::class, 'index'])->name('passes.index');
+                Route::get('/passes', [PassController::class, 'index'])->name('passes.index');
+        // Must stay ABOVE /passes/{pass}, otherwise {pass} swallows "check-duplicate".
+        Route::get('/passes/check-duplicate', [PassController::class, 'checkDuplicate'])->name('passes.check-duplicate');
         Route::post('/passes/register', [PassController::class, 'register'])->name('passes.register');
         Route::get('/passes/{pass}', [PassController::class, 'show'])->name('passes.show');
         Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');

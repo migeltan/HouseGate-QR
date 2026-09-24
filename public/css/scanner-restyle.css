@@ -1215,3 +1215,75 @@ select.gov-location-badge {
     background: #f1f5f9;
     border: 1px solid #dbe2ea;
 }
+/* ---------- Confirm dialog (replaces native window.confirm) ---------- */
+.gov-confirm.is-danger .gov-toast-icon {
+    background: #fde8e8;
+    color: var(--brand-red);
+}
+.gov-confirm.is-warning .gov-toast-icon {
+    background: #fff4d6;
+    color: var(--brand-gold-dark);
+}
+.gov-confirm-subject {
+    max-width: 100%;
+    margin: 0 0 0.7rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 9999px;
+    background: #f1f5f9;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.gov-confirm-subject[hidden] {
+    display: none;
+}
+.gov-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    width: 100%;
+}
+.gov-confirm-cancel,
+.gov-confirm-ok {
+    border-radius: 0.6rem;
+    padding: 0.85rem 1rem;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        filter 0.15s ease,
+        background 0.15s ease;
+}
+.gov-confirm-cancel {
+    background: #ffffff;
+    color: var(--ink);
+    border: 1.5px solid #cbd5e1;
+}
+.gov-confirm-cancel:hover {
+    background: #f1f5f9;
+}
+.gov-confirm-ok {
+    border: 0;
+    color: #ffffff;
+}
+.gov-confirm.is-danger .gov-confirm-ok {
+    background: linear-gradient(135deg, #f16d6d, var(--brand-red));
+}
+.gov-confirm.is-warning .gov-confirm-ok {
+    background: linear-gradient(
+        135deg,
+        var(--brand-gold),
+        var(--brand-gold-dark)
+    );
+    color: var(--ink);
+}
+.gov-confirm-ok:hover {
+    filter: brightness(1.08);
+}
+.gov-confirm-cancel:focus-visible,
+.gov-confirm-ok:focus-visible {
+    outline: 3px solid rgba(35, 90, 166, 0.45);
+    outline-offset: 2px;
+}

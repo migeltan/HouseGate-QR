@@ -59,6 +59,7 @@
             rows = [
                 ['Timestamp', row.dataset.timestamp],
                 ['Visitor', row.dataset.visitor],
+                ['Contact Person', row.dataset.contactPerson],
                 ['Pass #', row.dataset.passNumber],
                 ['Scanned At', row.dataset.scannedAt],
                 ['Result', row.dataset.result],
@@ -80,6 +81,9 @@
             rows = [
                 ['Timestamp', row.dataset.timestamp],
                 ['Visitor', row.dataset.visitor],
+                ['Buildings to Visit', row.dataset.buildings],
+                ['Congressman / Office', row.dataset.office],
+                ['Contact Person', row.dataset.contactPerson],
                 ['ID type / ref', row.dataset.idRef],
                 ['Pass class', row.dataset.passClass],
                 ['Expected return', row.dataset.expectedReturn],
@@ -104,10 +108,16 @@
             }
         }
 
-        fieldsGrid.innerHTML = rows
+        fieldsGrid.replaceChildren(...rows
             .filter(([, value]) => value)
-            .map(([label, value]) => `<div><span class="gov-meta-label">${label}</span><div class="gov-meta-value">${value}</div></div>`)
-            .join('');
+            .map(([label, value]) => {
+                // textContent, never innerHTML: names and contact persons are typed by guards.
+                const wrap = document.createElement('div');
+                const l = document.createElement('span'); l.className = 'gov-meta-label'; l.textContent = label;
+                const v = document.createElement('div'); v.className = 'gov-meta-value'; v.textContent = value;
+                wrap.append(l, v);
+                return wrap;
+            }));
 
         overlay.classList.remove('hidden');
     }

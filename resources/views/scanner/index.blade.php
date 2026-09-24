@@ -386,7 +386,7 @@ async function processScanToken(token) {
         if (!res.ok) {
             const text = await res.text();
             console.error('Scan request failed', res.status, text);
-            alert('Scan failed (server error ' + res.status + '). Check console/logs.');
+            showToast('The server returned an error (' + res.status + '). Check the console or logs.', 'error', 'Scan Failed');
             return;
         }
 
@@ -394,7 +394,7 @@ async function processScanToken(token) {
         displayScanResultUI(data);
     } catch (err) {
         console.error('Scan processing error', err);
-        alert('Scan failed to process — see console for details.');
+        showToast('The scan could not be processed. See the console for details.', 'error', 'Scan Failed');
     }
 }
 
@@ -492,9 +492,11 @@ function displayScanResultUI(data) {
 
     // Congressman(s) / offices the visitor is going to, one per line.
     const visiting = data.visiting || [];
-    document.getElementById('statusVisiting').innerText = visiting.length
-        ? 'Visiting:\n' + visiting.map(v => v.room ? `${v.name} — ${v.room}` : v.name).join('\n')
-        : '';
+    const visitingLines = visiting.length
+        ? ['Visiting:', ...visiting.map(v => v.room ? `${v.name} — ${v.room}` : v.name)]
+        : [];
+    if (data.contact_person) visitingLines.push(`Contact: ${data.contact_person}`);
+    document.getElementById('statusVisiting').innerText = visitingLines.join('\n');
         
     const directionBadge = document.getElementById('resDirectionBadge');
     if (data.direction === 'in') {
@@ -535,7 +537,7 @@ function toggleFullscreen(elId) {
     if (document.fullscreenElement) {
         document.exitFullscreen();
     } else {
-        el.requestFullscreen().catch(err => alert('Fullscreen error: ' + err.message));
+        el.requestFullscreen().catch(err =>showToast(err.message, 'error', 'Fullscreen Unavailable'));
     }
 }
 
@@ -576,7 +578,7 @@ function toggleCamera() {
                 btn.className = 'gov-btn-camera is-recording';
                 placeholder.classList.add('hidden');
                 targetOverlay.classList.remove('hidden');
-            }).catch(err => alert("Camera error: " + err));
+            }).catch(err => showToast(String(err), 'error', 'Camera Unavailable'));
         } else {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
                 .then(stream => {
@@ -588,7 +590,7 @@ function toggleCamera() {
                     btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
                     btn.className = 'gov-btn-camera is-recording';
                     placeholder.classList.add('hidden');
-                }).catch(err => alert("Camera error: " + err));
+                }).catch(err => showToast(String(err), 'error', 'Camera Unavailable'));
         }
     } else {
         if (html5QrcodeScanner) {

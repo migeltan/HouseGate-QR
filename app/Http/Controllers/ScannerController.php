@@ -121,7 +121,8 @@ class ScannerController extends Controller
             'scanned_building_id' => $scannerBuilding->id,
             'visitor_name_snapshot' => $visitorName,
             'pass_number_snapshot' => $passNumber,
-            'authorized_building_snapshot' => $authorizedBuildingName,
+                        'authorized_building_snapshot' => $authorizedBuildingName,
+            'contact_person_snapshot' => $pass?->contact_person,
             'result' => $result,
             'reason' => $reason,
             'direction' => $direction,
@@ -155,7 +156,9 @@ class ScannerController extends Controller
                 // Who this visitor is here to see (from the pass's open registration).
         // Shows every congressman on the pass, plus any free-text "Other" office.
         $visiting = [];
+        $contactPerson = null;
         if ($pass && ($registration = $pass->openRegistration())) {
+            $contactPerson = $registration->contact_person;
             $visiting = $registration->congressmen()
                 ->orderBy('name')
                 ->get()
@@ -184,6 +187,7 @@ class ScannerController extends Controller
             'direction' => $direction,
             'recent_activity' => $recentActivity,
             'visiting' => $visiting,
+            'contact_person' => $contactPerson,
         ]);
     }
 }

@@ -16,7 +16,7 @@
                     <div class="relative w-full">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" id="logSearchInput" name="search" value="{{ request('search') }}"
-                    placeholder="Search by name, pass #, etc..." autocomplete="off"
+                    placeholder="Search by name, contact person, pass #..." autocomplete="off"
                     class="w-full h-11 rounded-[8.1px] border border-slate-400 bg-slate-50 pl-9 pr-3 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
                     </div>
                 </div>
@@ -72,11 +72,12 @@
         <div class="px-10 pb-5">
             <div class="overflow-hidden rounded-xl border border-slate-400">
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[800.1px] border-collapse text-center text-xs">
+                    <table class="w-full min-w-[950px] border-collapse text-center text-xs">
                         <thead class="bg-slate-400 text-slate-800 uppercase tracking-wide">
                             <tr>
                                 <th class="py-3 px-4 font-bold">Timestamp</th>
                                 <th class="py-3 px-4 font-bold">Visitor</th>
+                                <th class="py-3 px-4 font-bold">Contact person</th>
                                 <th class="py-3 px-4 font-bold">Pass #</th>
                                 <th class="py-3 px-4 font-bold">Scanned at</th>
                                 <th class="py-3 px-4 font-bold">Result</th>
@@ -89,6 +90,7 @@
                                     data-type="scan"
                                     data-timestamp="{{ $l->created_at->format('Y-m-d h:i:s A') }}"
                                     data-visitor="{{ $l->visitor_name_snapshot }}"
+                                    data-contact-person="{{ $l->contact_person_snapshot ?? '—' }}"
                                     data-pass-number="{{ $l->pass_number_snapshot }}"
                                     data-scanned-at="{{ $l->scannedBuilding->name ?? '' }}"
                                     data-result="{{ ucfirst(strtolower($l->result)) }}"
@@ -97,6 +99,7 @@
                                     onclick="openRowModal(this)">
                                     <td class="border-r border-slate-100 py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $l->visitor_name_snapshot }}</td>
+                                    <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->contact_person_snapshot ?? '—' }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ $l->pass_number_snapshot }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->scannedBuilding->name ?? '' }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4">
@@ -108,7 +111,7 @@
                                     <td class="py-3 px-4 text-slate-600 truncate max-w-xs" title="{{ $l->reason }}">{{ $l->reason }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="py-10 text-center text-slate-400">No scan events recorded yet.</td></tr>
+                                <tr><td colspan="7" class="py-10 text-center text-slate-400">No scan events recorded yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
