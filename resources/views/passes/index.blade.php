@@ -307,7 +307,7 @@
                         </div>
                     </div>
 
-                                        <div class="reg-camera-grid">
+                        <div class="reg-camera-grid">
                         <div class="reg-camera-col">
                             <p class="reg-camera-help">Capture the photo of the visitor properly.</p>
                             <div class="reg-camera-preview" id="photoCaptureArea">
@@ -327,58 +327,35 @@
                                 <button type="button" id="retakeBtn" class="reg-button hidden" onclick="retakePhoto()">Retake</button>
                             </div>
                         </div>
-
                         <div class="reg-camera-col">
-                            <p class="reg-camera-help">Capture a clear photo of the visitor's ID.</p>
+                            <p class="reg-camera-help">Capture front and back of the visitor's ID.</p>
                             <div class="reg-camera-preview" id="idPhotoCaptureArea">
                                 <span class="reg-focus-corner tl"></span>
                                 <span class="reg-focus-corner tr"></span>
                                 <span class="reg-focus-corner bl"></span>
                                 <span class="reg-focus-corner br"></span>
                                 <video id="idPhotoVideo" autoplay playsinline class="hidden"></video>
-                                <img id="idPhotoPreview" class="hidden" alt="Captured ID photo">
-                                <span id="idPhotoPlaceholderText">Awaiting ID Photo</span>
+                                <img id="idPhotoPreview" class="hidden" alt="Captured ID">
+                                <span id="idPhotoPlaceholderText">Capture Front and Back of the ID</span>
+                                <button type="button" id="idArrowLeft" class="hidden" onclick="goToIdSlide(0)" aria-label="View front" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); width:32px; height:32px; border-radius:50%; background:rgba(15,23,42,0.55); color:#fff; border:0; font-size:14px; cursor:pointer; z-index:5;">&#9664;</button>
+                                <button type="button" id="idArrowRight" class="hidden" onclick="goToIdSlide(1)" aria-label="View back" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); width:32px; height:32px; border-radius:50%; background:rgba(15,23,42,0.55); color:#fff; border:0; font-size:14px; cursor:pointer; z-index:5;">&#9654;</button>
                             </div>
                             <div class="reg-camera-actions">
-                                <button type="button" id="startIdCameraBtn" class="reg-button reg-button-blue" onclick="startIdCamera()">
+                                <button type="button" id="idMainBtn" class="reg-button reg-button-blue" onclick="handleIdMainButton()">
                                     <span aria-hidden="true">&#9654;</span> Start Camera
                                 </button>
-                                <button type="button" id="captureIdBtn" class="reg-button reg-button-blue hidden" onclick="captureIdPhoto()">Capture</button>
-                                <button type="button" id="retakeIdBtn" class="reg-button hidden" onclick="retakeIdPhoto()">Retake</button>
                             </div>
-
-                            <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; cursor:pointer; margin-top:10px;">
-                                <input type="checkbox" id="idBackToggle" onchange="toggleIdBackCapture()">
-                                Also scan the back (e.g. PhilSys QR) for faster, more accurate autofill
-                            </label>
-                            <div class="reg-camera-col hidden" id="idBackSection" style="padding:0; margin-top:10px;">
-                                <div class="reg-camera-preview" id="idBackCaptureArea" style="aspect-ratio:1/1;">
-                                    <span class="reg-focus-corner tl"></span>
-                                    <span class="reg-focus-corner tr"></span>
-                                    <span class="reg-focus-corner bl"></span>
-                                    <span class="reg-focus-corner br"></span>
-                                    <video id="idBackVideo" autoplay playsinline class="hidden"></video>
-                                    <img id="idBackPreview" class="hidden" alt="Captured ID back">
-                                    <span id="idBackPlaceholderText">Awaiting ID Back</span>
-                                </div>
-                                <div class="reg-camera-actions">
-                                    <button type="button" id="startIdBackCameraBtn" class="reg-button reg-button-blue" onclick="startIdBackCamera()">
-                                        <span aria-hidden="true">&#9654;</span> Start Camera
-                                    </button>
-                                    <button type="button" id="captureIdBackBtn" class="reg-button reg-button-blue hidden" onclick="captureIdBackPhoto()">Capture</button>
-                                    <button type="button" id="retakeIdBackBtn" class="reg-button hidden" onclick="retakeIdBackPhoto()">Retake</button>
-                                </div>
-                            </div>
+                            <p class="reg-camera-help" id="idCaptureStatus" style="font-weight:700; color:#64748b;">Capture the visitor's ID — front, then back.</p>
+                            <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
                         </div>
+
                     </div>
 
-                                       <canvas id="photoCanvas" class="hidden"></canvas>
+                    <canvas id="photoCanvas" class="hidden"></canvas>
                     <input type="hidden" name="photo_data" id="photoDataInput">
-                                        <canvas id="idPhotoCanvas" class="hidden"></canvas>
-                    <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
+                    <canvas id="idPhotoCanvas" class="hidden"></canvas>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
-                    <canvas id="idBackCanvas" class="hidden"></canvas>
                 </section>
 
                 {{-- Step 2: Visitor Information --}}
@@ -453,20 +430,7 @@
                             <h2>Destination</h2>
                         </div>
                     </div>
-
                     <div class="reg-form-grid">
-                                                <div class="reg-field full">
-                            <label>Reason for Visiting <span class="reg-required">*</span></label>
-                            <select name="purpose_choice" id="purposeChoice" required onchange="document.getElementById('purposeOtherInput').classList.toggle('hidden', this.value !== 'Others'); document.getElementById('purposeOtherInput').required = (this.value === 'Others');">
-                                <option value="">Select reason</option>
-                                <option value="Official Business">Official Business</option>
-                                <option value="Financial/Medical Assistance">Financial/Medical Assistance</option>
-                                <option value="Visit">Visit</option>
-                                <option value="Others">Others</option>
-                            </select>
-                            <input type="text" name="purpose_other" id="purposeOtherInput" class="hidden" style="margin-top:8px;" placeholder="Please specify">
-                        </div>
-
                         <div class="reg-field full">
                             <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access (Multi-Access Pass))</span></label>
                             <div class="reg-building-grid" id="regBuildingGrid">
@@ -482,6 +446,18 @@
                             <p class="reg-north-gate-hint" id="northGateHint">
                                 2 or more buildings selected — this will be issued as a <strong>North Gate Access</strong> pass, valid at all selected buildings.
                             </p>
+                        </div>
+
+                        <div class="reg-field full">
+                            <label>Reason for Visiting <span class="reg-required">*</span></label>
+                            <select name="purpose_choice" id="purposeChoice" required onchange="document.getElementById('purposeOtherInput').classList.toggle('hidden', this.value !== 'Others'); document.getElementById('purposeOtherInput').required = (this.value === 'Others');">
+                                <option value="">Select reason</option>
+                                <option value="Official Business">Official Business</option>
+                                <option value="Financial/Medical Assistance">Financial/Medical Assistance</option>
+                                <option value="Visit">Visit</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <input type="text" name="purpose_other" id="purposeOtherInput" class="hidden" style="margin-top:8px;" placeholder="Please specify">
                         </div>
 
                         <div class="reg-field full" id="congressmanField">
@@ -654,6 +630,7 @@ function renderCongList() {
             document.getElementById('congSearch').value = '';
             renderCongChips();
             renderCongList();
+            list.classList.remove('is-open');
         });
         list.appendChild(item);
     });
@@ -665,6 +642,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const open = () => { renderCongList(); list.classList.add('is-open'); };
     search.addEventListener('focus', open);
     search.addEventListener('input', open);
+    search.addEventListener('keydown', e => {
+        if (e.key === 'Enter') e.preventDefault();
+    });
     document.addEventListener('click', e => {
         if (!e.target.closest('#congPicker')) list.classList.remove('is-open');
     });
@@ -801,62 +781,116 @@ function resetPhotoCapture() {
     document.getElementById('photoDataInput').value = '';
 }
 // ---- End visitor face photo capture ----
-
-// ---- Photo capture (ID) ----
+// ---- Photo capture (ID): one box, front then back, arrow to switch sides ----
 let idPhotoStream = null;
+let idSlide = 0; // 0 = front, 1 = back
+let idPhotos = { front: null, back: null };
+let idCameraActive = false;
 
-async function startIdCamera() {
+function updateIdSlideUI() {
     const video = document.getElementById('idPhotoVideo');
+    const preview = document.getElementById('idPhotoPreview');
+    const placeholder = document.getElementById('idPhotoPlaceholderText');
+    const mainBtn = document.getElementById('idMainBtn');
+    const side = idSlide === 0 ? 'front' : 'back';
+    const photo = idPhotos[side];
+
+    video.classList.toggle('hidden', !idCameraActive);
+    preview.classList.toggle('hidden', idCameraActive || !photo);
+    placeholder.classList.toggle('hidden', idCameraActive || !!photo);
+    if (photo && !idCameraActive) preview.src = photo;
+    if (!idCameraActive && !photo) {
+        placeholder.innerText = idSlide === 0 ? 'Capture Front and Back of the ID' : 'Now capture the back of the ID';
+    }
+
+    mainBtn.innerHTML = idCameraActive ? 'Capture' : (photo ? 'Retake' : '<span aria-hidden="true">&#9654;</span> Start Camera');
+    document.getElementById('idArrowLeft').classList.toggle('hidden', idSlide !== 1);
+    document.getElementById('idArrowRight').classList.toggle('hidden', !(idSlide === 0 && idPhotos.front));
+}
+
+function goToIdSlide(slide) {
+    stopIdCameraStream();
+    idCameraActive = false;
+    idSlide = slide;
+    updateIdSlideUI();
+}
+
+async function handleIdMainButton() {
+    if (idCameraActive) { captureCurrentIdSlide(); return; }
+    const side = idSlide === 0 ? 'front' : 'back';
+    idPhotos[side] = null;
     try {
         idPhotoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = idPhotoStream;
-        video.classList.remove('hidden');
-        document.getElementById('idPhotoPlaceholderText').classList.add('hidden');
-        document.getElementById('startIdCameraBtn').classList.add('hidden');
-        document.getElementById('captureIdBtn').classList.remove('hidden');
+        document.getElementById('idPhotoVideo').srcObject = idPhotoStream;
+        idCameraActive = true;
+        updateIdSlideUI();
     } catch (err) {
         alert('Could not access camera: ' + err.message);
     }
 }
 
-function captureIdPhoto() {
+function captureCurrentIdSlide() {
     const video = document.getElementById('idPhotoVideo');
     const canvas = document.getElementById('idPhotoCanvas');
-    const preview = document.getElementById('idPhotoPreview');
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    document.getElementById('idPhotoDataInput').value = dataUrl;
 
-    preview.src = dataUrl;
-    preview.classList.remove('hidden');
-    video.classList.add('hidden');
-    document.getElementById('captureIdBtn').classList.add('hidden');
-    document.getElementById('retakeIdBtn').classList.remove('hidden');
     stopIdCameraStream();
+    idCameraActive = false;
 
-    runIdOcr(dataUrl);
-}
-
-// ---- ID OCR auto-fill (National ID / PhilSys, client-side via Tesseract.js) ----
-async function runIdOcr(dataUrl) {
-    showToast('Reading ID… this can take a few seconds.', 'success');
-    try {
-        const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
-        const filled = applyIdOcrText(text);
-        showToast(filled.length ? `Auto-filled from ID: ${filled.join(', ')}. Please review.` : 'Could not read the ID clearly — please fill in manually.', filled.length ? 'success' : 'error');
-    } catch (err) {
-        console.error('ID OCR failed:', err);
-        showToast('ID reading failed — please fill in manually.', 'error');
+    if (idSlide === 0) {
+        idPhotos.front = dataUrl;
+        document.getElementById('idPhotoDataInput').value = dataUrl;
+        updateIdSlideUI();
+        runIdOcr(dataUrl);
+        if (!idPhotos.back) setTimeout(() => goToIdSlide(1), 400);
+    } else {
+        idPhotos.back = dataUrl; // in-memory only — never uploaded or stored
+        updateIdSlideUI();
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+        if (qr) applyIdBackQr(qr.data);
+        else setIdCaptureStatus('No QR code detected on the back — Retake or leave it as is.', 'warn');
     }
 }
 
-// Parses National ID (PhilSys) front-of-card text. Label appears on one line,
-// the value on the next — matches both the Filipino/English label and an
-// English-only fallback, since OCR sometimes drops one half of the pair.
+function stopIdCameraStream() {
+    if (idPhotoStream) { idPhotoStream.getTracks().forEach(t => t.stop()); idPhotoStream = null; }
+}
+
+function resetIdPhotoCapture() {
+    stopIdCameraStream();
+    idSlide = 0;
+    idPhotos = { front: null, back: null };
+    idCameraActive = false;
+    document.getElementById('idPhotoDataInput').value = '';
+    setIdCaptureStatus("Capture the visitor's ID — front, then back.", 'neutral');
+    updateIdSlideUI();
+}
+
+function setIdCaptureStatus(message, tone) {
+    const el = document.getElementById('idCaptureStatus');
+    const colors = { neutral: '#64748b', busy: '#2563eb', success: '#1c9a5b', warn: '#b45309', error: 'var(--brand-red)' };
+    el.innerText = message;
+    el.style.color = colors[tone] || colors.neutral;
+}
+
+// ---- ID OCR auto-fill (National ID / PhilSys front, client-side via Tesseract.js) ----
+async function runIdOcr(dataUrl) {
+    setIdCaptureStatus('Reading ID… this can take a few seconds.', 'busy');
+    try {
+        const { data: { text } } = await Tesseract.recognize(dataUrl, 'eng');
+        const filled = applyIdOcrText(text);
+        setIdCaptureStatus(filled.length ? `Auto-filled: ${filled.join(', ')}. Please review.` : 'Could not read the ID clearly — please fill in manually.', filled.length ? 'success' : 'warn');
+    } catch (err) {
+        console.error('ID OCR failed:', err);
+        setIdCaptureStatus('ID reading failed — please fill in manually.', 'error');
+    }
+}
+
 function applyIdOcrText(rawText) {
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
     const allLabelPatterns = [/Apelyido/i, /Last\s*Name/i, /Mga\s*Pangalan/i, /Given\s*Name/i, /Gitnang\s*Apelyido/i, /Middle\s*Name/i, /Petsa|Date\s*of\s*Birth/i, /Tirahan|Address/i, /Republika|Philippines|Identification/i];
@@ -867,21 +901,16 @@ function applyIdOcrText(rawText) {
     const findValueAfter = (labelPatterns) => {
         for (let i = 0; i < lines.length; i++) {
             if (!labelPatterns.some(p => p.test(lines[i]))) continue;
-            // The value is usually right below the label, but glare/spacing can
-            // push OCR to skip a line or two — scan a small window, not just +1.
             for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
-                if (looksLikeName(lines[j])) {
-                    return lines[j].replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
-                }
+                if (looksLikeName(lines[j])) return lines[j].replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
             }
         }
         return null;
     };
-    
+
     const lastName = findValueAfter([/Apelyido/i, /Last\s*Name/i]);
     const firstName = findValueAfter([/Mga\s*Pangalan/i, /Given\s*Name/i]);
     const middleName = findValueAfter([/Gitnang\s*Apelyido/i, /Middle\s*Name/i]);
-    // ID number: PhilSys format is 4 groups of 4 digits (e.g. 1234-5678-9101-1213).
     const idMatch = rawText.match(/\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}/);
     const idRef = idMatch ? idMatch[0].replace(/\s/g, '-') : null;
 
@@ -893,18 +922,11 @@ function applyIdOcrText(rawText) {
 
     if (lastName || firstName) {
         const idTypeSelect = document.querySelector('[name="id_type"]');
-        if (idTypeSelect && !idTypeSelect.value) {
-            idTypeSelect.value = 'PhilSys (National ID)';
-        }
+        if (idTypeSelect && !idTypeSelect.value) idTypeSelect.value = 'PhilSys (National ID)';
     }
-
     return filled;
 }
-// ---- End ID OCR auto-fill ----
 
-// Shared by OCR and QR autofill. A field an OCR/QR read filled in is marked
-// data-autofilled — the more reliable QR read is allowed to overwrite that
-// guess, but never something the guard typed by hand (the flag clears on input).
 function setAutofillValue(name, value, label, filledList) {
     if (!value) return;
     const input = document.querySelector(`[name="${name}"]`);
@@ -916,70 +938,19 @@ function setAutofillValue(name, value, label, filledList) {
     }
 }
 document.addEventListener('input', (e) => {
-    if (e.target.matches('[name="first_name"],[name="middle_name"],[name="last_name"],[name="id_ref"]')) {
-        delete e.target.dataset.autofilled;
-    }
+    if (e.target.matches('[name="first_name"],[name="middle_name"],[name="last_name"],[name="id_ref"]')) delete e.target.dataset.autofilled;
 });
 document.addEventListener('change', (e) => {
     if (e.target.matches('[name="gender"]')) delete e.target.dataset.autofilled;
 });
 
-// ---- ID Back QR (PhilSys, client-side via jsQR). Decoded and discarded —
-// the back-of-ID photo itself is never uploaded or stored. ----
-let idBackStream = null;
-
-function toggleIdBackCapture() {
-    const show = document.getElementById('idBackToggle').checked;
-    document.getElementById('idBackSection').classList.toggle('hidden', !show);
-    if (!show) stopIdBackCameraStream();
-}
-
-async function startIdBackCamera() {
-    const video = document.getElementById('idBackVideo');
-    try {
-        idBackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = idBackStream;
-        video.classList.remove('hidden');
-        document.getElementById('idBackPlaceholderText').classList.add('hidden');
-        document.getElementById('startIdBackCameraBtn').classList.add('hidden');
-        document.getElementById('captureIdBackBtn').classList.remove('hidden');
-    } catch (err) {
-        alert('Could not access camera: ' + err.message);
-    }
-}
-
-function captureIdBackPhoto() {
-    const video = document.getElementById('idBackVideo');
-    const canvas = document.getElementById('idBackCanvas');
-    const preview = document.getElementById('idBackPreview');
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-
-    preview.src = canvas.toDataURL('image/jpeg', 0.85);
-    preview.classList.remove('hidden');
-    video.classList.add('hidden');
-    document.getElementById('captureIdBackBtn').classList.add('hidden');
-    document.getElementById('retakeIdBackBtn').classList.remove('hidden');
-    stopIdBackCameraStream();
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
-    if (qr) {
-        applyIdBackQr(qr.data);
-    } else {
-        showToast('No QR code detected — try again with better lighting/focus.', 'error');
-    }
-}
-
+// ---- ID back QR (PhilSys), decoded client-side via jsQR ----
 function applyIdBackQr(rawText) {
     let json;
     try {
         json = JSON.parse(rawText);
     } catch (err) {
-        showToast('That QR did not contain readable ID data.', 'error');
+        setIdCaptureStatus('That QR did not contain readable ID data.', 'error');
         return;
     }
     const subj = json.subject || {};
@@ -996,46 +967,12 @@ function applyIdBackQr(rawText) {
         genderSelect.dataset.autofilled = '1';
         filled.push('Gender');
     }
-
     const idTypeSelect = document.querySelector('[name="id_type"]');
     if (idTypeSelect && !idTypeSelect.value) idTypeSelect.value = 'PhilSys (National ID)';
 
-    showToast(filled.length ? `Auto-filled from ID QR: ${filled.join(', ')}. Please review.` : 'QR read, but no matching fields found.', filled.length ? 'success' : 'error');
+    setIdCaptureStatus(filled.length ? `QR auto-filled: ${filled.join(', ')}. Please review.` : 'QR read, but no matching fields found.', filled.length ? 'success' : 'warn');
 }
-
-function retakeIdBackPhoto() {
-    document.getElementById('idBackPreview').classList.add('hidden');
-    document.getElementById('retakeIdBackBtn').classList.add('hidden');
-    startIdBackCamera();
-}
-
-function stopIdBackCameraStream() {
-    if (idBackStream) { idBackStream.getTracks().forEach(t => t.stop()); idBackStream = null; }
-}
-// ---- End ID Back QR ----
-
-function retakeIdPhoto() {
-    document.getElementById('idPhotoPreview').classList.add('hidden');
-    document.getElementById('retakeIdBtn').classList.add('hidden');
-    document.getElementById('idPhotoDataInput').value = '';
-    startIdCamera();
-}
-
-function stopIdCameraStream() {
-    if (idPhotoStream) { idPhotoStream.getTracks().forEach(t => t.stop()); idPhotoStream = null; }
-}
-
-function resetIdPhotoCapture() {
-    stopIdCameraStream();
-    document.getElementById('idPhotoVideo').classList.add('hidden');
-    document.getElementById('idPhotoPreview').classList.add('hidden');
-    document.getElementById('idPhotoPlaceholderText').classList.remove('hidden');
-    document.getElementById('retakeIdBtn').classList.add('hidden');
-    document.getElementById('captureIdBtn').classList.add('hidden');
-    document.getElementById('startIdCameraBtn').classList.remove('hidden');
-    document.getElementById('idPhotoDataInput').value = '';
-}
-// ---- End ID photo capture ----
+// ---- End ID capture ----
 
 function closeRegisterModal() {
     document.getElementById('registerModal').classList.add('hidden');
@@ -1046,8 +983,6 @@ function closeRegisterModal() {
     setPassClass('day');
     selectedCong.clear();
     updateBuildingSelection();
-    document.getElementById('idBackToggle').checked = false;
-    toggleIdBackCapture();
 }
        let currentModalFilter = 'all';
 
