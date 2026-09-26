@@ -439,6 +439,32 @@
                                     <input type="checkbox" name="confirm_different_person" value="1" id="dupConfirmCheck">
                                     I have verified this is a different person.
                                 </label>
+
+                                <div class="reg-dup-transfer hidden" id="dupTransferBlock">
+                                    <p class="reg-dup-transfer-label">Have the visitor's old card? Scan it to move their existing pass to this building instead.</p>
+
+                                    <div class="reg-dup-transfer-input-row">
+                                        <i class="fa-solid fa-barcode reg-dup-transfer-input-icon" aria-hidden="true"></i>
+                                        <input type="text" id="transferHwInput" class="reg-dup-transfer-input" placeholder="Scan old card here" autocomplete="off">
+                                        <span id="transferQrSuccess" class="hidden"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                                    </div>
+
+                                    <div class="reg-dup-transfer-footer">
+                                        <label class="reg-dup-transfer-toggle">
+                                            <input type="checkbox" id="transferCameraToggle" onchange="toggleTransferCameraFallback(this.checked)">
+                                            No scanner on hand? Use camera instead
+                                        </label>
+                                        <button type="button" class="reg-button reg-dup-transfer-clear hidden" id="transferClearBtn" onclick="clearTransferScan()">Clear</button>
+                                    </div>
+
+                                    <div class="reg-dup-transfer-scan hidden" id="dupTransferScanArea">
+                                        <video id="transferQrVideo" autoplay playsinline muted class="hidden"></video>
+                                        <span id="transferQrPlaceholder">Point the camera at the QR on the old card.</span>
+                                    </div>
+
+                                    <p class="reg-dup-transfer-status" id="transferScanStatus"></p>
+                                    <input type="hidden" name="transfer_qr_token" id="transferQrTokenInput">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1023,16 +1049,19 @@ async function runDuplicateCheck() {
         id_type: v('id_type'), id_ref: v('id_ref'),
         first_name: v('first_name'), last_name: v('last_name'), contact_no: v('contact_no'),
     });
+    const transferToken = document.getElementById('transferQrTokenInput').value.trim();
+    if (transferToken) params.set('transfer_qr_token', transferToken);
     const seq = ++dupSeq;
     try {
         const res = await fetch(`${DUP_URL}?${params}`, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
         if (!res.ok) return;
         const data = await res.json();
-        if (seq === dupSeq) renderDuplicate(data.match);
+        if (seq === dupSeq) renderDuplicate(data.match, data.transfer_ready);
     } catch (e) { /* the server re-checks on submit */ }
 }
 
 function dupBlocked() {
+    if (dupTransferReady) return false; // a verified transfer resolves either level
     return dupState === 'exact'
         || (dupState === 'possible' && !document.getElementById('dupConfirmCheck').checked);
 }
@@ -1059,17 +1088,28 @@ function refreshSubmitState() {
 
 function updateDupSubmitState() { refreshSubmitState(); }
 
-function renderDuplicate(match) {
+function renderDuplicate(match, transferReady) {
     dupState = match ? match.level : null;
+    dupTransferReady = !!transferReady;
     document.getElementById('dupConfirmCheck').checked = false; // any new result must be re-confirmed
     document.getElementById('dupWarning').classList.toggle('hidden', !match);
-    if (!match) { updateDupSubmitState(); return; }
+    document.getElementById('dupTransferBlock').classList.toggle('hidden', !match);
+    if (!match) {
+        document.getElementById('transferQrTokenInput').value = '';
+        transferHwInput.value = '';
+        stopTransferCamera();
+        document.getElementById('transferCameraToggle').checked = false;
+        document.getElementById('dupTransferScanArea').classList.add('hidden');
+        updateDupSubmitState();
+        return;
+    }
 
     const exact = match.level === 'exact';
     const p = match.pass;
     const box = document.getElementById('dupBox');
     box.classList.toggle('is-exact', exact);
     box.classList.toggle('is-possible', !exact);
+    box.classList.toggle('is-transfer-ready', dupTransferReady);
 
     document.getElementById('dupTitle').textContent = exact
         ? 'This person already has an active pass'
@@ -1093,11 +1133,24 @@ function renderDuplicate(match) {
     });
 
     const more = match.more > 0 ? ` (+${match.more} more active pass${match.more > 1 ? 'es' : ''} matched)` : '';
-    document.getElementById('dupNote').textContent = (exact
-        ? 'The same ID cannot be issued a second pass. Cancel this registration.'
-        : 'Only continue if you have verified this is a different person.') + more;
-    document.getElementById('dupCancelBtn').classList.toggle('hidden', !exact);
-    document.getElementById('dupConfirmWrap').classList.toggle('hidden', exact);
+    document.getElementById('dupNote').textContent = (dupTransferReady
+        ? 'Ready to transfer — submitting will close the old card and issue a new one here.'
+        : (exact
+            ? 'The same ID cannot be issued a second pass. Cancel this registration, or scan the old card below to transfer it.'
+            : 'Confirm this is a different person, or scan the old card below to transfer the existing pass.')) + more;
+    document.getElementById('dupCancelBtn').classList.toggle('hidden', !exact || dupTransferReady);
+    document.getElementById('dupConfirmWrap').classList.toggle('hidden', exact || dupTransferReady);
+
+    const hasTransferToken = !!document.getElementById('transferQrTokenInput').value;
+    document.getElementById('transferQrSuccess').classList.toggle('hidden', !dupTransferReady);
+    document.getElementById('transferClearBtn').classList.toggle('hidden', !hasTransferToken);
+    if (dupTransferReady) {
+        setTransferStatus('', 'neutral');
+    } else if (hasTransferToken) {
+        setTransferStatus('That card does not match the record shown above. Try again, or use Clear.', 'error');
+    }
+    if (match && !dupTransferReady) focusTransferHwInput();
+
     updateDupSubmitState();
 }
 
@@ -1117,6 +1170,114 @@ document.getElementById('registerForm').addEventListener('submit', (e) => {
     }
 });
 // ---- End duplicate check ----
+// ---- Transfer: scan the visitor's OLD physical card (Workflow 2) ----
+// Primary path: a Honeywell 2D scanner is a keyboard wedge — it types the
+// qr_token into whatever input has focus. Camera/jsQR is an opt-in fallback.
+let transferStream = null;
+let transferScanTimer = null;
+let transferHwDebounce = null;
+let dupTransferReady = false;
+
+const transferHwInput = document.getElementById('transferHwInput');
+transferHwInput.addEventListener('input', () => {
+    clearTimeout(transferHwDebounce);
+    transferHwDebounce = setTimeout(() => {
+        const token = transferHwInput.value.trim();
+        if (token) verifyTransferToken(token);
+    }, 250);
+});
+transferHwInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(transferHwDebounce);
+        const token = transferHwInput.value.trim();
+        if (token) verifyTransferToken(token);
+    }
+});
+
+function focusTransferHwInput() {
+    if (!document.getElementById('transferCameraToggle').checked) {
+        setTimeout(() => transferHwInput.focus(), 50);
+    }
+}
+
+function toggleTransferCameraFallback(enabled) {
+    document.getElementById('dupTransferScanArea').classList.toggle('hidden', !enabled);
+    if (enabled) {
+        // Only one camera stream tends to work at a time on mobile devices.
+        stopCameraStream();
+        stopIdCameraStream();
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                transferStream = stream;
+                const video = document.getElementById('transferQrVideo');
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                document.getElementById('transferQrPlaceholder').classList.remove('hidden');
+                setTransferStatus('Point the camera at the QR on the old card.', 'busy');
+                transferScanTimer = setInterval(scanTransferFrame, 400);
+            })
+            .catch(err => {
+                document.getElementById('transferCameraToggle').checked = false;
+                document.getElementById('dupTransferScanArea').classList.add('hidden');
+                showToast(err.message, 'error', 'Camera Unavailable');
+            });
+    } else {
+        stopTransferCamera();
+        focusTransferHwInput();
+    }
+}
+
+function stopTransferCamera() {
+    clearInterval(transferScanTimer);
+    transferScanTimer = null;
+    if (transferStream) { transferStream.getTracks().forEach(t => t.stop()); transferStream = null; }
+    document.getElementById('transferQrVideo').classList.add('hidden');
+}
+
+function scanTransferFrame() {
+    const video = document.getElementById('transferQrVideo');
+    if (!video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+    if (qr && qr.data) verifyTransferToken(qr.data.trim());
+}
+
+async function verifyTransferToken(token) {
+    if (!token) return;
+    if (document.getElementById('transferCameraToggle').checked) stopTransferCamera();
+    document.getElementById('transferQrTokenInput').value = token;
+    transferHwInput.value = '';
+    setTransferStatus('Checking card…', 'busy');
+    await runDuplicateCheck(); // re-runs the whole check, now including the scanned token
+}
+
+function clearTransferScan() {
+    stopTransferCamera();
+    document.getElementById('transferCameraToggle').checked = false;
+    document.getElementById('dupTransferScanArea').classList.add('hidden');
+    document.getElementById('transferQrTokenInput').value = '';
+    transferHwInput.value = '';
+    dupTransferReady = false;
+    document.getElementById('transferQrSuccess').classList.add('hidden');
+    document.getElementById('transferClearBtn').classList.add('hidden');
+    setTransferStatus('', 'neutral');
+    refreshSubmitState();
+    focusTransferHwInput();
+}
+
+function setTransferStatus(message, tone) {
+    const el = document.getElementById('transferScanStatus');
+    const colors = { neutral: '#64748b', busy: '#2563eb', success: '#1c9a5b', error: 'var(--brand-red)' };
+    el.textContent = message;
+    el.style.color = colors[tone] || colors.neutral;
+}
+// ---- End transfer scan ----
 
 function closeRegisterModal() {
     document.getElementById('registerModal').classList.add('hidden');

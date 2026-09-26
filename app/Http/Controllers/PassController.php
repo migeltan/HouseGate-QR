@@ -176,15 +176,26 @@ class PassController extends Controller
      */
     public function checkDuplicate(Request $request)
     {
-        return response()->json([
-            'match' => $this->findActiveDuplicate(
-                (string) $request->query('id_type'), (string) $request->query('id_ref'),
-                (string) $request->query('first_name'), (string) $request->query('last_name'),
-                (string) $request->query('contact_no')
-            ),
-        ]);
-    }
+        $match = $this->findActiveDuplicate(
+            (string) $request->query('id_type'), (string) $request->query('id_ref'),
+            (string) $request->query('first_name'), (string) $request->query('last_name'),
+            (string) $request->query('contact_no')
+        );
 
+        // Lets the Step 2 panel confirm a scanned old card belongs to the matched
+        // pass before the guard submits — register() re-checks this either way.
+        $transferReady = false;
+        if ($match) {
+            $token = trim((string) $request->query('transfer_qr_token'));
+            if ($token !== '') {
+                $old = VisitorPass::where('qr_token', $token)->where('status', 'active')->first();
+                $transferReady = $old && (int) $old->id === (int) $match['pass']['id'];
+            }
+        }
+
+        return response()->json(['match' => $match, 'transfer_ready' => $transferReady]);
+    }
+    
     /**
      * Returns null, or ['level' => 'exact'|'possible', 'more' => int, 'pass' => [...]].
      *  - exact:    same (id_type, id_ref) on an active pass, government ID types only (hard stop)
@@ -566,6 +577,12 @@ class PassController extends Controller
         ]);
 
         $registration->congressmen()->sync($data['congressman_ids'] ?? []);
+
+        // Close out the old card now that the new one is issued — otherwise
+        // it stays active and the visitor ends up holding two passes at once.
+        if ($oldPass && $oldRegistration) {
+            $this->closeForTransfer($oldPass, $oldRegistration);
+        }
 }
     /**
      * One-line "who they're visiting" text kept in office_to_visit so the info

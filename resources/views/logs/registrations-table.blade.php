@@ -84,7 +84,12 @@
                             @php
                                 $regStatusLabel = ! $r->unassigned_at
                                     ? 'Currently assigned'
-                                    : ($r->unassign_reason === 'auto_expired' ? 'Auto-expired' : ($r->unassign_reason === 'renewed' ? 'Renewed' : 'Returned'));
+                                    : match ($r->unassign_reason) {
+                                        'auto_expired' => 'Auto-expired',
+                                        'renewed' => 'Renewed',
+                                        'transferred' => 'Transferred',
+                                        default => 'Returned',
+                                    };
                                 $regPassClassLabel = $r->pass_class === 'long_term' ? 'Long-term' : 'Day';
                             @endphp
                             <tr class="cursor-pointer hover:bg-slate-50"
@@ -124,7 +129,7 @@
                                 <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->expected_return_date?->format('Y-m-d') ?? '—' }}</td>
                                 <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->registered_by ?? '—' }}</td>
                                 <td class="py-3 px-4">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : ($r->unassign_reason === 'transferred' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700') }}">
                                         {{ $regStatusLabel }}
                                     </span>
                                 </td>
