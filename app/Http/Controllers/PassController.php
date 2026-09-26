@@ -86,7 +86,7 @@ class PassController extends Controller
             'purpose_choice' => 'required|in:Official Business,Financial/Medical Assistance,Visit,Others',
             'purpose_other' => 'required_if:purpose_choice,Others|nullable|string|max:255',
             'vehicle' => 'nullable|string|max:255',
-            'registered_by' => 'nullable|string|max:255',
+            'registered_by' => 'required|string|max:255',
             'pass_class' => 'required|in:day,long_term',
             'expected_return_date' => 'required_if:pass_class,long_term|nullable|date|after:today',
             'building_ids' => 'required|array|min:1',
@@ -195,7 +195,46 @@ class PassController extends Controller
 
         return response()->json(['match' => $match, 'transfer_ready' => $transferReady]);
     }
-    
+
+    // Transfer Mode (Step 2 toggle): resolves an active pass directly by its
+    // qr_token so Step 2 can auto-fill from it, instead of the fuzzy
+    // name/ID match used above by checkDuplicate().
+    public function lookupTransferSource(Request $request)
+    {
+        $token = trim((string) $request->query('token'));
+        if ($token === '') {
+            return response()->json(['message' => 'No card token provided.'], 422);
+        }
+
+        $pass = VisitorPass::where('qr_token', $token)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$pass) {
+            return response()->json(['message' => 'That card does not match an active pass.'], 404);
+        }
+
+        $building = $pass->is_multi_building
+            ? ($pass->buildings->count() ? $pass->buildings->pluck('name')->join(', ') : 'North Gate Access')
+            : optional($pass->building)->name;
+
+        return response()->json([
+            'pass' => [
+                'id'            => $pass->id,
+                'pass_number'   => $pass->pass_number,
+                'holder'        => trim(collect([$pass->first_name, $pass->middle_name, $pass->last_name])->filter()->join(' ')),
+                'building'      => $building,
+                'first_name'    => $pass->first_name,
+                'middle_name'   => $pass->middle_name,
+                'last_name'     => $pass->last_name,
+                'gender'        => $pass->gender,
+                'contact_no'    => $pass->contact_no,
+                'visitor_email' => $pass->visitor_email,
+                'id_type'       => $pass->id_type,
+                'id_ref'        => $pass->id_ref,
+            ],
+        ]);
+    }
     /**
      * Returns null, or ['level' => 'exact'|'possible', 'more' => int, 'pass' => [...]].
      *  - exact:    same (id_type, id_ref) on an active pass, government ID types only (hard stop)

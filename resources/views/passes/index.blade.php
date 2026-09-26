@@ -369,15 +369,54 @@
 
                 {{-- Step 2: Visitor Information --}}
                 <section class="reg-step-card">
-                    <div class="reg-step-heading">
-                        <i class="fa-solid fa-file-lines step-icon"></i>
-                        <div>
-                            <p class="reg-step-label">Step 2: Information</p>
-                            <h2>Visitor Information Form</h2>
+                    <div class="reg-step-heading reg-step-heading-split">
+                        <div class="reg-step-heading-left">
+                            <i class="fa-solid fa-file-lines step-icon"></i>
+                            <div>
+                                <p class="reg-step-label">Step 2: Information</p>
+                                <h2>Visitor Information Form</h2>
+                            </div>
                         </div>
+                        <label class="reg-transfer-toggle">
+                            <input type="checkbox" id="transferModeToggle" onchange="toggleTransferMode(this.checked)">
+                            <span class="reg-transfer-toggle-track"><span class="reg-transfer-toggle-thumb"></span></span>
+                            Transferring an existing pass?
+                        </label>
                     </div>
 
                     <div class="reg-form-grid">
+                        <div class="reg-field full" id="transferModeBlock" style="display:none;">
+                            <p class="reg-dup-transfer-label">Scan the visitor's old card to pull their info and transfer their pass here.</p>
+
+                            <div class="reg-dup-transfer-input-row">
+                                <i class="fa-solid fa-qrcode reg-dup-transfer-input-icon" aria-hidden="true"></i>
+                                <input type="text" id="transferModeHwInput" class="reg-dup-transfer-input" placeholder="Scan old card here" autocomplete="off">
+                                <span id="transferModeSuccess" class="reg-dup-transfer-success hidden"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                            </div>
+
+                            <div class="reg-dup-transfer-footer">
+                                <label class="reg-dup-transfer-toggle">
+                                    <input type="checkbox" id="transferModeCameraToggle" onchange="toggleTransferModeCameraFallback(this.checked)">
+                                    <span class="reg-mini-toggle-track"><span class="reg-mini-toggle-thumb"></span></span>
+                                    No scanner on hand? Use camera instead
+                                </label>
+                                <button type="button" class="reg-button reg-dup-transfer-clear hidden" id="transferModeClearBtn" onclick="clearTransferModeScan()">Clear</button>
+                            </div>
+
+                            <div class="reg-dup-transfer-scan hidden" id="transferModeScanArea">
+                                <video id="transferModeVideo" autoplay playsinline muted class="hidden"></video>
+                                <span id="transferModePlaceholder">Point the camera at the QR on the old card.</span>
+                            </div>
+
+                            <p class="reg-dup-transfer-status" id="transferModeStatus"></p>
+
+                            <div class="reg-transfer-summary hidden" id="transferModeSummary">
+                                <span class="reg-transfer-summary-label">Transferring</span>
+                                <span id="transferModeSummaryText"></span>
+                            </div>
+                        </div>
+
+                        <div class="reg-identity-fields-wrap" id="manualIdentityFields">
                         <div class="reg-field">
                             <label class="optional">First Name</label>
                             <input type="text" name="first_name">
@@ -427,6 +466,12 @@
                             <label class="optional">ID Number</label>
                             <input type="text" name="id_ref" placeholder="e.g. N01-23-456789">
                         </div>
+                        </div>
+
+                        <div class="reg-field half">
+                            <label class="optional">Vehicle</label>
+                            <input type="text" name="vehicle" placeholder="Plate number, optional">
+                        </div>
 
                         {{-- Workflow 1: duplicate active-pass warning (filled by runDuplicateCheck) --}}
                         <div class="reg-field full hidden" id="dupWarning" role="alert" aria-live="polite">
@@ -444,14 +489,15 @@
                                     <p class="reg-dup-transfer-label">Have the visitor's old card? Scan it to move their existing pass to this building instead.</p>
 
                                     <div class="reg-dup-transfer-input-row">
-                                        <i class="fa-solid fa-barcode reg-dup-transfer-input-icon" aria-hidden="true"></i>
+                                        <i class="fa-solid fa-qrcode reg-dup-transfer-input-icon" aria-hidden="true"></i>
                                         <input type="text" id="transferHwInput" class="reg-dup-transfer-input" placeholder="Scan old card here" autocomplete="off">
-                                        <span id="transferQrSuccess" class="hidden"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                                        <span id="transferQrSuccess" class="reg-dup-transfer-success hidden"><i class="fa-solid fa-circle-check"></i> Verified</span>
                                     </div>
 
                                     <div class="reg-dup-transfer-footer">
                                         <label class="reg-dup-transfer-toggle">
                                             <input type="checkbox" id="transferCameraToggle" onchange="toggleTransferCameraFallback(this.checked)">
+                                            <span class="reg-mini-toggle-track"><span class="reg-mini-toggle-thumb"></span></span>
                                             No scanner on hand? Use camera instead
                                         </label>
                                         <button type="button" class="reg-button reg-dup-transfer-clear hidden" id="transferClearBtn" onclick="clearTransferScan()">Clear</button>
@@ -480,6 +526,10 @@
                         </div>
                     </div>
                     <div class="reg-form-grid">
+                        <div class="reg-field full reg-transfer-destination-note hidden" id="transferDestinationNote">
+                            <span class="reg-transfer-summary-label">Transferring</span>
+                            <span id="transferDestinationNoteText"></span> — choose where they're headed now.
+                        </div>
                         <div class="reg-field full">
                             <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a single-building pass, or 2+ for North Gate Access (Multi-Access Pass))</span></label>
                             <div class="reg-building-grid" id="regBuildingGrid">
@@ -497,7 +547,22 @@
                             </p>
                         </div>
 
-                        <div class="reg-field full">
+                        <div class="reg-field full reg-pair-row">
+                            <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen from the selected building(s) are listed)</span></label>
+                            <label class="optional">Other <span class="optional">(Not visiting a congressman)</span></label>
+
+                            <div id="congressmanField">
+                                <div class="cong-picker" id="congPicker">
+                                    <div class="cong-chips" id="congChips"></div>
+                                    <input type="text" id="congSearch" autocomplete="off" disabled placeholder="Select a building first…">
+                                    <div class="cong-list" id="congList"></div>
+                                </div>
+                                <div id="congHiddenInputs"></div>
+                            </div>
+                            <input type="text" name="office_other" id="officeOther" maxlength="255" required placeholder="e.g. HR Office, Secretariat">
+                        </div>
+
+                        <div class="reg-field half">
                             <label>Reason for Visiting <span class="reg-required">*</span></label>
                             <select name="purpose_choice" id="purposeChoice" required onchange="document.getElementById('purposeOtherInput').classList.toggle('hidden', this.value !== 'Others'); document.getElementById('purposeOtherInput').required = (this.value === 'Others');">
                                 <option value="">Select reason</option>
@@ -509,30 +574,14 @@
                             <input type="text" name="purpose_other" id="purposeOtherInput" class="hidden" style="margin-top:8px;" placeholder="Please specify">
                         </div>
 
-                        <div class="reg-field full" id="congressmanField">
-                            <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen from the selected building(s) are listed)</span></label>
-                            <div class="cong-picker" id="congPicker">
-                                <div class="cong-chips" id="congChips"></div>
-                                <input type="text" id="congSearch" autocomplete="off" disabled placeholder="Select a building first…">
-                                <div class="cong-list" id="congList"></div>
-                            </div>
-                            <div id="congHiddenInputs"></div>
-                            <label class="optional" style="margin-top:10px;">Other <span class="optional">(office or person not in the list — required if no congressman is chosen)</span></label>
-                            <input type="text" name="office_other" id="officeOther" maxlength="255" required placeholder="e.g. HR Office, Secretariat">
-                        </div>
-
-                        <div class="reg-field full">
-                            <label class="optional">Contact Person / Assistant <span class="optional">(optional — staff at the congressman's office who is sponsoring or expecting this visitor)</span></label>
+                        <div class="reg-field half">
+                            <label class="optional">Contact Person/Sponsor</label>
                             <input type="text" name="contact_person" maxlength="255" placeholder="e.g. Maria Santos, Chief of Staff">
                         </div>
 
-                        <div class="reg-field half">
-                            <label class="optional">Vehicle</label>
-                            <input type="text" name="vehicle" placeholder="Plate number, optional">
-                        </div>
-                        <div class="reg-field half">
-                            <label class="optional">Registered by</label>
-                            <input type="text" name="registered_by" placeholder="Entrance personnel name">
+                        <div class="reg-field full">
+                            <label>Registered by <span class="reg-required">*</span></label>
+                            <input type="text" name="registered_by" required placeholder="Entrance personnel name">
                         </div>
 
                         <div class="reg-field full">
@@ -1061,6 +1110,7 @@ async function runDuplicateCheck() {
 }
 
 function dupBlocked() {
+    if (transferModeActive) return !document.getElementById('transferQrTokenInput').value;
     if (dupTransferReady) return false; // a verified transfer resolves either level
     return dupState === 'exact'
         || (dupState === 'possible' && !document.getElementById('dupConfirmCheck').checked);
@@ -1074,6 +1124,7 @@ function formReady() {
     if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) return false;
     if (selectedCong.size === 0 && !v('office_other')) return false;
     if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) return false;
+    if (!v('registered_by')) return false;
     return true;
 }
 
@@ -1279,12 +1330,185 @@ function setTransferStatus(message, tone) {
 }
 // ---- End transfer scan ----
 
+// ---- Transfer Mode (Step 2 toggle): scan-first, autofills + locks visitor identity fields ----
+const TRANSFER_LOOKUP_URL = @json(route('passes.lookup-transfer-source'));
+let transferModeStream = null;
+let transferModeScanTimer = null;
+let transferModeHwDebounce = null;
+let transferModeActive = false;
+const transferModeLockedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'contact_no', 'visitor_email', 'id_type', 'id_ref'];
+
+function toggleTransferMode(enabled) {
+    transferModeActive = enabled;
+    document.getElementById('transferModeBlock').style.display = enabled ? '' : 'none';
+    document.getElementById('manualIdentityFields').classList.toggle('is-hidden-transfer', enabled);
+
+    if (enabled) {
+        // Transfer Mode replaces the typed duplicate check for this registration.
+        clearTimeout(dupTimer);
+        dupSeq++;
+        renderDuplicate(null);
+        focusTransferModeHwInput();
+    } else {
+        clearTransferModeScan();
+    }
+    refreshSubmitState();
+}
+
+const transferModeHwInput = document.getElementById('transferModeHwInput');
+transferModeHwInput.addEventListener('input', () => {
+    clearTimeout(transferModeHwDebounce);
+    transferModeHwDebounce = setTimeout(() => {
+        const token = transferModeHwInput.value.trim();
+        if (token) lookupTransferSource(token);
+    }, 250);
+});
+transferModeHwInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(transferModeHwDebounce);
+        const token = transferModeHwInput.value.trim();
+        if (token) lookupTransferSource(token);
+    }
+});
+
+function focusTransferModeHwInput() {
+    if (!document.getElementById('transferModeCameraToggle').checked) {
+        setTimeout(() => transferModeHwInput.focus(), 50);
+    }
+}
+
+function toggleTransferModeCameraFallback(enabled) {
+    document.getElementById('transferModeScanArea').classList.toggle('hidden', !enabled);
+    if (enabled) {
+        stopCameraStream();
+        stopIdCameraStream();
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                transferModeStream = stream;
+                const video = document.getElementById('transferModeVideo');
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                document.getElementById('transferModePlaceholder').classList.remove('hidden');
+                setTransferModeStatus('Point the camera at the QR on the old card.', 'busy');
+                transferModeScanTimer = setInterval(scanTransferModeFrame, 400);
+            })
+            .catch(err => {
+                document.getElementById('transferModeCameraToggle').checked = false;
+                document.getElementById('transferModeScanArea').classList.add('hidden');
+                showToast(err.message, 'error', 'Camera Unavailable');
+            });
+    } else {
+        stopTransferModeCamera();
+        focusTransferModeHwInput();
+    }
+}
+
+function stopTransferModeCamera() {
+    clearInterval(transferModeScanTimer);
+    transferModeScanTimer = null;
+    if (transferModeStream) { transferModeStream.getTracks().forEach(t => t.stop()); transferModeStream = null; }
+    document.getElementById('transferModeVideo').classList.add('hidden');
+}
+
+function scanTransferModeFrame() {
+    const video = document.getElementById('transferModeVideo');
+    if (!video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
+    if (qr && qr.data) lookupTransferSource(qr.data.trim());
+}
+
+async function lookupTransferSource(token) {
+    if (!token) return;
+    if (document.getElementById('transferModeCameraToggle').checked) stopTransferModeCamera();
+    transferModeHwInput.value = '';
+    setTransferModeStatus('Checking card…', 'busy');
+    try {
+        const res = await fetch(`${TRANSFER_LOOKUP_URL}?token=${encodeURIComponent(token)}`, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok || !data.pass) {
+            setTransferModeStatus(data.message || "That card doesn't match an active pass.", 'error');
+            return;
+        }
+        applyTransferModeMatch(data.pass, token);
+    } catch (e) {
+        setTransferModeStatus('Could not verify that card. Try again.', 'error');
+    }
+}
+
+function applyTransferModeMatch(pass, token) {
+    document.getElementById('transferQrTokenInput').value = token;
+
+    const form = document.getElementById('registerForm');
+    const setField = (name, value) => {
+        const el = form.elements[name];
+        if (!el) return;
+        el.value = value || '';
+        el.readOnly = true;
+        el.classList.add('is-locked');
+        if (el.tagName === 'SELECT') el.style.pointerEvents = 'none';
+    };
+    transferModeLockedFields.forEach(name => setField(name, pass[name]));
+
+    document.getElementById('transferModeSuccess').classList.remove('hidden');
+    document.getElementById('transferModeClearBtn').classList.remove('hidden');
+    document.getElementById('transferModeSummary').classList.remove('hidden');
+    document.getElementById('transferModeSummaryText').textContent =
+        `Pass #${pass.pass_number} · ${pass.holder} · currently at ${pass.building}`;
+    document.getElementById('transferDestinationNote').classList.remove('hidden');
+    document.getElementById('transferDestinationNoteText').textContent =
+        `Pass #${pass.pass_number} · ${pass.holder}`;
+    setTransferModeStatus('', 'neutral');
+    refreshSubmitState();
+}
+
+function clearTransferModeScan() {
+    stopTransferModeCamera();
+    document.getElementById('transferModeCameraToggle').checked = false;
+    document.getElementById('transferModeScanArea').classList.add('hidden');
+    document.getElementById('transferQrTokenInput').value = '';
+    transferModeHwInput.value = '';
+    document.getElementById('transferModeSuccess').classList.add('hidden');
+    document.getElementById('transferModeClearBtn').classList.add('hidden');
+    document.getElementById('transferModeSummary').classList.add('hidden');
+    document.getElementById('transferDestinationNote').classList.add('hidden');
+    setTransferModeStatus('', 'neutral');
+
+    const form = document.getElementById('registerForm');
+    transferModeLockedFields.forEach(name => {
+        const el = form.elements[name];
+        if (!el) return;
+        el.readOnly = false;
+        el.classList.remove('is-locked');
+        el.style.pointerEvents = '';
+    });
+
+    refreshSubmitState();
+    focusTransferModeHwInput();
+}
+
+function setTransferModeStatus(message, tone) {
+    const el = document.getElementById('transferModeStatus');
+    const colors = { neutral: '#64748b', busy: '#2563eb', success: '#1c9a5b', error: 'var(--brand-red)' };
+    el.textContent = message;
+    el.style.color = colors[tone] || colors.neutral;
+}
+// ---- End Transfer Mode ----
+
 function closeRegisterModal() {
     document.getElementById('registerModal').classList.add('hidden');
     document.getElementById('registerForm').reset();
     clearTimeout(dupTimer);
     dupSeq++;
     renderDuplicate(null);
+    document.getElementById('transferModeToggle').checked = false;
+    toggleTransferMode(false);
     resetPhotoCapture();
     resetIdPhotoCapture();
     setPassClass('day');
