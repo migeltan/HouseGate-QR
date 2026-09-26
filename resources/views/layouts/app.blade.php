@@ -23,7 +23,7 @@
 
     <header class="gov-header">
         {{-- Rattan pattern overlay, 75% opacity, sits above the solid blue fill and below all content --}}
-        <div class="gov-header-pattern" aria-hidden="true"></div>
+        {{--<div class="gov-header-pattern" aria-hidden="true"></div>--}}
 
         <div class="max-w-7xl mx-auto px-4 py-8 flex flex-wrap justify-between items-center gap-4 gov-header-inner">
             <div class="flex items-center gap-3">
@@ -32,8 +32,8 @@
                 </div>
                 <div class="flex flex-col">
                     <span class="gov-brand-title">House of Representatives</span>
-                    <span class="gov-brand-subtitle-1">Legislative Security Bureau</span>
-                    <span class="gov-brand-subtitle-2">Perimeter Security Group</span>
+                    <span class="gov-card-subtitle-1">Legislative Security Bureau</span>
+                    <span class="gov-card-subtitle-2">Perimeter Security Group</span>
                 </div>
             </div>
 

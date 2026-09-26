@@ -395,17 +395,19 @@
                             </div>
 
                             <div class="reg-dup-transfer-footer">
-                                <label class="reg-dup-transfer-toggle">
-                                    <input type="checkbox" id="transferModeCameraToggle" onchange="toggleTransferModeCameraFallback(this.checked)">
+                            <label class="reg-dup-transfer-toggle">
+                                <span class="reg-mini-toggle">
+                                    <input type="checkbox" id="transferModeCameraToggle" class="reg-mini-toggle-input" onchange="toggleTransferModeCameraFallback(this.checked)">
                                     <span class="reg-mini-toggle-track"><span class="reg-mini-toggle-thumb"></span></span>
-                                    No scanner on hand? Use camera instead
-                                </label>
+                                </span>
+                                <span class="reg-mini-toggle-text">No scanner on hand? Use camera instead</span>
+                            </label>
                                 <button type="button" class="reg-button reg-dup-transfer-clear hidden" id="transferModeClearBtn" onclick="clearTransferModeScan()">Clear</button>
                             </div>
 
                             <div class="reg-dup-transfer-scan hidden" id="transferModeScanArea">
                                 <video id="transferModeVideo" autoplay playsinline muted class="hidden"></video>
-                                <span id="transferModePlaceholder">Point the camera at the QR on the old card.</span>
+                                <span id="transferModePlaceholder" class="reg-dup-transfer-scan-hint">Point the camera at the QR on the old card.</span>
                             </div>
 
                             <p class="reg-dup-transfer-status" id="transferModeStatus"></p>
@@ -415,7 +417,6 @@
                                 <span id="transferModeSummaryText"></span>
                             </div>
                         </div>
-
                         <div class="reg-identity-fields-wrap" id="manualIdentityFields">
                         <div class="reg-field">
                             <label class="optional">First Name</label>
@@ -448,7 +449,7 @@
                             <input type="email" name="visitor_email" placeholder="For check-out / expiry reminders">
                         </div>
 
-                        <div class="reg-field half">
+                        <div class="reg-field">
                             <label class="optional">Government ID Type</label>
                             <select name="id_type">
                                 <option value="">Select ID type</option>
@@ -462,15 +463,14 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div class="reg-field half">
+                        <div class="reg-field">
                             <label class="optional">ID Number</label>
                             <input type="text" name="id_ref" placeholder="e.g. N01-23-456789">
                         </div>
-                        </div>
-
-                        <div class="reg-field half">
+                        <div class="reg-field">
                             <label class="optional">Vehicle</label>
                             <input type="text" name="vehicle" placeholder="Plate number, optional">
+                        </div>
                         </div>
 
                         {{-- Workflow 1: duplicate active-pass warning (filled by runDuplicateCheck) --}}
@@ -495,11 +495,13 @@
                                     </div>
 
                                     <div class="reg-dup-transfer-footer">
-                                        <label class="reg-dup-transfer-toggle">
-                                            <input type="checkbox" id="transferCameraToggle" onchange="toggleTransferCameraFallback(this.checked)">
+                                    <label class="reg-dup-transfer-toggle">
+                                        <span class="reg-mini-toggle">
+                                            <input type="checkbox" id="transferCameraToggle" class="reg-mini-toggle-input" onchange="toggleTransferCameraFallback(this.checked)">
                                             <span class="reg-mini-toggle-track"><span class="reg-mini-toggle-thumb"></span></span>
-                                            No scanner on hand? Use camera instead
-                                        </label>
+                                        </span>
+                                        <span class="reg-mini-toggle-text">No scanner on hand? Use camera instead</span>
+                                    </label>
                                         <button type="button" class="reg-button reg-dup-transfer-clear hidden" id="transferClearBtn" onclick="clearTransferScan()">Clear</button>
                                     </div>
 

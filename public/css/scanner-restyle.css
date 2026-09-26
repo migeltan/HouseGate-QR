@@ -66,21 +66,26 @@
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
     display: block;
 }
-.gov-brand-subtitle-1 {
-    font-family: "Source Serif Pro", serif;
-    font-weight: 650;
-    font-size: 1.25rem;
+
+.gov-card-subtitle-1 {
+    font-family: "Source Sans Pro", sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 26px;
+    letter-spacing: 0;
     color: #ffffff;
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
-    display: block;
+    margin: 0;
 }
-.gov-brand-subtitle-2 {
-    font-family: "Source Serif Pro", serif;
+.gov-card-subtitle-2 {
+    font-family: "Source Sans Pro", sans-serif;
+    font-size: 18px;
     font-weight: 650;
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.85);
+    line-height: 26px;
+    letter-spacing: 0;
+    color: #ffffff;
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
-    display: block;
+    margin: 0;
 }
 
 .gov-nav {
@@ -194,6 +199,8 @@
     overflow: hidden;
     pointer-events: none;
 }
+
+/*
 .gov-corner-accent::before {
     content: "";
     position: absolute;
@@ -216,6 +223,7 @@
     border-width: 0 96px 96px 0;
     border-color: transparent var(--brand-blue) transparent transparent;
 }
+    */
 
 /* ---------- Instructions body ---------- */
 .gov-steps {
