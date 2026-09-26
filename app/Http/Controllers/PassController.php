@@ -96,17 +96,29 @@ class PassController extends Controller
         // Reason is chosen from a fixed list; free text only applies when "Others" is picked.
                 // Workflow 1: refuse a second pass for someone who already holds an active one.
         // This is the real enforcement; the Step 2 warning is only a convenience.
+        $data['transfer_from_pass_id'] = null;
         if ($dup = $this->findActiveDuplicate(
             $data['id_type'] ?? null, $data['id_ref'] ?? null,
             $data['first_name'] ?? null, $data['last_name'] ?? null, $data['contact_no'] ?? null
         )) {
             $p = $dup['pass'];
-            if ($dup['level'] === 'exact') {
+            $token = trim((string) $request->input('transfer_qr_token'));
+
+            if ($token !== '') {
+                // Workflow 2: the guard is holding the old card. Its QR token must belong to
+                // the exact pass this person matched, otherwise nothing gets closed.
+                $old = VisitorPass::where('qr_token', $token)->first();
+                if (! $old || (int) $old->id !== (int) $p['id']) {
+                    return back()->withErrors(
+                        "That card is not the active pass for this visitor (found #{$p['pass_number']}, {$p['buildings']}). Scan the old card again."
+                    )->withInput();
+                }
+                $data['transfer_from_pass_id'] = $old->id;
+            } elseif ($dup['level'] === 'exact') {
                 return back()->withErrors(
                     "This ID already has an active pass (#{$p['pass_number']}, {$p['buildings']}). A new pass cannot be issued."
                 )->withInput();
-            }
-            if (! $request->boolean('confirm_different_person')) {
+            } elseif (! $request->boolean('confirm_different_person')) {
                 return back()->withErrors(
                     "Possible match: {$p['holder']} already has active pass #{$p['pass_number']} ({$p['buildings']}). Confirm this is a different person to continue."
                 )->withInput();
@@ -241,6 +253,7 @@ class PassController extends Controller
             'level' => $level,
             'more' => count($matches) - 1,
             'pass' => [
+                'id' => $pass->id,
                 'pass_number' => $pass->pass_number,
                 'buildings' => $pass->authorizedBuildingNames(),
                 'holder' => $pass->visitor_name,
@@ -425,6 +438,40 @@ class PassController extends Controller
     }
     
     /**
+     * Workflow 2: the old card was handed back at the destination. Same reset as
+     * unassign(), except the registration is closed as 'transferred' (the new
+     * registration already points back at it). The card returns straight to
+     * available stock in its home building.
+     */
+    private function closeForTransfer(VisitorPass $old, PassRegistration $oldRegistration): void
+    {
+        $photoPaths = array_filter([$old->photo_path, $old->id_photo_path]);
+
+        $oldRegistration->update([
+            'unassigned_at' => now(),
+            'unassign_reason' => 'transferred',
+        ]);
+
+        $old->update([
+            'visitor_name' => null, 'first_name' => null, 'middle_name' => null, 'last_name' => null,
+            'gender' => null, 'contact_no' => null, 'id_ref' => null, 'id_type' => null,
+            'purpose' => null, 'office_to_visit' => null, 'contact_person' => null, 'vehicle' => null,
+            'status' => 'available', 'issued_at' => null,
+            'photo_path' => null, 'id_photo_path' => null, 'pass_class' => 'day',
+            'expected_return_date' => null, 'visitor_email' => null, 'registered_by' => null,
+            'current_building_id' => null, 'checked_in_at' => null, 'last_egress_at' => null,
+        ]);
+
+        if ($old->is_multi_building) {
+            $old->buildings()->detach();
+        }
+
+        foreach ($photoPaths as $path) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    /**
      * A guard may only unassign/view passes homed in their own building.
      * North Gate Access (multi-building) passes are never guard-actionable,
      * even if the guard's building happens to be one of the authorized ones —
@@ -442,6 +489,19 @@ class PassController extends Controller
        private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): void
     {
         $idPhotoPath = $this->storeIdPhoto($request) ?? $pass->id_photo_path;
+
+        $oldPass = null;
+        $oldRegistration = null;
+        if (! empty($data['transfer_from_pass_id'])) {
+            // Re-check under a row lock: another guard may have closed it since the form loaded.
+            $oldPass = VisitorPass::whereKey($data['transfer_from_pass_id'])->lockForUpdate()->first();
+            $oldRegistration = ($oldPass && $oldPass->status === 'active') ? $oldPass->openRegistration() : null;
+            if (! $oldRegistration) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'transfer' => 'That pass is no longer active, so it cannot be transferred. Refresh and try again.',
+                ]);
+            }
+        }
         $fullName = trim(preg_replace('/\s+/', ' ', implode(' ', array_filter([
             $data['first_name'] ?? null,
             $data['middle_name'] ?? null,
@@ -502,6 +562,7 @@ class PassController extends Controller
             // Frozen at registration: multi-pass building links are wiped on unassign.
             'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
             'registered_at' => now(),
+            'transferred_from_registration_id' => $oldRegistration?->id,
         ]);
 
         $registration->congressmen()->sync($data['congressman_ids'] ?? []);
