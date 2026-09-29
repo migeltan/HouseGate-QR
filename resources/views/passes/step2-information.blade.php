@@ -185,14 +185,21 @@
 
             <div class="reg-transfer-footer">
                 <label class="reg-switch" for="transferModeCameraToggle">
-                    <input type="checkbox" id="transferModeCameraToggle" class="reg-switch-input"
-                        onchange="toggleTransferModeCameraFallback(this.checked)">
-                    <span class="reg-switch-track" aria-hidden="true">
-                        <span class="reg-switch-thumb">
-                            <i class="fa-solid fa-camera reg-switch-icon"></i>
+
+                    <div class="flex w-auto h-auto">
+                        <input type="checkbox" id="transferModeCameraToggle" class="reg-switch-input"
+                            onchange="toggleTransferModeCameraFallback(this.checked)">
+                        <span class="reg-switch-track" aria-hidden="true">
+                            <span class="reg-switch-thumb">
+                                <i class="fa-solid fa-camera reg-switch-icon"></i>
+                            </span>
                         </span>
-                    </span>
-                    <span class="reg-switch-text">{{ 'No scanner on hand? Use camera instead' }}</span>
+                        <div class="w-auto h-auto flex items-center justify-center ml-2">
+                            <span class="reg-switch-text ">{{ 'No scanner on hand? Use camera instead' }}</span>
+                        </div>
+                    </div>
+
+
                 </label>
                 <button type="button" class="reg-button reg-dup-transfer-clear reg-transfer-clear hidden"
                     id="transferModeClearBtn" onclick="clearTransferModeScan()">{{ 'Clear' }}</button>
