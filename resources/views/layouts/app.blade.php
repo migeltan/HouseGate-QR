@@ -18,50 +18,97 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('css/theme-govt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/scanner-restyle.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/sidebar.css') }}?v={{ filemtime(public_path('css/sidebar.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/glass-status.css') }}?v={{ filemtime(public_path('css/glass-status.css')) }}">
+    <script>try{if(localStorage.getItem('hg.sidebar')==='collapsed')document.documentElement.classList.add('sb-collapsed')}catch(e){}</script>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col gov-page-bg">
+<body class="bg-slate-100 text-slate-800 antialiased gov-page-bg">
+<div class="app-shell">
+@auth
+    @php
+        $authUser = auth()->user();
+        $assignedName = $authUser->isGuard() && session('assigned_building_id')
+            ? \App\Models\Building::find(session('assigned_building_id'))?->name
+            : null;
+        [$accessEyebrow, $accessName] = $authUser->isAdmin()
+            ? ['Admin Access for', 'All Buildings']
+            : ['Personnel Access at', $assignedName ?? 'Building not selected'];
+        $accessLabel = "{$accessEyebrow} {$accessName}";
+        $navItems = [
+            ['scanner.index', 'scanner.*', 'fa-qrcode', 'Scanner'],
+            ['passes.index',  'passes.*',  'fa-clipboard-list', 'Registry'],
+            ['logs.index',    'logs.*',    'fa-clock-rotate-left', 'Audit Trail'],
+        ];
+    @endphp
 
-    <header class="gov-header">
-        {{-- Rattan pattern overlay, 75% opacity, sits above the solid blue fill and below all content --}}
-        {{--<div class="gov-header-pattern" aria-hidden="true"></div>--}}
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-        <div class="max-w-7xl mx-auto px-4 py-8 flex flex-wrap justify-between items-center gap-4 gov-header-inner">
-            <div class="flex items-center gap-3">
-                <div class="gov-brand-logo">
-                    <img src="{{ asset('images/hrep-seal.png') }}" alt="House of Representatives">
-                </div>
-                <div class="flex flex-col">
-                    <span class="gov-brand-title">House of Representatives</span>
-                    <span class="gov-card-subtitle-1">Legislative Security Bureau</span>
-                    <span class="gov-card-subtitle-2">Perimeter Security Group</span>
-                </div>
-            </div>
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
 
-            <div class="flex flex-wrap items-center gap-5">
-                @auth
-                    <nav class="gov-nav flex gap-7">
-                        <a href="{{ route('scanner.index') }}" class="gov-nav-link {{ request()->routeIs('scanner.*') ? 'is-active' : '' }}">Scanner</a>
-                        <a href="{{ route('passes.index') }}" class="gov-nav-link {{ request()->routeIs('passes.*') ? 'is-active' : '' }}">Passes</a>
-                        <a href="{{ route('logs.index') }}" class="gov-nav-link {{ request()->routeIs('logs.*') ? 'is-active' : '' }}">Logs</a>
-                    </nav>
-
-                    <div class="flex items-center gap-3 text-xs gov-header-meta">
-                        <span class="gov-account-chip">
-                            <i class="fa-solid fa-circle-user"></i>
-                            {{ auth()->user()->name }} <span class="gov-account-role">({{ auth()->user()->role }})</span>
-                        </span>
-                        @if (auth()->user()->isGuard() && session('assigned_building_id'))
-                            <span class="gov-badge-neutral">{{ \App\Models\Building::find(session('assigned_building_id'))?->name }}</span>
-                        @endif
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="gov-btn-ghost px-3 py-1.5 rounded-full">Logout</button>
-                        </form>
-                    </div>
-                @endauth
+        <div class="sidebar-inner">
+        <div class="sidebar-brand">
+            <img src="{{ asset('images/lsb-seal.png') }}" alt="Legislative Security Bureau">
+            <div class="sidebar-brand-text">
+                <span class="sidebar-brand-title">House of Representatives</span>
+                <span class="sidebar-brand-sub1">Legislative Security Bureau</span>
+                <span class="sidebar-brand-sub2">Perimeter Security Group</span>
             </div>
         </div>
-    </header>
+
+        <div class="sidebar-context" data-label="{{ $accessLabel }}">
+            <i class="fa-solid fa-building sidebar-context-icon"></i>
+            <span class="sidebar-context-text sidebar-label">
+                <span class="sidebar-context-eyebrow">{{ $accessEyebrow }}</span>
+                <span class="sidebar-context-name">{{ $accessName }}</span>
+            </span>
+        </div>
+
+        <ul class="sidebar-nav">
+            @foreach ($navItems as [$route, $pattern, $icon, $label])
+                <li>
+                    <a href="{{ route($route) }}" data-label="{{ $label }}"
+                       class="sidebar-link {{ request()->routeIs($pattern) ? 'is-active' : '' }}">
+                        <i class="fa-solid {{ $icon }} sidebar-link-icon"></i>
+                        <span class="sidebar-label">{{ $label }}</span>
+                    </a>
+                </li>
+            @endforeach
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-footer-info">
+                <span class="sidebar-role">{{ $authUser->role }}</span>
+                <div class="sidebar-greeting">Good day, {{ $authUser->name }}!</div>
+                <div class="sidebar-hint">Edit your account credentials<br>under here.</div>
+            </div>
+            <div class="sidebar-actions">
+                {{-- Placeholder: no account-edit route/UI yet --}}
+                <button type="button" class="sidebar-btn" aria-disabled="true" title="Coming soon" data-label="Edit Info">
+                    <i class="fa-solid fa-user-pen"></i><span class="sidebar-label">Edit Info</span>
+                </button>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="sidebar-btn is-logout" data-label="Log Out">
+                        <i class="fa-solid fa-right-from-bracket"></i><span class="sidebar-label">Log Out</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+        </div>{{-- /sidebar-inner --}}
+    </aside>
+@endauth
+
+<div class="app-content">
+    @auth
+        <div class="sidebar-topbar">
+            <button type="button" id="sidebarOpen" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
+            <img src="{{ asset('images/lsb-seal.png') }}" alt="">
+            <strong>{{ $accessLabel }}</strong>
+        </div>
+    @endauth
 
         <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         @yield('content')
@@ -70,6 +117,8 @@
     <footer class="gov-footer">
         <img src="{{ asset('images/inspire-logo.png') }}" alt="House of Representatives INSPIRE">
     </footer>
+</div>{{-- /app-content --}}
+</div>{{-- /app-shell --}}
 
         <script>
       function showToast(message, type = 'success', title = null, action = null) {
@@ -118,6 +167,7 @@
         dismiss();
     });
 }
+
 function dismissAllToasts() {
     document.querySelectorAll('.gov-toast').forEach(t => t.querySelector('.gov-toast-close')?.click());
 }
@@ -199,6 +249,46 @@ document.addEventListener('submit', async (e) => {
     @if ($errors->any())
         document.addEventListener('DOMContentLoaded', () => showToast(@json($errors->first()), 'error'));
     @endif
+    </script>
+
+    <script>
+    (function () {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
+        const backdrop = document.getElementById('sidebarBackdrop');
+        const setOpen = (open) => {
+            sidebar.classList.toggle('is-open', open);
+            backdrop.classList.toggle('is-open', open);
+        };
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            document.documentElement.classList.add('sb-animate'); // no animation on page load, only after a click
+            const collapsed = document.documentElement.classList.toggle('sb-collapsed');
+            try { localStorage.setItem('hg.sidebar', collapsed ? 'collapsed' : 'expanded'); } catch (_) {}
+        });
+        document.getElementById('sidebarOpen').addEventListener('click', () => setOpen(true));
+        backdrop.addEventListener('click', () => setOpen(false));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+
+        // Collapsed-state tooltips live on <body> so the sidebar's clipping can't cut them off
+        const tip = document.createElement('div');
+        tip.className = 'sidebar-tip';
+        document.body.appendChild(tip);
+        const showTip = (e) => {
+            const el = e.target.closest('[data-label]');
+            if (!el || !document.documentElement.classList.contains('sb-collapsed') || innerWidth < 768) return;
+            const r = el.getBoundingClientRect();
+            tip.textContent = el.dataset.label;
+            tip.style.left = (sidebar.getBoundingClientRect().right + 12) + 'px';
+            tip.style.top = (r.top + r.height / 2) + 'px';
+            tip.classList.add('is-visible');
+        };
+        const hideTip = () => tip.classList.remove('is-visible');
+        sidebar.addEventListener('mouseover', showTip);
+        sidebar.addEventListener('mouseout', hideTip);
+        sidebar.addEventListener('focusin', showTip);
+        sidebar.addEventListener('focusout', hideTip);
+        document.getElementById('sidebarToggle').addEventListener('click', hideTip);
+    })();
     </script>
 
     @yield('scripts')

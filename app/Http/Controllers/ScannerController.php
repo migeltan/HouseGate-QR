@@ -97,7 +97,7 @@ class ScannerController extends Controller
                 $reason = 'Visitor pass is REVOKED by Security.';
             } elseif (! $pass->isAuthorizedFor($scannerBuilding->id)) {
                 $result = 'UNAUTHORIZED';
-                $reason = "BUILDING MISMATCH! Pass is authorized ONLY for [{$authorizedBuildingName}], but scanned at [{$scannerBuilding->name}].";
+$reason = "Building Mismatch - Pass is only authorized for {$authorizedBuildingName}, but scanned at {$scannerBuilding->name}.";
             } elseif ($pass->current_building_id && (int) $pass->current_building_id !== $scannerBuilding->id) {
                 $result = 'BLOCKED';
                 $currentName = $pass->currentBuilding?->name ?? 'another building';

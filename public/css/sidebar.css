@@ -1,0 +1,438 @@
+/* Sidebar — replaces the old header. Loaded after scanner-restyle.css */
+:root {
+    --sb-w: 288px;
+    --sb-w-collapsed: 93px; /* = 3px border + 2*20px pad + 2*(1px border + 14px pad) + 20px icon, so icons never shift */
+    --sb-pad: 20px;
+    --sb-info-w: 245px; /* fixed inner width of the greeting block so text never reflows */
+    --sb-speed: 0.35s;
+    --sb-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+.app-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    width: var(--sb-w);
+    height: 100vh;
+    height: 100dvh;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+        180deg,
+        var(--brand-blue) 0%,
+        var(--navy-deep) 100%
+    );
+    border-right: 3px solid var(--brand-yellow);
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+    color: #fff;
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+    z-index: 40; /* below modals (z-50) */
+    transition: width var(--sb-speed) var(--sb-ease);
+}
+/* Clips everything during the width animation; the toggle lives outside it */
+.sidebar-inner {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Glass toggle */
+.sidebar-toggle {
+    position: absolute;
+    top: 7rem;
+    right: -16px;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(36, 91, 166, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    cursor: pointer;
+    z-index: 41;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition:
+        transform 0.15s,
+        background 0.15s;
+}
+.sidebar-toggle:hover {
+    transform: scale(1.1);
+    background: rgba(36, 91, 166, 0.75);
+}
+.sidebar-toggle i {
+    transition: transform var(--sb-speed) var(--sb-ease);
+}
+
+/* Brand: logo center = 45px in both states */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 var(--sb-pad);
+    padding: 1.5rem 0 1.1rem 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+.sidebar-brand img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+.sidebar-brand-title {
+    font-family: "Old English Text MT", serif;
+    font-size: 1.05rem;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+}
+.sidebar-brand-sub1 {
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.sidebar-brand-sub2 {
+    font-size: 0.65rem;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+/* Access context: same geometry as nav links so the icons share one column */
+.sidebar-context {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin: 1.1rem var(--sb-pad) 0;
+    padding: 0.5rem 14px;
+    border: 1px solid transparent;
+}
+.sidebar-context-icon {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--brand-yellow);
+    font-size: 1.1rem;
+}
+.sidebar-context-text {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    white-space: nowrap;
+    line-height: 1.25;
+}
+.sidebar-context-eyebrow {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+}
+.sidebar-context-name {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* Nav */
+.sidebar-nav {
+    list-style: none;
+    margin: 2rem 0 0;
+    padding: 0 var(--sb-pad);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.sidebar-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.65rem 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+.sidebar-link.is-active {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+}
+.sidebar-link.is-active .sidebar-link-icon {
+    color: var(--brand-yellow);
+}
+.sidebar-link-icon {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.sidebar-link .sidebar-label {
+    white-space: nowrap;
+}
+
+/* Footer */
+.sidebar-footer {
+    margin: auto var(--sb-pad) 0;
+    padding: 1.25rem 0 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    text-align: center;
+}
+.sidebar-footer-info {
+    width: var(--sb-info-w);
+    max-height: 140px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.sidebar-role {
+    display: inline-block;
+    margin-bottom: 0.35rem;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.15);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.sidebar-greeting {
+    font-weight: 700;
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sidebar-hint {
+    margin: 0.2rem 0 0.9rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.75);
+}
+.sidebar-actions {
+    display: flex;
+    gap: 0.6rem;
+}
+.sidebar-actions form {
+    flex: 1;
+    display: flex;
+}
+.sidebar-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.sidebar-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+.sidebar-btn[aria-disabled="true"] {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.sidebar-btn[aria-disabled="true"]:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+.sidebar-btn.is-logout {
+    color: #ff8a94;
+    border-color: rgba(241, 57, 72, 0.5);
+}
+.sidebar-btn.is-logout:hover {
+    background: rgba(241, 57, 72, 0.18);
+    border-color: rgba(241, 57, 72, 0.8);
+}
+
+/* Fades: on expand, text waits for the width to open; on collapse it leaves first */
+.sidebar-label,
+.sidebar-brand-text,
+.sidebar-footer-info {
+    transition:
+        opacity 0.2s ease 0.12s,
+        max-height var(--sb-speed) var(--sb-ease);
+}
+
+/* Tooltip (collapsed state), created by JS at body level so it is never clipped */
+.sidebar-tip {
+    position: fixed;
+    z-index: 60;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-4px, -50%);
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: var(--navy-deep);
+    color: #fff;
+    white-space: nowrap;
+    font:
+        600 0.75rem "Source Sans 3",
+        sans-serif;
+    transition:
+        opacity 0.15s,
+        transform 0.15s;
+}
+.sidebar-tip.is-visible {
+    opacity: 1;
+    transform: translate(0, -50%);
+}
+
+/* Footer buttons re-stack when collapsed, so hide that moment and fade them in after the resize.
+   Two keyframe names so the animation restarts on every toggle (only after the first click). */
+@keyframes sbFadeA {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes sbFadeB {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+.sb-animate .sidebar-actions {
+    animation: sbFadeA 0.2s ease 0.25s both;
+}
+
+.sidebar-topbar,
+.sidebar-backdrop {
+    display: none;
+}
+
+/* Collapsed (desktop only) */
+@media (min-width: 768px) {
+    .sb-collapsed .sidebar {
+        width: var(--sb-w-collapsed);
+    }
+    .sb-collapsed .sidebar-label,
+    .sb-collapsed .sidebar-brand-text,
+    .sb-collapsed .sidebar-footer-info {
+        opacity: 0;
+        transition-delay: 0s, 0s;
+        transition-duration: 0.1s, var(--sb-speed);
+    }
+    .sb-collapsed .sidebar-footer-info {
+        max-height: 0;
+    }
+    .sb-collapsed .sidebar-actions {
+        flex-direction: column;
+    }
+    .sb-collapsed .sidebar-btn .sidebar-label {
+        display: none;
+    }
+    .sb-collapsed .sidebar-toggle i {
+        transform: rotate(180deg);
+    }
+    .sb-animate.sb-collapsed .sidebar-actions {
+        animation-name: sbFadeB;
+    }
+}
+
+/* Mobile: off-canvas drawer */
+@media (max-width: 767px) {
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(var(--sb-w), 85vw);
+        transform: translateX(-100%);
+        transition: transform var(--sb-speed) var(--sb-ease);
+    }
+    .sidebar.is-open {
+        transform: none;
+    }
+    .sidebar-toggle {
+        display: none;
+    }
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 39;
+        background: rgba(11, 37, 69, 0.55);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--sb-speed);
+    }
+    .sidebar-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .sidebar-topbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        padding: 0.6rem 1rem;
+        background: var(--brand-blue);
+        border-bottom: 3px solid var(--brand-yellow);
+        color: #fff;
+    }
+    .sidebar-topbar img {
+        height: 32px;
+    }
+    .sidebar-topbar button {
+        background: none;
+        border: 0;
+        color: #fff;
+        font-size: 1.25rem;
+        cursor: pointer;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .sidebar-label,
+    .sidebar-brand-text,
+    .sidebar-footer-info,
+    .sidebar-toggle i {
+        transition: none;
+    }
+    .sb-animate .sidebar-actions {
+        animation: none;
+    }
+}

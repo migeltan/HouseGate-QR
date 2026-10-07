@@ -58,6 +58,7 @@
                 <canvas id="securityCamCanvas" class="hidden"></canvas>
 
                 <div id="scanTargetOverlay" class="gov-scan-overlay hidden">
+                    <span class="gov-scan-frame"></span>
                     <span class="gov-scan-corner gov-scan-corner-tl"></span>
                     <span class="gov-scan-corner gov-scan-corner-tr"></span>
                     <span class="gov-scan-corner gov-scan-corner-bl"></span>
@@ -66,6 +67,7 @@
 
                 <div id="camPlaceholder" class="gov-scan-placeholder">
                     <p>Awaiting Camera Feed</p>
+                    <small id="camModeHint" class="gov-scan-hint"></small>
                 </div>
 
 
@@ -186,48 +188,43 @@
                 <i class="fa-solid fa-user"></i>
             </div>
 
-            <button type="button" id="viewIdPhotoBtn" class="hidden" style="margin-top:8px; font-size:12.5px; width:100%;" onclick="showIdPhotoPopup()">
-                <i class="fa-solid fa-id-card"></i> View ID Photo
+            <button type="button" id="viewIdPhotoBtn" class="hidden result-photo-idbtn" onclick="showIdPhotoPopup()">
+                <i class="fa-solid fa-id-card"></i> View ID
             </button>
         </div>
 
         <div class="gov-meta-grid">
-
-            <div>
+            <div class="gov-meta-cell is-wide">
                 <span class="gov-meta-label">Visitor</span>
                 <div id="resVisitorName" class="gov-meta-value"></div>
             </div>
-
-            <div>
+            <div class="gov-meta-cell">
                 <span class="gov-meta-label">Pass #</span>
                 <div id="resPassNum" class="gov-meta-value font-mono"></div>
             </div>
-
-            <div>
-                <span class="gov-meta-label">Authorized Bldg.</span>
+            <div class="gov-meta-cell">
+                <span class="gov-meta-label">Authorized bldg.</span>
                 <div id="resPassBldg" class="gov-meta-value"></div>
             </div>
-
-            <div>
-                <span class="gov-meta-label">Scanned At</span>
+            <div class="gov-meta-cell">
+                <span class="gov-meta-label">Scanned at</span>
                 <div id="resScanLoc" class="gov-meta-value"></div>
             </div>
-
-            <div id="resPassClassRow" class="hidden">
+            <div id="resPassClassRow" class="gov-meta-cell hidden">
                 <span class="gov-meta-label">Pass class</span>
-
                 <div id="resPassClass" class="gov-meta-value">
-                    <span class="badge-neutral"
-                          id="resPassClassBadge"></span>
+                    <span class="badge-neutral" id="resPassClassBadge"></span>
                 </div>
             </div>
-
         </div>
 
     </div>
 
 <div id="resActivitySection" class="gov-activity-section hidden">
-    <p class="gov-activity-heading">Recent Activity — This Pass</p>
+    <div class="gov-activity-head">
+        <p class="gov-activity-heading">Recent activity</p>
+        <span id="resActivityCount" class="gov-activity-count"></span>
+    </div>
     <div id="resActivityList" class="gov-activity-list"></div>
 </div>
 
@@ -405,6 +402,21 @@ function flashCaptureFeedback() {
     setTimeout(() => video.classList.remove('gov-capture-flash'), 200);
 }
 
+// "Building Mismatch - Pass is only…" renders the lead bold and the rest muted
+function renderReason(reason) {
+    const el = document.getElementById('statusSubtitle');
+    el.replaceChildren();
+    const i = (reason || '').indexOf(' - ');
+    if (i > 0) {
+        const lead = document.createElement('strong');
+        lead.className = 'gov-status-lead';
+        lead.textContent = reason.slice(0, i);
+        el.append(lead, ' - ' + reason.slice(i + 3));
+    } else {
+        el.textContent = reason || '';
+    }
+}
+
 function displayScanResultUI(data) {
     const idleEl = document.getElementById('resultIdle');
     const activeEl = document.getElementById('resultActive');
@@ -425,7 +437,10 @@ function displayScanResultUI(data) {
     });
 
     document.getElementById('scanTimestamp').innerText = data.timestamp;
-    document.getElementById('resVisitorName').innerText = data.visitor_name;
+    const noName = !data.visitor_name || data.visitor_name === 'Unnamed Visitor';
+    const nameEl = document.getElementById('resVisitorName');
+    nameEl.innerText = noName ? '(See ID)' : data.visitor_name;
+    nameEl.classList.toggle('is-placeholder', noName);
     document.getElementById('resPassNum').innerText = data.pass_number;
     document.getElementById('resPassBldg').innerText = data.authorized_building;
     document.getElementById('resScanLoc').innerText = data.scanned_building;
@@ -462,8 +477,9 @@ function displayScanResultUI(data) {
     }
 
     window.__lastIdPhotoUrl = data.id_photo_url || null;
+    window.__lastIdPhotoLabel = data.id_photo_label || null; // optional, see note below
+    window.__lastPassNumber = data.pass_number || '';
     document.getElementById('viewIdPhotoBtn').classList.toggle('hidden', !window.__lastIdPhotoUrl);
-    document.getElementById('statusNoNameNotice').classList.toggle('hidden', data.visitor_name !== 'Unnamed Visitor');
 
     const header = document.getElementById('statusHeader');
     const advisory = document.getElementById('advisoryText');
@@ -481,14 +497,24 @@ function displayScanResultUI(data) {
     header.className = `gov-status-banner ${statusClass} anim-fade-in-up`;
 
     const label = data.result.charAt(0) + data.result.slice(1).toLowerCase();
-    document.getElementById('statusText').innerHTML = `Access <span class="gov-status-title-accent">${label}</span>`;
-    document.getElementById('statusSubtitle').innerText = data.reason;
-    entryLine.innerText = data.result === 'AUTHORIZED'
-        ? (data.direction === 'out' ? 'Exited' : 'Entered') + ' at ' + data.timestamp
-        : '';
+    const statusIcons = {
+        AUTHORIZED: 'fa-circle-check', UNAUTHORIZED: 'fa-circle-xmark', EXPIRED: 'fa-clock',
+        REVOKED: 'fa-ban', BLOCKED: 'fa-lock', INVALID: 'fa-circle-question',
+    };
+    document.getElementById('statusText').innerHTML =
+        `<i class="fa-solid ${statusIcons[data.result] || 'fa-circle-question'} gov-status-icon"></i>Access <span class="gov-status-title-accent">${label}</span>`;
+    renderReason(data.reason);
+
+    entryLine.replaceChildren();
+    if (data.result === 'AUTHORIZED') {
+        const t = document.createElement('strong');
+        t.textContent = data.timestamp;
+        entryLine.append((data.direction === 'out' ? 'Exited' : 'Entered') + ' at ', t);
+    }
+    // The reason is already shown above, so non-authorized states leave this line empty (no duplicate)
     advisory.innerText = data.result === 'AUTHORIZED'
-        ? `Confirmed: ${data.visitor_name} holds a valid pass for ${data.scanned_building}.`
-        : data.reason;
+        ? `Confirmed: ${noName ? 'Visitor' : data.visitor_name} holds a valid pass for ${data.scanned_building}.`
+        : '';
 
     // Congressman(s) / offices the visitor is going to, one per line.
     const visiting = data.visiting || [];
@@ -520,10 +546,12 @@ function displayScanResultUI(data) {
             row.innerHTML = `
                 <span class="gov-activity-dir is-${entry.direction || 'neutral'}">${label}</span>
                 <span class="gov-activity-building">${entry.building}</span>
-                <span class="gov-activity-time">${entry.time} &middot; ${entry.date}</span>
+                <span class="gov-activity-when"><strong>${entry.time}</strong><small>${entry.date}</small></span>
             `;
             activityList.appendChild(row);
         });
+        const n = data.recent_activity.length;
+        document.getElementById('resActivityCount').innerText = `This pass · ${n} scan${n === 1 ? '' : 's'}`;
         activitySection.classList.remove('hidden');
     } else {
         activitySection.classList.add('hidden');
@@ -551,65 +579,116 @@ document.addEventListener('fullscreenchange', () => {
 
 let securityCamStream = null;
 
-function toggleCamera() {
-    const btn = document.getElementById('toggleCamBtn');
-    const placeholder = document.getElementById('camPlaceholder');
-    const targetOverlay = document.getElementById('scanTargetOverlay');
-    const qrMode = document.getElementById('qrFallbackMode').checked;
+// ---- QR scan gate: a QR must leave the frame before it can scan again ----
+const QR_RELEASE_MS = 1200;  // same QR must be out of frame this long to count as a new scan
+const QR_MIN_GAP_MS = 1500;  // minimum time between any two accepted scans
+let qrLastSeen = { token: null, at: 0 };
+let qrLastHandledAt = 0;
 
-    if (!isCameraActive) {
-        if (qrMode) {
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 220, height: 220 } },
-                (decodedText) => {
-                    if (scanCooldownActive) return;
-                    if (decodedText === lastScannedToken) return;
-                    lastScannedToken = decodedText;
-                    scanCooldownActive = true;
-                    processScanToken(decodedText);
-                    setTimeout(() => { scanCooldownActive = false; lastScannedToken = null; }, 3000);
-                },
-                () => {}
-            ).then(() => {
-                isCameraActive = true;
-                btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
-                btn.className = 'gov-btn-camera is-recording';
-                placeholder.classList.add('hidden');
-                targetOverlay.classList.remove('hidden');
-            }).catch(err => showToast(String(err), 'error', 'Camera Unavailable'));
-        } else {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then(stream => {
-                    securityCamStream = stream;
-                    const video = document.getElementById('securityCamVideo');
-                    video.srcObject = stream;
-                    video.classList.remove('hidden');
-                    isCameraActive = true;
-                    btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
-                    btn.className = 'gov-btn-camera is-recording';
-                    placeholder.classList.add('hidden');
-                }).catch(err => showToast(String(err), 'error', 'Camera Unavailable'));
-        }
-    } else {
-        if (html5QrcodeScanner) {
-            html5QrcodeScanner.stop().then(() => html5QrcodeScanner.clear());
-            html5QrcodeScanner = null;
-        }
-        if (securityCamStream) {
-            securityCamStream.getTracks().forEach(t => t.stop());
-            securityCamStream = null;
-            document.getElementById('securityCamVideo').classList.add('hidden');
-        }
-        isCameraActive = false;
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Camera';
-        btn.className = 'gov-btn-camera';
-        placeholder.classList.remove('hidden');
-        targetOverlay.classList.add('hidden');
+function resetQrGate() { qrLastSeen = { token: null, at: 0 }; qrLastHandledAt = 0; }
+
+function shouldHandleQrScan(token) {
+    const now = Date.now();
+    const heldInView = token === qrLastSeen.token && (now - qrLastSeen.at) < QR_RELEASE_MS;
+    qrLastSeen = { token, at: now };
+    if (heldInView) return false;
+    if (now - qrLastHandledAt < QR_MIN_GAP_MS) {
+        qrLastSeen = { token: null, at: 0 }; // not handled yet, so the next sighting counts as fresh
+        return false;
     }
+    qrLastHandledAt = now;
+    return true;
 }
 
+// ---- Camera ----
+const qrCheckbox = document.getElementById('qrFallbackMode');
+let cameraBusy = false;
+
+// Shows/hides the QR template right away, with or without the camera running
+function syncQrTemplate() {
+    const qrMode = qrCheckbox.checked;
+    document.getElementById('scanTargetOverlay').classList.toggle('hidden', !qrMode);
+    document.getElementById('camModeHint').innerText =
+        qrMode && !isCameraActive ? 'QR fallback mode: press Start Camera' : '';
+}
+
+function setCameraUI(active) {
+    const btn = document.getElementById('toggleCamBtn');
+    btn.innerHTML = active
+        ? '<i class="fa-solid fa-stop"></i> Stop Camera'
+        : '<i class="fa-solid fa-play"></i> Start Camera';
+    btn.className = active ? 'gov-btn-camera is-recording' : 'gov-btn-camera';
+    document.getElementById('camPlaceholder').classList.toggle('hidden', active);
+    syncQrTemplate();
+}
+
+async function releaseCamera() {
+    if (html5QrcodeScanner) {
+        try { await html5QrcodeScanner.stop(); } catch (e) {}
+        try { html5QrcodeScanner.clear(); } catch (e) {}
+        html5QrcodeScanner = null;
+    }
+    if (securityCamStream) {
+        securityCamStream.getTracks().forEach(t => t.stop());
+        securityCamStream = null;
+    }
+    document.getElementById('securityCamVideo').classList.add('hidden');
+    isCameraActive = false;
+}
+
+async function startCamera() {
+    resetQrGate();
+    try {
+        if (qrCheckbox.checked) {
+            html5QrcodeScanner = new Html5Qrcode('reader', {
+                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+                verbose: false,
+            });
+            await html5QrcodeScanner.start(
+                { facingMode: 'environment' },
+                { fps: 10 }, // no qrbox: the whole frame is scanned, the on-screen frame is only a guide
+                (text) => { if (shouldHandleQrScan(text)) processScanToken(text); },
+                () => {}
+            );
+        } else {
+            securityCamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const video = document.getElementById('securityCamVideo');
+            video.srcObject = securityCamStream;
+            video.classList.remove('hidden');
+        }
+        isCameraActive = true;
+    } catch (err) {
+        await releaseCamera();
+        showToast(String(err), 'error', 'Camera Unavailable');
+    }
+    setCameraUI(isCameraActive);
+}
+
+async function stopCamera() {
+    await releaseCamera();
+    resetQrGate();
+    setCameraUI(false);
+}
+
+// One transition at a time: prevents the stop/start race that wiped the video
+async function runCameraTransition(fn) {
+    if (cameraBusy) return;
+    cameraBusy = true;
+    qrCheckbox.disabled = true;
+    try { await fn(); } finally { cameraBusy = false; qrCheckbox.disabled = false; }
+}
+
+function toggleCamera() {
+    return runCameraTransition(() => isCameraActive ? stopCamera() : startCamera());
+}
+
+// Ticking/unticking switches modes immediately, even while the camera is running
+qrCheckbox.addEventListener('change', () => {
+    syncQrTemplate();
+    if (isCameraActive) runCameraTransition(async () => { await stopCamera(); await startCamera(); });
+});
+syncQrTemplate();
 function captureSecurityFrame() {
     if (!securityCamStream) return null;
     const video = document.getElementById('securityCamVideo');
@@ -623,15 +702,39 @@ function captureSecurityFrame() {
 function showIdPhotoPopup() {
     if (!window.__lastIdPhotoUrl) return;
     const overlay = document.createElement('div');
-    overlay.className = 'gov-toast-container';
+    overlay.className = 'gov-idviewer';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
     overlay.innerHTML = `
-        <div class="gov-toast" style="max-width:520px; padding:1rem;">
-            <img src="${window.__lastIdPhotoUrl}" alt="ID photo" style="width:100%; border-radius:0.6rem;">
-            <button type="button" class="gov-toast-action" style="margin-top:1rem;">Close</button>
+        <div class="gov-idviewer-panel">
+            <div class="gov-idviewer-head">
+                <div>
+                    <span class="gov-eyebrow"></span>
+                    <span class="gov-card-title">ID photo</span>
+                </div>
+                <div class="gov-idviewer-head-right">
+                    <span class="gov-idviewer-chip hidden"><i class="fa-solid fa-clone"></i><span></span></span>
+                    <button type="button" class="gov-idviewer-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="gov-idviewer-body">
+                <div class="gov-idviewer-frame"><img alt="ID photo"></div>
+            </div>
         </div>
     `;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    overlay.querySelector('.gov-toast-action').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('.gov-eyebrow').textContent =
+        window.__lastPassNumber ? `Visitor pass #${window.__lastPassNumber}` : 'Visitor pass';
+    overlay.querySelector('img').src = window.__lastIdPhotoUrl;
+    if (window.__lastIdPhotoLabel) {
+        const chip = overlay.querySelector('.gov-idviewer-chip');
+        chip.querySelector('span').textContent = window.__lastIdPhotoLabel;
+        chip.classList.remove('hidden');
+    }
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('.gov-idviewer-close').addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
     document.body.appendChild(overlay);
 }
 
