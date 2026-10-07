@@ -23,6 +23,8 @@
     ];
 @endphp
 
+
+
 <div class="gov-legend">
     <span class="gov-legend-item"><span class="gov-legend-dot is-active"></span> Active Passes</span>
     <span class="gov-legend-item"><span class="gov-legend-dot is-available"></span> Available Passes</span>
@@ -50,9 +52,9 @@
             class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
                 <h3>{{ $b->name }}</h3>
-                <p class="is-active">{{ $activeCount }} Active Passes</p>
-                <p class="is-available">{{ $availableCount }} Available Passes</p>
-                <p class="is-inactive">{{ $inactiveCount }} Inactive Passes</p>
+                <p class="is-active"><b>{{ $activeCount }}</b> Active Passes</p>
+                <p class="is-available"><b>{{ $availableCount }}</b> Available Passes</p>
+                <p class="is-inactive" title="Expired or revoked"><b>{{ $inactiveCount }}</b> Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
                 <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"

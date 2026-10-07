@@ -54,6 +54,10 @@
                         <option value="AUTHORIZED" {{ request('result') === 'AUTHORIZED' ? 'selected' : '' }}>Authorized</option>
                         <option value="UNAUTHORIZED" {{ request('result') === 'UNAUTHORIZED' ? 'selected' : '' }}>Unauthorized</option>
                         <option value="INVALID" {{ request('result') === 'INVALID' ? 'selected' : '' }}>Invalid</option>
+                        <option value="UNASSIGNED" {{ request('result') === 'UNASSIGNED' ? 'selected' : '' }}>Unassigned</option>
+                        <option value="EXPIRED" {{ request('result') === 'EXPIRED' ? 'selected' : '' }}>Expired</option>
+                        <option value="REVOKED" {{ request('result') === 'REVOKED' ? 'selected' : '' }}>Revoked</option>
+                        <option value="BLOCKED" {{ request('result') === 'BLOCKED' ? 'selected' : '' }}>Blocked</option>
                     </select>
                     <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
                 </div>
@@ -104,7 +108,13 @@
                                     <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->scannedBuilding->name ?? '' }}</td>
                                     <td class="border-r border-slate-100 py-3 px-4">
                                         <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold
-                                            {{ $l->result === 'AUTHORIZED' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                            {{ match($l->result) {
+                                                'AUTHORIZED' => 'bg-emerald-100 text-emerald-700',
+                                                'UNASSIGNED' => 'bg-indigo-100 text-indigo-700',
+                                                'EXPIRED', 'BLOCKED' => 'bg-amber-100 text-amber-700',
+                                                'INVALID' => 'bg-slate-100 text-slate-600',
+                                                default => 'bg-red-100 text-red-700',
+                                            } }}">
                                             {{ ucfirst(strtolower($l->result)) }}
                                         </span>
                                     </td>

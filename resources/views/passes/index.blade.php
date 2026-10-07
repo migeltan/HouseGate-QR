@@ -10,10 +10,6 @@
     {{-- TAB 2 - BUILDINGS (includes the building passes modal + pass info modal) --}}
     @include('passes.tab2-buildings')
 
-    {{-- TAB 3 - USER JOURNEY --}}
-    @include('passes.tab3-user-journey')
-
-
     {{-- Register Visitor modal — each step lives in resources/views/passes/ --}}
     <div id="registerModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="registration-title">
         <section class="reg-modal">

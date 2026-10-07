@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuildingSelectController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\PassController;
+use App\Http\Controllers\PassInventoryController;
 use App\Http\Controllers\ScannerController;
 use Illuminate\Support\Facades\Route;
 
@@ -44,6 +45,10 @@ Route::middleware('auth')->group(function () {
         Route::middleware('admin')->group(function () {
             Route::delete('/logs/purge/range', [LogController::class, 'purgeRange'])->name('logs.purge.range');
             Route::delete('/logs/purge/all', [LogController::class, 'purgeAll'])->name('logs.purge.all');
+
+            Route::post('/passes/inventory/generate', [PassInventoryController::class, 'generate'])->name('passes.inventory.generate');
+            Route::get('/passes/inventory/print', [PassInventoryController::class, 'print'])->name('passes.inventory.print');
+            Route::get('/passes/inventory/csv', [PassInventoryController::class, 'csv'])->name('passes.inventory.csv');
         });
     });
 });

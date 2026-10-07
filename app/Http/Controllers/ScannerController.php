@@ -89,7 +89,12 @@ class ScannerController extends Controller
             $photoUrl = $pass->photo_path ? $publicDisk->url($pass->photo_path) : null;
             $idPhotoUrl = $pass->id_photo_path ? $publicDisk->url($pass->id_photo_path) : null;
 
-            if ($pass->status === 'expired') {
+            if ($pass->status === 'available') {
+                // Card exists but nobody holds it: never approve, never check in/out.
+                $result = 'UNASSIGNED';
+                $reason = 'Card recognized, but no person is currently assigned to it.';
+                $visitorName = 'No person assigned';
+            } elseif ($pass->status === 'expired') {
                 $result = 'EXPIRED';
                 $reason = 'Visitor pass status marked as EXPIRED.';
             } elseif ($pass->status === 'revoked') {
@@ -137,7 +142,7 @@ $reason = "Building Mismatch - Pass is only authorized for {$authorizedBuildingN
         // count as real entries/exits — denied/blocked attempts aren't
         // actual movements and would just clutter the timeline.
         $recentActivity = [];
-        if ($pass) {
+        if ($pass && $pass->status !== 'available') {
             $recentActivity = ScanLog::where('visitor_pass_id', $pass->id)
                 ->where('result', 'AUTHORIZED')
                 ->with('scannedBuilding')

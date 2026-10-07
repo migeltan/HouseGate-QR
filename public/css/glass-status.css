@@ -134,13 +134,19 @@ select.gov-location-badge option {
     --st-bg: #f1f5f9;
     --st-line: #dbe2ea;
 }
+.gov-status-banner.is-unassigned {
+    --st: #4f6190;
+    --st-bg: #eef2fb;
+    --st-line: #cfd9ef;
+}
 
 .gov-status-banner.is-authorized,
 .gov-status-banner.is-denied,
 .gov-status-banner.is-expired,
 .gov-status-banner.is-revoked,
 .gov-status-banner.is-blocked,
-.gov-status-banner.is-invalid {
+.gov-status-banner.is-invalid,
+.gov-status-banner.is-unassigned {
     background: linear-gradient(
         135deg,
         var(--st-bg) 0%,
@@ -227,18 +233,38 @@ select.gov-location-badge option {
 
 /* ---------- Photo + details: wraps on narrow cards, bordered tiles ---------- */
 .result-details {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
     gap: 1rem;
-    align-items: flex-start;
+    align-items: stretch;
     padding: 1rem 0;
     flex: 0 0 auto;
 }
 .result-photo {
     position: relative;
-    flex: 0 1 200px;
-    min-width: 160px;
-    aspect-ratio: 1 / 1;
+    min-height: 11rem; /* grows with the info column, so no blank space under the photo */
+}
+.result-details .gov-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense; /* a wide building list lets the small cells fill the gap */
+}
+#resPassBldg {
+    display: -webkit-box;
+    display: box; /* fallback for older browsers */
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@media (max-width: 520px) {
+    .result-details {
+        grid-template-columns: 1fr;
+    }
+    .result-photo {
+        aspect-ratio: 1 / 1;
+        max-width: 220px;
+    }
 }
 .result-photo img,
 .result-photo-placeholder {
@@ -607,4 +633,300 @@ select.gov-location-badge option {
 }
 .gov-scan-hint:empty {
     display: none;
+}
+/* ---------- UNASSIGNED card: compact panel, no photo / visitor fields ---------- */
+.gov-unassigned-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    margin: 1rem 0;
+    padding: 1.4rem 1rem 1.1rem;
+    text-align: center;
+    background: rgba(248, 250, 252, 0.8);
+    border: 1.5px dashed #b9c6e4;
+    border-radius: 0.85rem;
+    flex: 0 0 auto;
+}
+.gov-unassigned-icon {
+    width: 3.2rem;
+    height: 3.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 1.35rem;
+    color: #4f6190;
+    background: #eef2fb;
+    border: 1px solid #cfd9ef;
+}
+.gov-unassigned-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.gov-unassigned-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.88rem;
+    color: #475569;
+}
+.gov-unassigned-meta {
+    width: 100%;
+    flex: 0 0 auto;
+    text-align: left;
+}
+/* ---------- Card header: glass icon tiles ---------- */
+.gov-card-header-left {
+    align-items: center;
+}
+.gov-card-header-icon {
+    flex: 0 0 auto;
+    width: 2.7rem;
+    height: 2.7rem;
+    margin-top: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--brand-blue);
+    border-radius: 0.85rem;
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.95),
+        rgba(214, 228, 248, 0.65)
+    );
+    border: 1px solid rgba(35, 90, 166, 0.16);
+    box-shadow:
+        0 4px 12px rgba(35, 90, 166, 0.16),
+        inset 0 1px 0 #fff,
+        inset 0 -1px 0 rgba(35, 90, 166, 0.12);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+/* ---------- Instructions: step tiles ---------- */
+.gov-instr-lead {
+    color: #475569;
+}
+.gov-instr-steps {
+    list-style: none;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.75rem;
+}
+.gov-instr-steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.75rem 0.9rem;
+    background: rgba(248, 250, 252, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 0.8rem;
+    font-weight: 600;
+}
+.gov-instr-num {
+    flex: 0 0 auto;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--brand-blue);
+}
+.gov-instr-steps li > i {
+    color: var(--brand-blue);
+}
+/* ---------- User Journey: glass controls ---------- */
+.gov-journey-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9rem;
+    margin-top: 0.75rem;
+}
+.gov-journey-nav {
+    position: static;
+    transform: none;
+    width: 2.6rem;
+    height: 2.6rem;
+    font-size: 0.85rem;
+    color: var(--brand-blue);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(35, 90, 166, 0.18);
+    box-shadow:
+        0 4px 12px rgba(35, 90, 166, 0.14),
+        inset 0 1px 0 #fff;
+    -webkit-backdrop-filter: blur(10px) saturate(1.4);
+    backdrop-filter: blur(10px) saturate(1.4);
+    transition:
+        transform 0.15s ease,
+        background 0.15s ease;
+}
+.gov-journey-nav:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: #fff;
+}
+.gov-journey-nav:disabled,
+.gov-journey-nav:disabled:hover {
+    transform: none;
+    opacity: 0.35;
+}
+.gov-journey-dots {
+    display: flex;
+    gap: 0.45rem;
+}
+.gov-journey-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: #c5d1e3;
+    cursor: pointer;
+    transition:
+        width 0.2s ease,
+        background 0.2s ease;
+}
+.gov-journey-dot.is-active {
+    width: 1.4rem;
+    background: var(--brand-blue);
+}
+.gov-journey-counter {
+    min-width: 2.8rem;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+/* ---------- Premium micro-interactions (subtle, CSS-only) ---------- */
+
+/* Header icon tiles: lift + glow on hover, with a one-time light sweep */
+.gov-card-header-icon {
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1),
+        box-shadow 0.3s ease;
+}
+.gov-card-header-icon::before {
+    display: inline-block;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.gov-card-header-icon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        115deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.85) 50%,
+        transparent 70%
+    );
+    transform: translateX(-130%);
+    pointer-events: none;
+}
+.gov-card-header-left:hover .gov-card-header-icon {
+    transform: translateY(-2px);
+    box-shadow:
+        0 8px 18px rgba(35, 90, 166, 0.26),
+        inset 0 1px 0 #fff,
+        inset 0 -1px 0 rgba(35, 90, 166, 0.12);
+}
+.gov-card-header-left:hover .gov-card-header-icon::before {
+    transform: scale(1.14) rotate(-6deg);
+}
+.gov-card-header-left:hover .gov-card-header-icon::after {
+    transform: translateX(130%);
+    transition: transform 0.7s ease;
+}
+
+/* Instruction step tiles */
+.gov-instr-steps li {
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease,
+        border-color 0.25s ease,
+        background 0.25s ease;
+}
+.gov-instr-steps li:hover {
+    transform: translateY(-2px);
+    background: #fff;
+    border-color: rgba(35, 90, 166, 0.35);
+    box-shadow: 0 8px 18px rgba(35, 90, 166, 0.12);
+}
+.gov-instr-num {
+    transition:
+        transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.25s ease;
+}
+.gov-instr-steps li:hover .gov-instr-num {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 4px rgba(35, 90, 166, 0.16);
+}
+
+/* Journey controls: press feedback + dot hover */
+.gov-journey-nav:active:not(:disabled) {
+    transform: scale(0.94);
+}
+.gov-journey-dot:hover:not(.is-active) {
+    background: #9db4d6;
+    transform: scale(1.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gov-card-header-icon,
+    .gov-card-header-icon::before,
+    .gov-card-header-icon::after,
+    .gov-instr-steps li,
+    .gov-instr-num,
+    .gov-journey-nav,
+    .gov-journey-dot {
+        transition: none !important;
+        transform: none !important;
+    }
+}
+/* ---------- Registry: building cards (polish only) ---------- */
+.gov-building-card {
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+}
+.gov-building-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 26px rgba(35, 90, 166, 0.16);
+}
+.gov-building-card-info {
+    text-align: left;
+}
+.gov-building-card-info h3 {
+    margin-bottom: 0.55rem;
+}
+.gov-building-card-info p {
+    line-height: 1.85;
+}
+.gov-building-card-info p b {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.gov-building-card-photo {
+    overflow: hidden;
+}
+.gov-building-card-photo img {
+    transition: transform 0.5s ease;
+}
+.gov-building-card:hover .gov-building-card-photo img {
+    transform: scale(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gov-building-card,
+    .gov-building-card-photo img {
+        transition: none !important;
+        transform: none !important;
+    }
 }

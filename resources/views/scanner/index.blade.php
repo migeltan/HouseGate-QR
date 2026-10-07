@@ -7,7 +7,7 @@
 <div class="gov-card">
     <div class="gov-card-header">
         <div class="gov-card-header-left">
-            <i class="fa-solid fa-desktop gov-card-header-icon"></i>
+            <i class="fa-solid fa-qrcode gov-card-header-icon"></i>
             <div>
                 <span class="gov-eyebrow">Instructions</span>
                 <span class="gov-card-title">Visitor Access Scanner</span>
@@ -16,11 +16,11 @@
         <div class="gov-corner-accent" aria-hidden="true"></div>
     </div>
     <div class="gov-card-body">
-        <p>Scan a visitor's pass to validate authorized building access through this terminal. The personnel must do the following:</p>
-        <ol class="gov-steps">
-            <li>Start the camera scanner</li>
-            <li>Choose the corresponding station assigned</li>
-            <li>Let the visitors scan their QR-Based Visitor Pass</li>
+        <p class="gov-instr-lead">Scan a visitor's pass to validate authorized building access through this terminal. The personnel must do the following:</p>
+        <ol class="gov-instr-steps">
+            <li><span class="gov-instr-num">1</span><span>Start the camera scanner</span></li>
+            <li><span class="gov-instr-num">2</span><span>Choose the corresponding station assigned</span></li>
+            <li><span class="gov-instr-num">3</span><span>Let the visitors scan their QR-Based Visitor Pass</span></li>
         </ol>
     </div>
 </div>
@@ -31,7 +31,7 @@
     <div class="gov-card flex flex-col" id="liveScannerCard">
     <div class="gov-card-header">
         <div class="gov-card-header-left">
-            <i class="fa-solid fa-camera gov-card-header-icon"></i>
+            <i class="fa-solid fa-video gov-card-header-icon"></i>
 
                 <div>
                     <span class="gov-eyebrow">Camera</span>
@@ -79,7 +79,7 @@
     <div id="resultCard" class="gov-card flex flex-col">
         <div class="gov-card-header">
             <div class="gov-card-header-left">
-                <i class="fa-solid fa-folder-open gov-card-header-icon"></i>
+                <i class="fa-solid fa-shield-halved gov-card-header-icon"></i>
                 <div>
                     <span class="gov-eyebrow">Status and Location</span>
                     <span class="gov-card-title">Authorization</span>
@@ -176,7 +176,7 @@
 
                 --}}
                  <!-- Visitor Information -->
-    <div class="result-details">
+<div id="resDetailsBlock" class="result-details">
 
         <div class="result-photo">
             <img id="resPhoto"
@@ -220,6 +220,24 @@
 
     </div>
 
+<div id="unassignedPanel" class="gov-unassigned-panel" style="display:none;">
+    <div class="gov-unassigned-icon"><i class="fa-solid fa-id-card"></i></div>
+    <div class="gov-unassigned-text">
+        <p class="gov-unassigned-title">Card recognized</p>
+        <p class="gov-unassigned-sub">No person is currently assigned to this card.</p>
+    </div>
+    <div class="gov-meta-grid gov-unassigned-meta">
+        <div class="gov-meta-cell">
+            <span class="gov-meta-label">Pass #</span>
+            <div id="unPassNum" class="gov-meta-value font-mono"></div>
+        </div>
+        <div class="gov-meta-cell">
+            <span class="gov-meta-label">Scanned at</span>
+            <div id="unScanLoc" class="gov-meta-value"></div>
+        </div>
+    </div>
+</div>
+
 <div id="resActivitySection" class="gov-activity-section hidden">
     <div class="gov-activity-head">
         <p class="gov-activity-heading">Recent activity</p>
@@ -249,7 +267,7 @@
 <div class="gov-card">
     <div class="gov-card-header">
         <div class="gov-card-header-left">
-            <i class="fa-solid fa-people-arrows gov-card-header-icon"></i>
+            <i class="fa-solid fa-route gov-card-header-icon"></i>
             <div>
                 <span class="gov-eyebrow">User Journey</span>
                 <span class="gov-card-title">Diagram of User Journey of the System</span>
@@ -262,11 +280,19 @@
             <img id="journeyImage" src="{{ asset('images/carousel/step1.svg') }}"
                 alt="User journey step"
                 class="w-full h-auto">
+        </div>
+        <div class="gov-journey-controls">
             <button type="button" id="journeyPrevBtn" class="gov-journey-nav is-prev" aria-label="Previous step" onclick="prevJourneyStep()" disabled>
-                <i class="fa-solid fa-caret-left"></i>
+                <i class="fa-solid fa-chevron-left"></i>
             </button>
+            <div class="gov-journey-dots">
+                <button type="button" class="gov-journey-dot is-active" aria-label="Step 1" onclick="goJourneyStep(0)"></button>
+                <button type="button" class="gov-journey-dot" aria-label="Step 2" onclick="goJourneyStep(1)"></button>
+                <button type="button" class="gov-journey-dot" aria-label="Step 3" onclick="goJourneyStep(2)"></button>
+            </div>
+            <span id="journeyCounter" class="gov-journey-counter">1 / 3</span>
             <button type="button" id="journeyNextBtn" class="gov-journey-nav" aria-label="Next step" onclick="nextJourneyStep()">
-                <i class="fa-solid fa-caret-right"></i>
+                <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
     </div>
@@ -291,6 +317,12 @@ function updateJourneyImage() {
     }, 150);
     document.getElementById('journeyPrevBtn').disabled = journeyIndex === 0;
     document.getElementById('journeyNextBtn').disabled = journeyIndex === journeySteps.length - 1;
+    document.querySelectorAll('.gov-journey-dot').forEach((d, i) => d.classList.toggle('is-active', i === journeyIndex));
+    document.getElementById('journeyCounter').innerText = `${journeyIndex + 1} / ${journeySteps.length}`;
+}
+
+function goJourneyStep(i) {
+    if (i >= 0 && i < journeySteps.length && i !== journeyIndex) { journeyIndex = i; updateJourneyImage(); }
 }
 
 function nextJourneyStep() {
@@ -442,7 +474,10 @@ function displayScanResultUI(data) {
     nameEl.innerText = noName ? '(See ID)' : data.visitor_name;
     nameEl.classList.toggle('is-placeholder', noName);
     document.getElementById('resPassNum').innerText = data.pass_number;
-    document.getElementById('resPassBldg').innerText = data.authorized_building;
+    const bldgEl = document.getElementById('resPassBldg');
+    bldgEl.innerText = data.authorized_building;
+    bldgEl.title = data.authorized_building;
+    bldgEl.parentElement.classList.toggle('is-wide', data.authorized_building.length > 24);
     document.getElementById('resScanLoc').innerText = data.scanned_building;
 
 
@@ -492,6 +527,7 @@ function displayScanResultUI(data) {
         REVOKED: 'is-revoked',
         BLOCKED: 'is-blocked',
         INVALID: 'is-invalid',
+        UNASSIGNED: 'is-unassigned',
     };
     const statusClass = statusClassMap[data.result] || 'is-invalid';
     header.className = `gov-status-banner ${statusClass} anim-fade-in-up`;
@@ -500,9 +536,11 @@ function displayScanResultUI(data) {
     const statusIcons = {
         AUTHORIZED: 'fa-circle-check', UNAUTHORIZED: 'fa-circle-xmark', EXPIRED: 'fa-clock',
         REVOKED: 'fa-ban', BLOCKED: 'fa-lock', INVALID: 'fa-circle-question',
+        UNASSIGNED: 'fa-id-card',
     };
+    const titlePrefix = data.result === 'UNASSIGNED' ? 'Card' : 'Access';
     document.getElementById('statusText').innerHTML =
-        `<i class="fa-solid ${statusIcons[data.result] || 'fa-circle-question'} gov-status-icon"></i>Access <span class="gov-status-title-accent">${label}</span>`;
+        `<i class="fa-solid ${statusIcons[data.result] || 'fa-circle-question'} gov-status-icon"></i>${titlePrefix} <span class="gov-status-title-accent">${label}</span>`;
     renderReason(data.reason);
 
     entryLine.replaceChildren();
@@ -554,6 +592,16 @@ function displayScanResultUI(data) {
         document.getElementById('resActivityCount').innerText = `This pass · ${n} scan${n === 1 ? '' : 's'}`;
         activitySection.classList.remove('hidden');
     } else {
+        activitySection.classList.add('hidden');
+    }
+
+    // UNASSIGNED gets its own compact panel instead of the empty visitor block.
+    const isUnassigned = data.result === 'UNASSIGNED';
+    document.getElementById('resDetailsBlock').style.display = isUnassigned ? 'none' : '';
+    document.getElementById('unassignedPanel').style.display = isUnassigned ? '' : 'none';
+    if (isUnassigned) {
+        document.getElementById('unPassNum').innerText = data.pass_number;
+        document.getElementById('unScanLoc').innerText = data.scanned_building;
         activitySection.classList.add('hidden');
     }
 
@@ -642,12 +690,18 @@ async function startCamera() {
         if (qrCheckbox.checked) {
             html5QrcodeScanner = new Html5Qrcode('reader', {
                 formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
                 verbose: false,
             });
             await html5QrcodeScanner.start(
                 { facingMode: 'environment' },
-                { fps: 10 }, // no qrbox: the whole frame is scanned, the on-screen frame is only a guide
+                {
+                    fps: 10,
+                    videoConstraints: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                    },
+                },
                 (text) => { if (shouldHandleQrScan(text)) processScanToken(text); },
                 () => {}
             );
