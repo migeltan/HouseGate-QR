@@ -551,6 +551,7 @@
             const transferToken = document.getElementById('transferQrTokenInput').value.trim();
             if (transferToken) params.set('transfer_qr_token', transferToken);
             const seq = ++dupSeq;
+            const skTimer = setTimeout(() => { if (seq === dupSeq) toggleDupSkeleton(true); }, 150);
             try {
                 const res = await fetch(`${DUP_URL}?${params}`, {
                     headers: {
@@ -563,7 +564,14 @@
                 if (seq === dupSeq) renderDuplicate(data.match, data.transfer_ready);
             } catch (e) {
                 /* the server re-checks on submit */
+            } finally {
+                clearTimeout(skTimer);
+                if (seq === dupSeq) toggleDupSkeleton(false);
             }
+        }
+
+        function toggleDupSkeleton(on) {
+            document.getElementById('dupSkeleton').classList.toggle('hidden', !on);
         }
 
         function dupBlocked() {
@@ -599,6 +607,7 @@
         }
 
         function renderDuplicate(match, transferReady) {
+            toggleDupSkeleton(false);
             dupState = match ? match.level : null;
             dupTransferReady = !!transferReady;
             document.getElementById('dupConfirmCheck').checked = false; // any new result must be re-confirmed
@@ -806,6 +815,7 @@
             };
             el.textContent = message;
             el.style.color = colors[tone] || colors.neutral;
+            el.classList.toggle('is-busy', tone === 'busy');
         }
         // ---- End transfer scan ----
 
@@ -996,6 +1006,7 @@
             };
             el.textContent = message;
             el.style.color = colors[tone] || colors.neutral;
+            el.classList.toggle('is-busy', tone === 'busy');
         }
         // ---- End Transfer Mode ----
 

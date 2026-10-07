@@ -110,7 +110,19 @@
 
         </div>
 
-        <div class="gov-card-body flex-grow flex flex-col">
+        <div class="gov-card-body flex-grow flex flex-col relative">
+            <div id="resultSkeleton" class="gov-sk-overlay hidden" aria-hidden="true">
+                <div class="sk gov-sk-banner"></div>
+                <div class="gov-sk-body">
+                    <div class="sk gov-sk-photo"></div>
+                    <div class="gov-sk-lines">
+                        <div class="sk sk-line sk-w-60"></div>
+                        <div class="sk sk-line sk-w-40"></div>
+                        <div class="sk sk-line sk-w-80"></div>
+                        <div class="sk sk-line sk-w-50"></div>
+                    </div>
+                </div>
+            </div>
             <div id="resultIdle" class="gov-idle-panel">
                 <p>Awaiting Pass Scan</p>
             </div>
@@ -394,11 +406,21 @@ function playAudioFeedback(authorized) {
     } catch(e) {}
 }
 
+// Shows the result skeleton only if the server takes longer than 150 ms (no flicker on fast scans)
+let scanSkTimer = null;
+function scanSkeleton(on) {
+    clearTimeout(scanSkTimer);
+    const sk = document.getElementById('resultSkeleton');
+    if (!on) { sk.classList.add('hidden'); return; }
+    scanSkTimer = setTimeout(() => sk.classList.remove('hidden'), 150);
+}
+
 async function processScanToken(token) {
     if (!token) return;
     const buildingId = document.getElementById('scannerBuildingId').value;
     const verificationPhoto = captureSecurityFrame();
     flashCaptureFeedback();
+    scanSkeleton(true);
 
     try {
         const res = await fetch('{{ route('scanner.scan') }}', {
@@ -420,10 +442,13 @@ async function processScanToken(token) {
         }
 
         const data = await res.json();
+        scanSkeleton(false); // reveal first so the entrance animation is visible
         displayScanResultUI(data);
     } catch (err) {
         console.error('Scan processing error', err);
         showToast('The scan could not be processed. See the console for details.', 'error', 'Scan Failed');
+    } finally {
+        scanSkeleton(false);
     }
 }
 

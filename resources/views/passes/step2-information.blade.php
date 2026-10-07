@@ -277,6 +277,15 @@
             </div>
         </div>
 
+        {{-- Placeholder shown while the duplicate check request is slow --}}
+        <div class="reg-field full hidden" id="dupSkeleton" aria-hidden="true">
+            <div class="sk-dup">
+                <div class="sk sk-line sk-w-60"></div>
+                <div class="sk sk-line sk-w-80"></div>
+                <div class="sk sk-line sk-w-40"></div>
+            </div>
+        </div>
+
         {{-- Workflow 1: duplicate active-pass warning (filled by runDuplicateCheck) --}}
         <div class="reg-field full hidden" id="dupWarning" role="alert" aria-live="polite">
             <div class="reg-dup" id="dupBox">

@@ -930,3 +930,490 @@ select.gov-location-badge option {
         transform: none !important;
     }
 }
+/* Glass outline: secondary action that pairs with .gov-btn-camera */
+.gov-btn-glass-outline {
+    font-family: "Source Sans Pro", sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--brand-blue);
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid rgba(36, 91, 166, 0.35);
+    border-radius: 9999px;
+    padding: 0.45rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow:
+        0 4px 12px rgba(36, 91, 166, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    transition:
+        transform 0.15s,
+        box-shadow 0.15s,
+        background 0.15s;
+}
+.gov-btn-glass-outline:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.92);
+}
+.gov-btn-glass-outline:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 3px rgba(36, 91, 166, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+/* ---------- Modal header: match main page cards (Register + Inventory) ---------- */
+.reg-modal-header .header-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--brand-blue);
+    border-radius: 0.85rem;
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.95),
+        rgba(214, 228, 248, 0.65)
+    );
+    border: 1px solid rgba(35, 90, 166, 0.16);
+    box-shadow:
+        0 4px 12px rgba(35, 90, 166, 0.16),
+        inset 0 1px 0 #fff,
+        inset 0 -1px 0 rgba(35, 90, 166, 0.12);
+}
+.reg-modal-header .reg-eyebrow {
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    opacity: 0.9;
+    margin-bottom: 3px;
+}
+.reg-modal-header h1 {
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+}
+.reg-close-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 9999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 1.5rem;
+    line-height: 1;
+    transition:
+        background 0.15s,
+        transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.reg-close-button:hover {
+    background: #e2e8f0;
+    transform: rotate(90deg);
+}
+
+/* ---------- Modal open animation (JS tags every overlay with .hg-overlay) ---------- */
+@keyframes hgOverlayIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes hgPanelIn {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.hg-overlay {
+    margin: 0 !important;
+    height: 100dvh;
+}
+.hg-overlay:not(.hidden) {
+    animation: hgOverlayIn 0.2s ease-out backwards;
+}
+.hg-overlay:not(.hidden) > * {
+    animation: hgPanelIn 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+    .hg-overlay:not(.hidden),
+    .hg-overlay:not(.hidden) > * {
+        animation: none;
+    }
+    .reg-close-button:hover {
+        transform: none;
+    }
+}
+/* ---------- Inventory modal ---------- */
+@keyframes invFade {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.inv-body {
+    gap: 18px;
+}
+.inv-panel {
+    display: grid;
+    gap: 16px;
+}
+.inv-panel:not(.hidden) {
+    animation: invFade 0.24s ease backwards;
+}
+.inv-panel.hidden,
+[data-inv-fields].hidden {
+    display: none !important;
+}
+
+.inv-building label,
+.inv-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.inv-building select,
+.inv-field input[type="number"],
+.inv-field input[type="text"] {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    color: #0f172a;
+    font:
+        600 14px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    background: #fff;
+    border: 1px solid #b8c2cf;
+    border-radius: 8px;
+    outline: none;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+.inv-building select:focus,
+.inv-field input:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(36, 91, 166, 0.18);
+}
+
+.inv-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+.inv-stat {
+    padding: 2px 10px;
+    border-radius: 9999px;
+    background: #eef2f7;
+    color: #475569;
+    font:
+        600 12px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.inv-stat b {
+    font-weight: 700;
+    color: #0f172a;
+}
+.inv-stat.is-available b {
+    color: var(--brand-blue);
+}
+.inv-stat.is-active b {
+    color: #1c9a5b;
+}
+.inv-stat.is-inactive b {
+    color: var(--brand-red);
+}
+
+.inv-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    background: #eef2f7;
+    border-radius: 9999px;
+}
+.inv-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1rem;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: #475569;
+    font:
+        700 0.85rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        color 0.2s,
+        box-shadow 0.2s;
+}
+.inv-tab:hover {
+    color: var(--brand-blue);
+}
+.inv-tab.is-active {
+    color: #fff;
+    background: var(--glass-blue);
+    box-shadow:
+        0 4px 12px rgba(36, 91, 166, 0.25),
+        var(--glass-edge);
+}
+
+.inv-seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.inv-seg-btn {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid rgba(36, 91, 166, 0.25);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.65);
+    color: var(--brand-blue);
+    font:
+        600 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+.inv-seg-btn:hover {
+    background: #fff;
+}
+.inv-seg-btn.is-active {
+    background: var(--brand-blue);
+    border-color: var(--brand-blue);
+    color: #fff;
+}
+
+.inv-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+.inv-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font:
+        600 13px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.inv-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--brand-blue);
+}
+
+.inv-summary {
+    margin: 0;
+    min-height: 1.25rem;
+    color: var(--brand-blue);
+    font:
+        600 13px/1.4 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.inv-summary.is-error {
+    color: #b91c1c;
+}
+.inv-summary.is-warn {
+    color: #b45309;
+}
+.inv-help {
+    margin: 0;
+    color: #64748b;
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+.inv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.inv-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.inv-actions > *:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .inv-panel:not(.hidden) {
+        animation: none;
+    }
+}
+/* Inventory modal: print options */
+.inv-opts {
+    display: grid;
+    gap: 12px;
+}
+.inv-opt {
+    display: grid;
+    gap: 6px;
+}
+.inv-opt-label {
+    font:
+        700 13px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #0f172a;
+}
+.inv-opt.hidden {
+    display: none !important;
+}
+/* ---------- Skeleton loading (shared primitives; reuse .sk for anything async) ---------- */
+@keyframes skShimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+@keyframes skFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+.sk,
+.sk-img {
+    background: linear-gradient(90deg, #e6ecf4 25%, #f5f8fc 50%, #e6ecf4 75%);
+    background-size: 200% 100%;
+    animation: skShimmer 1.4s ease-in-out infinite;
+}
+.sk {
+    border-radius: 8px;
+    color: transparent;
+}
+.sk-line {
+    height: 0.85rem;
+    border-radius: 6px;
+}
+.sk-circle {
+    border-radius: 50%;
+}
+.sk-w-40 {
+    width: 40%;
+}
+.sk-w-50 {
+    width: 50%;
+}
+.sk-w-60 {
+    width: 60%;
+}
+.sk-w-80 {
+    width: 80%;
+}
+.sk-fade {
+    animation: skFadeIn 0.3s ease;
+}
+
+/* Scanner result placeholder while a scan request is in flight */
+.gov-sk-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: #fff;
+    border-radius: inherit;
+}
+.gov-sk-overlay.hidden {
+    display: none !important;
+}
+.gov-sk-banner {
+    height: 5.5rem;
+    border-radius: 0.85rem;
+}
+.gov-sk-body {
+    display: grid;
+    grid-template-columns: minmax(9rem, 11rem) 1fr;
+    gap: 1rem;
+    flex: 1;
+}
+.gov-sk-photo {
+    border-radius: 0.85rem;
+    min-height: 11rem;
+}
+.gov-sk-lines {
+    display: grid;
+    align-content: start;
+    gap: 0.9rem;
+}
+
+/* Duplicate-check placeholder (Register modal) */
+.sk-dup {
+    display: grid;
+    gap: 0.6rem;
+    padding: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fafbfc;
+}
+#dupSkeleton.hidden {
+    display: none !important;
+}
+
+/* "Checking card…" status pills while a transfer lookup runs */
+.reg-dup-transfer-status.is-busy {
+    display: inline-block;
+    min-width: 9rem;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #e6ecf4 25%, #f5f8fc 50%, #e6ecf4 75%);
+    background-size: 200% 100%;
+    animation: skShimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sk,
+    .sk-img,
+    .sk-fade,
+    .reg-dup-transfer-status.is-busy {
+        animation: none;
+    }
+}

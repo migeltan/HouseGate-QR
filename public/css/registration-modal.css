@@ -53,10 +53,10 @@
     margin: 0;
     color: #245ba6;
     font:
-        600 14px/1.25 "Source Sans Serif 4",
-        serif;
+        600 14px/1.25 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
 }
-
 .reg-modal-header h1 {
     margin: 0;
     font-family: "Source Sans Pro", sans-serif;

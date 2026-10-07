@@ -291,6 +291,66 @@ document.addEventListener('submit', async (e) => {
     })();
     </script>
 
+    <script>
+    // Shared modal behaviour for every overlay: lifted to <body> (fixes the 24px
+    // space-y-6 offset), tagged for the open animation, page-scroll lock, Esc/backdrop close.
+    (function () {
+        // Order matters: later entries stack above earlier ones.
+        const ids = ['registerModal', 'inventoryModal', 'buildingPassesModal', 'passInfoModal',
+                     'rowDetailsModalOverlay', 'purgeModalOverlay', 'confirmPurgeOverlay'];
+        const overlays = ids.map(id => document.getElementById(id)).filter(Boolean);
+        if (!overlays.length) return;
+
+        // Register modal holds a half-filled form + camera photos: X / Cancel only.
+        const NO_DISMISS = ['registerModal'];
+        const isOpen = el => !el.classList.contains('hidden');
+        const sync = () => { document.body.style.overflow = overlays.some(isOpen) ? 'hidden' : ''; };
+        const closeOf = el => {
+            const btn = el.querySelector('.reg-close-button, [aria-label="Close"], [onclick*="close" i]');
+            btn ? btn.click() : el.classList.add('hidden');
+        };
+
+        overlays.forEach(el => {
+            document.body.appendChild(el);
+            el.classList.add('hg-overlay');
+            new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ['class'] });
+
+            let downOnBackdrop = false; // ignore text-selection drags that end on the backdrop
+            el.addEventListener('mousedown', e => { downOnBackdrop = e.target === el; });
+            el.addEventListener('click', e => {
+                if (e.target === el && downOnBackdrop && !NO_DISMISS.includes(el.id)) closeOf(el);
+            });
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            const top = [...overlays].reverse().find(isOpen);
+            if (top && !NO_DISMISS.includes(top.id)) closeOf(top);
+        });
+    })();
+    </script>
+
+    <script>
+    // Skeleton for photos: shimmer sits on the <img> itself until it has loaded.
+    // Covers building cards, scanner result photo, pass-info + log-row photos.
+    (function () {
+        const sel = '.gov-building-card-photo img, .gov-info-photo, .result-photo img';
+        const watch = img => {
+            const start = () => {
+                if (img.getAttribute('src') && !(img.complete && img.naturalWidth)) img.classList.add('sk-img');
+            };
+            const done = () => {
+                if (img.classList.contains('sk-img')) { img.classList.remove('sk-img'); img.classList.add('sk-fade'); }
+            };
+            img.addEventListener('load', done);
+            img.addEventListener('error', () => img.classList.remove('sk-img'));
+            new MutationObserver(start).observe(img, { attributes: true, attributeFilter: ['src'] });
+            start();
+        };
+        document.querySelectorAll(sel).forEach(watch);
+    })();
+    </script>
+
     @yield('scripts')
 
 </body>
