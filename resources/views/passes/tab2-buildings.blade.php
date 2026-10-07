@@ -70,28 +70,32 @@
         <div class="p-6 pb-4 flex-shrink-0 border-b border-slate-100">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex items-center gap-3">
-                    <span id="buildingModalSwatch" class="gov-pass-modal-swatch"></span>
+                    <i class="fa-solid fa-id-badge bp-header-icon"></i>
                     <div>
-                        <span class="gov-eyebrow">Visitor Passes</span>
-                        <h3 id="buildingModalTitle" class="gov-pass-modal-title"></h3>
+                        <span class="bp-eyebrow">Visitor Passes</span>
+                        <div class="bp-title-row">
+                            <span id="buildingModalSwatch" class="bp-dot"></span>
+                            <h3 id="buildingModalTitle" class="gov-pass-modal-title"></h3>
+                        </div>
                     </div>
                 </div>
-                <button type="button" onclick="closeBuildingModal()"
-                        class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full p-2.5 transition-colors leading-none flex-shrink-0">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <button type="button" class="reg-close-button" aria-label="Close" onclick="closeBuildingModal()">&times;</button>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 mt-4">
-                <div class="flex gap-2">
-                    <button type="button" onclick="filterModalPasses('all')" class="modal-filter-pill is-active" data-filter="all">All</button>
-                    <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available</button>
-                    <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active</button>
-                    <button type="button" onclick="filterModalPasses('inactive')" class="modal-filter-pill" data-filter="inactive">Inactive</button>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="filterModalPasses('all')" class="modal-filter-pill is-active" data-filter="all">All <span class="bp-count" data-count="all">0</span></button>
+                    <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available <span class="bp-count" data-count="available">0</span></button>
+                    <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active <span class="bp-count" data-count="active">0</span></button>
+                    <button type="button" onclick="filterModalPasses('inactive')" class="modal-filter-pill" data-filter="inactive">Inactive <span class="bp-count" data-count="inactive">0</span></button>
                 </div>
-                <div class="gov-modal-search">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="buildingModalSearch" placeholder="Search by name or pass #..." autocomplete="off" oninput="applyModalFilters()">
+                <div class="flex items-center gap-3">
+                    <span id="buildingModalShowing" class="bp-showing"></span>
+                    <div class="gov-modal-search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="buildingModalSearch" placeholder="Search by name or pass #..." autocomplete="off" oninput="applyModalFilters()">
+                        <button type="button" id="buildingModalSearchClear" class="bp-search-clear hidden" aria-label="Clear search" onclick="clearModalSearch()">&times;</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -114,6 +118,9 @@
                             [$badgeClass, $badgeLabel] = $badgeMap[$p->status] ?? ['is-available', 'Available'];
                             $infoPayload = [
                                 'pass_number' => $p->pass_number,
+                                'status' => $p->status,
+                                'building' => $p->building->name,
+                                'qr_url' => route('passes.show', $p),
                                 'visitor_name' => $p->visitor_name,
                                 'gender' => $p->gender,
                                 'contact_no' => $p->contact_no,
@@ -172,9 +179,9 @@
                                             data-confirm-message="The card will be reset and returned to available stock."
                                             data-confirm-label="Unassign">
                                             @csrf
-                                            <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-link-slash"></i> Unassign</button>
+<button type="submit" class="gov-pass-row-btn is-ghost is-warn"><i class="fa-solid fa-link-slash"></i> Unassign</button>
                                         </form>
-                                        <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
+<button type="button" class="gov-pass-row-btn is-ghost" data-qr-url="{{ route('passes.show', $p) }}" data-pass-number="{{ $p->pass_number }}" onclick="openPassQrModal(this)"><i class="fa-solid fa-qrcode"></i> View QR</button>
                                         <form method="POST" action="{{ route('passes.revoke', $p) }}"
                                             data-confirm data-confirm-tone="danger"
                                             data-confirm-title="Revoke this pass?"
@@ -182,7 +189,7 @@
                                             data-confirm-message="The visitor will be denied on their next scan."
                                             data-confirm-label="Revoke pass">
                                             @csrf
-                                            <button type="submit" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-ban"></i> Revoke</button>
+<button type="submit" class="gov-pass-row-btn is-ghost is-danger"><i class="fa-solid fa-ban"></i> Revoke</button>
                                         </form>
                                         <button type="button" class="gov-pass-row-btn is-ghost" data-pass-number="{{ $p->pass_number }}" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
                                     @else
@@ -202,29 +209,71 @@
 </div>
 
 {{-- Pass info modal (opened from "View Info" inside the building passes modal) --}}
-<div id="passInfoModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="gov-info-modal-panel">
-        <div class="gov-info-modal-header">
-            <div>
-                <span class="gov-eyebrow">Pass Information</span>
-                <h3 id="infoModalTitle" class="gov-pass-modal-title"></h3>
+<div id="passInfoModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
+    <div class="bp-modal-panel bp-info-panel">
+        <div class="bp-modal-head">
+            <div class="flex items-center gap-3 min-w-0">
+                <i class="fa-solid fa-address-card bp-header-icon"></i>
+                <div class="min-w-0">
+                    <span class="bp-eyebrow">Pass Information</span>
+                    <h3 id="infoModalTitle" class="gov-pass-modal-title"></h3>
+                    <div class="bp-info-meta">
+                        <span id="infoStatusBadge" class="gov-pass-badge"></span>
+                        <span id="infoBuilding" class="bp-info-building"></span>
+                    </div>
+                </div>
             </div>
-            <button type="button" onclick="closePassInfoModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full p-2.5 transition-colors leading-none">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <button type="button" class="reg-close-button" aria-label="Close" onclick="closePassInfoModal()">&times;</button>
         </div>
-        <div class="gov-info-modal-body">
-            <div class="gov-info-photos">
-                <div>
+
+        <div class="bp-modal-body bp-info-body">
+            <div id="infoPhotos" class="bp-info-photos">
+                <figure class="bp-photo-fig" onclick="toggleInfoPhotoZoom(this)" title="Click to enlarge">
                     <span class="gov-meta-label">Visitor Photo</span>
                     <img id="infoPhoto" class="gov-info-photo" alt="Visitor photo">
-                </div>
-                <div>
+                </figure>
+                <figure class="bp-photo-fig" onclick="toggleInfoPhotoZoom(this)" title="Click to enlarge">
                     <span class="gov-meta-label">ID Photo</span>
                     <img id="infoIdPhoto" class="gov-info-photo" alt="ID photo">
+                </figure>
+            </div>
+            <div id="infoSections"></div>
+        </div>
+
+        <div class="bp-modal-foot">
+            <button type="button" id="infoViewQr" class="gov-btn-glass-outline" onclick="openPassQrModal(this)"><i class="fa-solid fa-qrcode"></i> View QR</button>
+        </div>
+    </div>
+</div>
+
+{{-- Pass QR overlay (opened from "View QR"; data comes from PassController@show as JSON) --}}
+<div id="passQrModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="passQrTitle">
+    <div class="bp-modal-panel bp-qr-panel">
+        <div class="bp-modal-head">
+            <div class="flex items-center gap-3 min-w-0">
+                <i class="fa-solid fa-qrcode bp-header-icon"></i>
+                <div class="min-w-0">
+                    <span id="passQrEyebrow" class="bp-eyebrow">Pass QR</span>
+                    <h3 id="passQrTitle" class="gov-pass-modal-title"></h3>
                 </div>
             </div>
-            <div class="gov-info-modal-grid" id="infoFieldsGrid"></div>
+            <button type="button" class="reg-close-button" aria-label="Close" onclick="closePassQrModal()">&times;</button>
+        </div>
+
+        <div class="bp-modal-body bp-qr-body">
+            <div id="passQrStage" class="bp-qr-stage">
+                <div id="passQrPrintArea" class="bp-qr-card">
+                    <div class="bp-qr-box"><div id="passQrCanvas"></div></div>
+                    <div id="passQrNumber" class="bp-qr-num"></div>
+                </div>
+                <div id="passQrSkeleton" class="bp-qr-skeleton sk hidden"></div>
+            </div>
+            <p id="passQrError" class="bp-qr-error hidden"></p>
+        </div>
+
+        <div class="bp-modal-foot">
+            <button type="button" id="passQrPrintBtn" class="gov-btn-camera" onclick="printPassQr()" disabled><i class="fa-solid fa-print"></i> Print</button>
+            <button type="button" class="gov-btn-glass-outline" onclick="closePassQrModal()">Close</button>
         </div>
     </div>
 </div>
@@ -257,50 +306,188 @@ function closeBuildingModal() {
     document.getElementById('buildingPassesModal').classList.add('hidden');
 }
 
+const INFO_STATUS = {
+    active:    ['is-active', 'Active'],
+    available: ['is-available', 'Available'],
+    expired:   ['is-expired', 'Expired'],
+    revoked:   ['is-revoked', 'Revoked'],
+};
+
 function openPassInfoModal(info) {
-    document.getElementById('infoModalTitle').innerText = info.visitor_name ? `Pass #${info.pass_number} — ${info.visitor_name}` : `Pass #${info.pass_number}`;
+    document.getElementById('infoModalTitle').textContent = info.visitor_name ? `Pass #${info.pass_number} — ${info.visitor_name}` : `Pass #${info.pass_number}`;
 
-    const photo = document.getElementById('infoPhoto');
-    photo.src = info.photo_url || '';
-    photo.style.display = info.photo_url ? '' : 'none';
+    const [badgeClass, badgeLabel] = INFO_STATUS[info.status] || INFO_STATUS.available;
+    const badge = document.getElementById('infoStatusBadge');
+    badge.className = 'gov-pass-badge ' + badgeClass;
+    badge.textContent = badgeLabel;
+    document.getElementById('infoBuilding').textContent = info.building || '';
 
-    const idPhoto = document.getElementById('infoIdPhoto');
-    idPhoto.src = info.id_photo_url || '';
-    idPhoto.style.display = info.id_photo_url ? '' : 'none';
+    // Photos: reset any zoom, hide a missing photo, go single-column if only one exists.
+    const photos = document.getElementById('infoPhotos');
+    photos.classList.remove('is-zoomed');
+    photos.querySelectorAll('figure').forEach(f => f.classList.remove('is-zoom-target'));
+    [['infoPhoto', info.photo_url], ['infoIdPhoto', info.id_photo_url]].forEach(([id, url]) => {
+        const img = document.getElementById(id);
+        img.src = url || '';
+        img.closest('figure').style.display = url ? '' : 'none';
+    });
+    photos.style.display = (info.photo_url || info.id_photo_url) ? '' : 'none';
+    photos.classList.toggle('is-single', !info.photo_url !== !info.id_photo_url);
 
-    const rows = [
-        ['Gender', info.gender],
-        ['Contact No.', info.contact_no],
-        ['Email', info.visitor_email],
-        ['ID Type', info.id_type],
-        ['ID Number', info.id_ref],
-        ['Office to Visit', info.office_to_visit],
-        ['Contact Person', info.contact_person],
-        ['Reason', info.purpose],
-        ['Vehicle', info.vehicle],
-        ['Registered By', info.registered_by],
-        ['Pass Class', info.pass_class === 'long_term' ? 'Long-term' : 'Day'],
-        ['Issued', info.issued_at],
-        ['Expected Return', info.expected_return_date],
+    // Grouped fields. textContent, never innerHTML: names and contact persons are typed by guards.
+    const sections = [
+        ['Visitor', [['Gender', info.gender], ['Contact No.', info.contact_no], ['Email', info.visitor_email]]],
+        ['Identification', [['ID Type', info.id_type], ['ID Number', info.id_ref]]],
+        ['Visit', [['Office to Visit', info.office_to_visit], ['Contact Person', info.contact_person], ['Reason', info.purpose], ['Vehicle', info.vehicle]]],
+        ['Pass', [['Registered By', info.registered_by], ['Pass Class', info.pass_class === 'long_term' ? 'Long-term' : 'Day'], ['Issued', info.issued_at], ['Expected Return', info.expected_return_date]]],
     ];
 
-    document.getElementById('infoFieldsGrid').replaceChildren(...rows
-        .filter(([, value]) => value)
-        .map(([label, value]) => {
-            // textContent, never innerHTML: names and contact persons are typed by guards.
+    const frag = document.createDocumentFragment();
+    sections.forEach(([title, fields]) => {
+        const rows = fields.filter(([, value]) => value);
+        if (!rows.length) return;
+
+        const sec = document.createElement('section');
+        sec.className = 'bp-info-section';
+        const h = document.createElement('h4');
+        h.className = 'bp-sec-title';
+        h.textContent = title;
+        const grid = document.createElement('div');
+        grid.className = 'gov-info-modal-grid';
+
+        rows.forEach(([label, value]) => {
             const wrap = document.createElement('div');
             const l = document.createElement('span'); l.className = 'gov-meta-label'; l.textContent = label;
             const v = document.createElement('div'); v.className = 'gov-meta-value'; v.textContent = value;
             wrap.append(l, v);
-            return wrap;
-        }));
+            grid.append(wrap);
+        });
+
+        sec.append(h, grid);
+        frag.append(sec);
+    });
+    document.getElementById('infoSections').replaceChildren(frag);
+
+    const qrBtn = document.getElementById('infoViewQr');
+    qrBtn.dataset.qrUrl = info.qr_url || '';
+    qrBtn.dataset.passNumber = info.pass_number;
+    qrBtn.classList.toggle('hidden', !info.qr_url);
 
     document.getElementById('passInfoModal').classList.remove('hidden');
+    document.querySelector('#passInfoModal .bp-info-body').scrollTop = 0;
+}
+
+function toggleInfoPhotoZoom(fig) {
+    const wrap = document.getElementById('infoPhotos');
+    const zoom = !fig.classList.contains('is-zoom-target');
+    wrap.querySelectorAll('figure').forEach(f => f.classList.remove('is-zoom-target'));
+    wrap.classList.toggle('is-zoomed', zoom);
+    if (zoom) fig.classList.add('is-zoom-target');
 }
 
 function closePassInfoModal() {
     document.getElementById('passInfoModal').classList.add('hidden');
 }
+
+// ---- Pass QR overlay ----
+let qrSeq = 0;          // cancels stale loads if the overlay is closed/reopened mid-fetch
+let qrLibPromise = null;
+
+function loadQrLib() {
+    if (window.QRCode) return Promise.resolve();
+    if (!qrLibPromise) {
+        qrLibPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            s.onload = resolve;
+            s.onerror = () => { qrLibPromise = null; reject(new Error('QR library failed to load')); };
+            document.head.appendChild(s);
+        });
+    }
+    return qrLibPromise;
+}
+
+function preloadImage(src) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = img.onerror = () => resolve();
+        img.src = src;
+    });
+}
+
+function toggleQrSkeleton(on) {
+    document.getElementById('passQrSkeleton').classList.toggle('hidden', !on);
+}
+
+async function openPassQrModal(btn) {
+    const url = btn.dataset.qrUrl;
+    const number = btn.dataset.passNumber;
+    const seq = ++qrSeq;
+
+    const card = document.getElementById('passQrPrintArea');
+    const printBtn = document.getElementById('passQrPrintBtn');
+    const error = document.getElementById('passQrError');
+
+    // Reset to a clean, pending state.
+    card.classList.remove('is-ready');
+    document.getElementById('passQrCanvas').replaceChildren();
+    document.getElementById('passQrTitle').textContent = `Pass #${number}`;
+    document.getElementById('passQrEyebrow').textContent = 'Pass QR';
+    document.getElementById('passQrNumber').textContent = number;
+    document.getElementById('passQrStage').classList.remove('hidden');
+    error.classList.add('hidden');
+    printBtn.disabled = true;
+    toggleQrSkeleton(false);
+    document.getElementById('passQrModal').classList.remove('hidden');
+
+    // Only show the skeleton if loading is actually slow (150 ms), to avoid flicker.
+    const timer = setTimeout(() => toggleQrSkeleton(true), 150);
+    try {
+        const [data] = await Promise.all([
+            fetch(url, { headers: { 'Accept': 'application/json' } }).then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            }),
+            loadQrLib(),
+        ]);
+        if (seq !== qrSeq) return;
+        await preloadImage(data.template);
+        if (seq !== qrSeq) return;
+
+        card.style.backgroundImage = `url("${data.template}")`;
+        new QRCode(document.getElementById('passQrCanvas'), {
+            text: data.qr_token,
+            width: 140, height: 140,
+            colorDark: data.qr_color,
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H,
+        });
+        document.getElementById('passQrEyebrow').textContent = `Pass QR · ${data.building}`;
+        card.classList.add('is-ready');
+        printBtn.disabled = false;
+    } catch (e) {
+        if (seq === qrSeq) {
+            document.getElementById('passQrStage').classList.add('hidden');
+            error.textContent = "Couldn't load this QR code. Check your connection and try again.";
+            error.classList.remove('hidden');
+        }
+    } finally {
+        clearTimeout(timer);
+        if (seq === qrSeq) toggleQrSkeleton(false);
+    }
+}
+
+function closePassQrModal() {
+    qrSeq++;
+    document.getElementById('passQrModal').classList.add('hidden');
+}
+
+function printPassQr() {
+    document.body.classList.add('qr-printing');
+    window.addEventListener('afterprint', () => document.body.classList.remove('qr-printing'), { once: true });
+    window.print();
+}
+// ---- End Pass QR overlay ----
 
 function filterModalPasses(status) {
     currentModalFilter = status;
@@ -314,21 +501,43 @@ function applyModalFilters() {
     const visibleGroup = document.querySelector('[id^="buildingPassGroup-"]:not(.hidden)');
     if (!visibleGroup) return;
 
-    const query = document.getElementById('buildingModalSearch').value.trim().toLowerCase();
-    let anyVisible = false;
+    const searchInput = document.getElementById('buildingModalSearch');
+    const query = searchInput.value.trim().toLowerCase();
+    document.getElementById('buildingModalSearchClear').classList.toggle('hidden', !searchInput.value);
 
-    visibleGroup.querySelectorAll('.gov-pass-card').forEach(row => {
-        const matchesStatus = currentModalFilter === 'all' || (currentModalFilter === 'inactive' ? ['expired', 'revoked'].includes(row.dataset.status) : row.dataset.status === currentModalFilter);
+    const rows = visibleGroup.querySelectorAll('.gov-pass-card');
+    const counts = { all: rows.length, available: 0, active: 0, inactive: 0 };
+    let shown = 0;
+
+    rows.forEach(row => {
+        const status = row.dataset.status;
+        if (status === 'available') counts.available++;
+        else if (status === 'active') counts.active++;
+        else if (status === 'expired' || status === 'revoked') counts.inactive++;
+
+        const matchesStatus = currentModalFilter === 'all' || (currentModalFilter === 'inactive' ? ['expired', 'revoked'].includes(status) : status === currentModalFilter);
         const matchesSearch = !query || (row.dataset.search || '').includes(query);
         const show = matchesStatus && matchesSearch;
         row.style.display = show ? '' : 'none';
-        if (show) anyVisible = true;
+        if (show) shown++;
     });
+
+    document.querySelectorAll('#buildingPassesModal [data-count]').forEach(el => {
+        el.textContent = counts[el.dataset.count] ?? 0;
+    });
+    document.getElementById('buildingModalShowing').textContent = rows.length ? `Showing ${shown} of ${rows.length}` : '';
 
     const emptyState = visibleGroup.querySelector('.gov-pass-row-empty');
     if (emptyState) {
-        emptyState.classList.toggle('hidden', anyVisible || visibleGroup.querySelectorAll('.gov-pass-card').length === 0);
+        emptyState.classList.toggle('hidden', shown > 0 || rows.length === 0);
     }
+}
+
+function clearModalSearch() {
+    const input = document.getElementById('buildingModalSearch');
+    input.value = '';
+    applyModalFilters();
+    input.focus();
 }
 // ---- End Tab 2 ----
 </script>

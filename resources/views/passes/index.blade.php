@@ -34,6 +34,7 @@
 
                 <footer class="reg-modal-footer">
                     <button type="button" class="reg-button" onclick="closeRegisterModal()">Cancel</button>
+                    <span id="registerHint" class="reg-footer-hint" aria-live="polite"></span>
                     <button type="submit" id="registerSubmitBtn" class="reg-button reg-button-green">Admit and
                         Auto-assign</button>
                 </footer>
@@ -593,6 +594,19 @@
             return true;
         }
 
+        // Which required pieces are still missing (mirrors formReady) — shown beside the Admit button.
+        function missingFields() {
+            const f = document.getElementById('registerForm');
+            const v = (n) => (f.elements[n]?.value || '').trim();
+            const out = [];
+            if (checkedBuildingIds().length === 0) out.push('building');
+            if (selectedCong.size === 0 && !v('office_other')) out.push('congressman or “Other”');
+            if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) out.push('reason');
+            if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) out.push('return date');
+            if (!v('registered_by')) out.push('registered by');
+            return out;
+        }
+
         // Single owner of the Admit button's state: required fields AND duplicate warning.
         function refreshSubmitState() {
             const btn = document.getElementById('registerSubmitBtn');
@@ -600,7 +614,20 @@
             btn.disabled = blocked || !formReady();
             btn.style.opacity = btn.disabled ? '0.5' : '1';
             btn.classList.toggle('is-dup-blocked', blocked);
+
+            const hint = document.getElementById('registerHint');
+            if (hint) {
+                const missing = btn.disabled && !blocked ? missingFields() : [];
+                hint.textContent = blocked
+                    ? 'Resolve the duplicate-pass warning above to continue.'
+                    : (missing.length ? 'Still needed: ' + missing.join(', ') : '');
+            }
         }
+
+        // Show the hint as soon as the modal opens (the form is empty at that point).
+        new MutationObserver(() => {
+            if (!document.getElementById('registerModal').classList.contains('hidden')) refreshSubmitState();
+        }).observe(document.getElementById('registerModal'), { attributes: true, attributeFilter: ['class'] });
 
         function updateDupSubmitState() {
             refreshSubmitState();

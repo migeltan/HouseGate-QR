@@ -428,6 +428,17 @@ class PassController extends Controller
     {
         $this->authorizeGuardScope($request, $pass);
         $pass->load(['building', 'buildings']);
+        // The View QR overlay fetches this JSON; the full page below stays as a fallback.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'pass_number' => $pass->pass_number,
+                'qr_token'    => $pass->qr_token,
+                'building'    => $pass->building->name,
+                'template'    => asset($pass->building->template_image),
+                'qr_color'    => $pass->building->qr_color_hex ?: '#000000',
+            ]);
+        }
+
         return view('passes.show', compact('pass'));
     }
 

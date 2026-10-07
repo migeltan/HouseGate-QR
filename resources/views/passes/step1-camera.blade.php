@@ -28,6 +28,7 @@
                     onclick="capturePhoto()">Capture</button>
                 <button type="button" id="retakeBtn" class="reg-button hidden" onclick="retakePhoto()">Retake</button>
             </div>
+            <p class="reg-camera-help reg-camera-note">Center the visitor's face in the frame.</p>
         </div>
 
         <div class="reg-camera-col">

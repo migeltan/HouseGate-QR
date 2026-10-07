@@ -222,6 +222,7 @@
 
         {{-- Manual identity fields (hidden while Transfer Mode is on) --}}
         <div class="reg-identity-fields-wrap" id="manualIdentityFields">
+            <p class="reg-subhead">Name</p>
             <div class="reg-field">
                 <label class="optional">{{ 'First Name' }}</label>
                 <input type="text" name="first_name">
@@ -235,6 +236,7 @@
                 <input type="text" name="last_name">
             </div>
 
+            <p class="reg-subhead">Personal &amp; contact</p>
             <div class="reg-field">
                 <label class="optional">{{ 'Gender / Sex' }}</label>
                 <select name="gender">
@@ -253,6 +255,7 @@
                 <input type="email" name="visitor_email" placeholder="{{ 'For check-out / expiry reminders' }}">
             </div>
 
+            <p class="reg-subhead">ID &amp; vehicle</p>
             <div class="reg-field">
                 <label class="optional">{{ 'Government ID Type' }}</label>
                 <select name="id_type">

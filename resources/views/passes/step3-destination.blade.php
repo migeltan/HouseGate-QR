@@ -37,7 +37,7 @@
         <div class="reg-field full reg-pair-row">
             <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen
                     from the selected building(s) are listed)</span></label>
-            <label class="optional">Other <span class="optional">(Not visiting a congressman)</span></label>
+            <label class="optional">Or: Other <span class="optional">(not visiting a congressman)</span></label>
 
             <div id="congressmanField">
                 <div class="cong-picker" id="congPicker">
@@ -50,6 +50,7 @@
             </div>
             <input type="text" name="office_other" id="officeOther" maxlength="255" required
                 placeholder="e.g. HR Office, Secretariat">
+            <p class="reg-field-note">Select at least one congressman, or fill in “Other”.</p>
         </div>
 
         <div class="reg-field half">
@@ -78,7 +79,7 @@
 
         <div class="reg-field full">
             <label>Pass duration <span class="reg-required">*</span></label>
-            <div style="display:flex; gap:8px;">
+            <div class="reg-seg">
                 <label class="pass-type-option" style="flex:1;">
                     <input type="radio" name="pass_class" value="day" checked onchange="setPassClass('day')"
                         class="sr-only">

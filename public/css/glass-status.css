@@ -1417,3 +1417,874 @@ select.gov-location-badge option {
         animation: none;
     }
 }
+/* ---------- Building passes modal restyle ---------- */
+.bp-header-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--brand-blue);
+    border-radius: 0.85rem;
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.95),
+        rgba(214, 228, 248, 0.65)
+    );
+    border: 1px solid rgba(35, 90, 166, 0.16);
+    box-shadow:
+        0 4px 12px rgba(35, 90, 166, 0.16),
+        inset 0 1px 0 #fff,
+        inset 0 -1px 0 rgba(35, 90, 166, 0.12);
+}
+.bp-eyebrow {
+    display: block;
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    opacity: 0.9;
+    margin-bottom: 3px;
+}
+.bp-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.bp-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex: 0 0 auto;
+    border-radius: 9999px;
+    box-shadow:
+        0 0 0 3px rgba(15, 23, 42, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* Filter pills + counts */
+.modal-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.35rem 0.3rem 0.9rem;
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+}
+.modal-filter-pill.is-active {
+    background: linear-gradient(180deg, #3b82d6, var(--brand-blue));
+    color: #fff;
+    box-shadow:
+        0 4px 10px rgba(35, 90, 166, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.bp-count {
+    min-width: 1.5rem;
+    padding: 0 0.4rem;
+    line-height: 1.25rem;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-align: center;
+}
+.modal-filter-pill.is-active .bp-count {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+/* Search + showing line */
+.bp-showing {
+    font:
+        600 12px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+.gov-modal-search input {
+    padding-right: 2rem;
+}
+.bp-search-clear {
+    position: absolute;
+    right: 0.4rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.bp-search-clear:hover {
+    background: #e2e8f0;
+}
+.bp-search-clear.hidden {
+    display: none;
+}
+
+/* Rows: status accent stripe */
+.gov-pass-card {
+    position: relative;
+    overflow: hidden;
+    transition:
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s;
+}
+.gov-pass-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #cbd5e1;
+}
+.gov-pass-card[data-status="available"]::before {
+    background: var(--brand-blue);
+}
+.gov-pass-card[data-status="active"]::before {
+    background: #1c9a5b;
+}
+.gov-pass-card[data-status="expired"]::before {
+    background: #e0a400;
+}
+.gov-pass-card[data-status="revoked"]::before {
+    background: var(--brand-red);
+}
+.gov-pass-card:hover {
+    background: #fff;
+    border-color: #cfd9e6;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+}
+.gov-pass-card-number {
+    min-width: 3.25rem;
+}
+
+/* Badges: same soft style for every status, with a dot */
+.gov-pass-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.78rem;
+}
+.gov-pass-badge::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 9999px;
+    background: currentColor;
+}
+.gov-pass-badge.is-expired {
+    background: #fff6d6;
+    color: #8a6200;
+}
+.gov-pass-badge.is-revoked {
+    background: #fdecec;
+    color: #b42318;
+}
+
+/* Actions: one row, tinted Unassign / Revoke */
+.gov-pass-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+}
+.gov-pass-card-actions form {
+    margin: 0;
+}
+.gov-pass-row-btn.is-warn {
+    background: #fff4dc;
+    color: #8a5a00;
+}
+.gov-pass-row-btn.is-danger {
+    background: #fdecec;
+    color: #b42318;
+}
+@media (max-width: 720px) {
+    .gov-pass-card-actions {
+        justify-content: flex-start;
+    }
+    .gov-pass-card-actions > * {
+        flex: 1 1 calc(50% - 0.4rem);
+    }
+    .gov-pass-card-actions .gov-pass-row-btn {
+        width: 100%;
+    }
+}
+/* ---------- Pass Info + Pass QR modals ---------- */
+#passQrModal {
+    z-index: 60;
+}
+.bp-modal-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 92dvh;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(16, 24, 40, 0.25);
+}
+.bp-info-panel {
+    max-width: 600px;
+}
+.bp-qr-panel {
+    max-width: 380px;
+}
+.bp-modal-head {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+}
+.bp-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem;
+}
+.bp-modal-foot {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.85rem 1.5rem;
+    border-top: 1px solid var(--line);
+    background: #f8fafc;
+}
+.bp-qr-panel .bp-modal-foot > * {
+    flex: 1;
+    justify-content: center;
+}
+.bp-modal-foot button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* View Info */
+.bp-info-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+.bp-info-building {
+    font:
+        600 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+.bp-info-photos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.bp-info-photos.is-single,
+.bp-info-photos.is-zoomed {
+    grid-template-columns: 1fr;
+}
+.bp-photo-fig {
+    margin: 0;
+    cursor: zoom-in;
+}
+.bp-info-photos .gov-info-photo {
+    aspect-ratio: 4 / 3;
+    margin-top: 0.3rem;
+    max-width: none;
+}
+.bp-info-photos.is-zoomed .bp-photo-fig:not(.is-zoom-target) {
+    display: none;
+}
+.bp-info-photos.is-zoomed .bp-photo-fig {
+    cursor: zoom-out;
+}
+.bp-info-photos.is-zoomed .gov-info-photo {
+    object-fit: contain;
+    background: #f1f5f9;
+}
+.bp-info-section + .bp-info-section {
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--line);
+}
+.bp-sec-title {
+    margin: 0 0 0.6rem;
+    font:
+        700 0.7rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
+.bp-info-section .gov-meta-label,
+.bp-info-section .gov-meta-value {
+    overflow-wrap: anywhere;
+}
+#infoViewQr.hidden {
+    display: none;
+}
+
+/* View QR */
+.bp-qr-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f1f5f9;
+}
+.bp-qr-stage {
+    position: relative;
+    width: 300px;
+    height: 500px;
+    flex: 0 0 auto;
+}
+.bp-qr-stage.hidden {
+    display: none;
+}
+.bp-qr-card {
+    position: relative;
+    width: 300px;
+    height: 500px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background-color: #e2e8f0;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 10px 30px rgba(16, 24, 40, 0.18);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+.bp-qr-card.is-ready {
+    opacity: 1;
+}
+.bp-qr-box {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 6px;
+    border-radius: 8px;
+}
+.bp-qr-num {
+    position: absolute;
+    left: 50%;
+    top: 80%;
+    transform: translateX(-50%);
+    color: #fff;
+    font:
+        900 2.5rem ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.bp-qr-skeleton {
+    position: absolute;
+    inset: 0;
+    border-radius: 0.75rem;
+}
+.bp-qr-skeleton.hidden {
+    display: none;
+}
+.bp-qr-error {
+    margin: 0.75rem 0;
+    font:
+        600 0.85rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #b42318;
+    text-align: center;
+}
+.bp-qr-error.hidden {
+    display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .bp-qr-card {
+        transition: none;
+    }
+}
+
+/* Print only the card from the QR overlay */
+@media print {
+    body.qr-printing * {
+        visibility: hidden !important;
+    }
+    body.qr-printing #passQrPrintArea,
+    body.qr-printing #passQrPrintArea * {
+        visibility: visible !important;
+    }
+    body.qr-printing #passQrPrintArea {
+        position: fixed;
+        left: 0;
+        top: 0;
+        border-radius: 0;
+        box-shadow: none;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    body.qr-printing #passQrModal {
+        background: none !important;
+        backdrop-filter: none !important;
+    }
+}
+
+/* ---------- Register Visitor modal: beautify (width, shell, steps, camera, form, footer) ---------- */
+
+/* Shell: wider, header + footer fixed, only the body scrolls */
+.reg-modal {
+    width: min(1120px, 96vw);
+    max-height: calc(100dvh - 48px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.reg-modal > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.reg-modal-header {
+    position: static;
+    flex: 0 0 auto;
+}
+.reg-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: start;
+    gap: 20px;
+    padding: 24px 28px;
+    background: #f4f7fb;
+}
+.reg-modal-footer {
+    position: static;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 28px;
+    background: #fff;
+    border-top: 1px solid #dbe3ee;
+}
+.reg-footer-hint {
+    flex: 1 1 auto;
+    text-align: right;
+    font:
+        600 0.82rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+.reg-footer-hint:empty {
+    display: none;
+}
+@media (max-width: 640px) {
+    .reg-modal {
+        width: 100%;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+    .reg-modal-body {
+        padding: 16px 18px;
+    }
+    .reg-modal-footer {
+        flex-wrap: wrap;
+        padding: 12px 18px;
+    }
+    .reg-footer-hint {
+        order: -1;
+        flex: 1 0 100%;
+        text-align: left;
+    }
+}
+
+/* Step cards + headings match the modal title */
+.reg-step-card {
+    padding: 24px 26px;
+    background: #fff;
+    border: 1px solid #dbe3ee;
+    border-radius: 18px;
+    box-shadow: 0 6px 24px rgba(16, 24, 40, 0.05);
+}
+.reg-step-card-emphasis {
+    background: linear-gradient(180deg, #f7fbff, #f0f6fd);
+    border-color: #d3e2f5;
+}
+.reg-step-heading {
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.reg-step-heading .step-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    flex: 0 0 auto;
+    font-size: 1.1rem;
+    color: var(--brand-blue);
+    border-radius: 0.85rem;
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.95),
+        rgba(214, 228, 248, 0.65)
+    );
+    border: 1px solid rgba(35, 90, 166, 0.16);
+    box-shadow:
+        0 4px 12px rgba(35, 90, 166, 0.16),
+        inset 0 1px 0 #fff,
+        inset 0 -1px 0 rgba(35, 90, 166, 0.12);
+}
+.reg-step-label {
+    font:
+        600 0.75rem/1.2 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+}
+.reg-step-heading h2 {
+    margin-top: 3px;
+    font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+    font-size: 20px;
+    line-height: 24px;
+}
+
+/* Buttons: glass pills */
+.reg-modal .reg-button {
+    min-height: 44px;
+    padding: 10px 20px;
+    font:
+        700 14px/1 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    border-radius: 9999px;
+    color: #1e3a8a;
+    background: linear-gradient(180deg, #fff, #eef3fa);
+    border: 1px solid rgba(35, 90, 166, 0.28);
+    box-shadow:
+        0 2px 8px rgba(16, 24, 40, 0.06),
+        inset 0 1px 0 #fff;
+    transition:
+        transform 0.15s,
+        box-shadow 0.15s,
+        filter 0.15s;
+}
+.reg-modal .reg-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+        0 6px 14px rgba(35, 90, 166, 0.16),
+        inset 0 1px 0 #fff;
+}
+.reg-modal .reg-button-blue {
+    color: #fff;
+    background: var(--glass-blue);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow:
+        0 4px 12px rgba(36, 91, 166, 0.25),
+        var(--glass-edge);
+}
+.reg-modal .reg-button-green {
+    color: #fff;
+    background: linear-gradient(180deg, #34c38a, #059669);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow:
+        0 4px 12px rgba(5, 150, 105, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.reg-modal .reg-button:disabled {
+    cursor: not-allowed;
+    transform: none;
+    filter: saturate(0.7);
+}
+
+/* Camera step */
+.reg-camera-grid {
+    gap: 20px;
+}
+.reg-camera-col {
+    gap: 10px;
+}
+.reg-camera-col > .reg-camera-help:first-child {
+    margin: 0;
+    font:
+        700 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink);
+}
+.reg-camera-preview {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    min-height: 0;
+    max-height: 300px;
+    border-radius: 16px;
+    background: radial-gradient(120% 120% at 50% 0%, #1d2c44 0%, #0b1220 70%);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        0 6px 18px rgba(11, 18, 32, 0.25);
+    color: rgba(255, 255, 255, 0.78);
+    text-align: center;
+}
+.reg-camera-preview video,
+.reg-camera-preview img {
+    border-radius: 16px;
+}
+.reg-focus-corner {
+    border-color: rgba(255, 255, 255, 0.4);
+}
+#photoPlaceholderText,
+#idPhotoPlaceholderText {
+    padding: 0 1.5rem;
+    font:
+        600 0.9rem/1.35 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+#photoPlaceholderText::before,
+#idPhotoPlaceholderText::before {
+    display: block;
+    margin-bottom: 0.55rem;
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 1.7rem;
+    opacity: 0.8;
+}
+#photoPlaceholderText::before {
+    content: "\f030";
+}
+#idPhotoPlaceholderText::before {
+    content: "\f2c2";
+}
+
+/* State pill: Waiting / Live / Captured (pure CSS, follows the existing hidden classes) */
+.reg-camera-preview::after {
+    content: "Waiting";
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    font:
+        700 0.68rem/1.4 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+}
+.reg-camera-preview:has(video:not(.hidden))::after {
+    content: "● Live";
+    color: #fff;
+    background: rgba(241, 57, 72, 0.75);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+.reg-camera-preview:has(img:not(.hidden))::after {
+    content: "✓ Captured";
+    color: #fff;
+    background: rgba(28, 154, 91, 0.8);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Status / hint chips under both cameras (same height so the columns line up) */
+.reg-camera-note,
+#idCaptureStatus {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.4rem;
+    margin: 0;
+    padding: 0.55rem 0.8rem;
+    border-radius: 10px;
+    background: #f1f5f9;
+    font:
+        600 0.8rem/1.3 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+
+/* Form: sub-headings, inputs, focus ring */
+.reg-subhead {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 4px 0 -4px;
+    font:
+        700 0.7rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
+.reg-subhead::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e2e8f0;
+}
+.reg-subhead:first-child {
+    margin-top: 0;
+}
+.reg-form-grid
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(
+        .reg-dup-transfer-input
+    ),
+.reg-form-grid select {
+    height: 44px;
+    border: 1px solid #cfd8e3;
+    border-radius: 10px;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+.reg-form-grid
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(
+        .reg-dup-transfer-input
+    ):focus,
+.reg-form-grid select:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(36, 91, 166, 0.15);
+}
+.reg-form-grid input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+.reg-field-note {
+    grid-column: 1 / -1;
+    margin: 2px 0 0;
+    font:
+        600 0.78rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+
+/* Step 3: building tiles */
+.reg-building-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+.reg-building-option {
+    grid-template-columns: 18px 12px minmax(0, 1fr) auto;
+    column-gap: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    border: 1px solid #d5deea;
+    border-radius: 12px;
+    transition:
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s;
+}
+.reg-building-option:hover {
+    border-color: #9db9de;
+    box-shadow: 0 4px 12px rgba(35, 90, 166, 0.08);
+}
+.reg-building-dot {
+    width: 12px;
+    height: 12px;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.06);
+}
+.reg-building-option::after {
+    content: "\f00c";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 0.75rem;
+    color: var(--brand-blue);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.reg-building-option:has(input:checked) {
+    background: #eef4fc;
+    border-color: var(--brand-blue);
+    box-shadow:
+        0 0 0 1px var(--brand-blue),
+        0 4px 12px rgba(35, 90, 166, 0.12);
+}
+.reg-building-option:has(input:checked)::after {
+    opacity: 1;
+}
+@media (max-width: 900px) {
+    .reg-building-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 640px) {
+    .reg-building-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Step 3: pass duration segmented control */
+.reg-seg {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 9999px;
+    background: #eef2f7;
+    box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.reg-seg .pass-type-option {
+    flex: 1;
+}
+.reg-seg .pass-type-btn {
+    padding: 0.6rem 0.5rem;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: #475569;
+    font:
+        700 0.9rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.reg-seg .pass-type-btn:hover:not(.is-active) {
+    background: rgba(255, 255, 255, 0.7);
+}
+.reg-seg .pass-type-btn.is-active {
+    background: var(--glass-blue);
+    color: #fff;
+    box-shadow:
+        0 4px 10px rgba(36, 91, 166, 0.25),
+        var(--glass-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reg-modal .reg-button,
+    .reg-building-option,
+    .reg-building-option::after,
+    .reg-form-grid input,
+    .reg-form-grid select {
+        transition: none;
+    }
+}
