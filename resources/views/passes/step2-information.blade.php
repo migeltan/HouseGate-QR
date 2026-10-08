@@ -202,7 +202,7 @@
 
                 </label>
                 <button type="button" class="reg-button reg-dup-transfer-clear reg-transfer-clear hidden"
-                    id="transferModeClearBtn" onclick="clearTransferModeScan()">{{ 'Clear' }}</button>
+id="transferModeClearBtn" onclick="clearTransferModeScan()">{{ 'Change card' }}</button>
             </div>
 
             <div class="reg-dup-transfer-scan hidden" id="transferModeScanArea">
@@ -215,8 +215,16 @@
             <p class="reg-dup-transfer-status" id="transferModeStatus"></p>
 
             <div class="reg-transfer-summary hidden" id="transferModeSummary">
-                <span class="reg-transfer-summary-label">{{ 'Transferring' }}</span>
-                <span id="transferModeSummaryText"></span>
+                <div class="reg-transfer-card">
+                    <span class="reg-transfer-passno">#<span id="tmPassNo"></span></span>
+                    <div class="reg-transfer-who">
+                        <strong id="tmHolder"></strong>
+                        <span id="tmFrom"></span>
+                    </div>
+                    <span class="reg-transfer-verified"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                </div>
+                <dl class="reg-transfer-details hidden" id="tmDetails"></dl>
+                <p class="reg-transfer-copied">These details are copied from the old card and can't be edited here.</p>
             </div>
         </div>
 

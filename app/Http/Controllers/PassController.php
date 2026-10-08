@@ -97,28 +97,48 @@ class PassController extends Controller
                 // Workflow 1: refuse a second pass for someone who already holds an active one.
         // This is the real enforcement; the Step 2 warning is only a convenience.
         $data['transfer_from_pass_id'] = null;
-        if ($dup = $this->findActiveDuplicate(
+        $token = trim((string) $request->input('transfer_qr_token'));
+
+        if ($token !== '') {
+            // Workflow 2: the guard scanned the visitor's old card. Resolve it straight from its QR
+            // token instead of relying on the fuzzy name/ID match, which misses passes with blank
+            // details and day passes from an earlier day (the card used to be ignored silently,
+            // leaving the visitor holding two passes).
+            $old = VisitorPass::where('qr_token', $token)->where('status', 'active')->first();
+            if (! $old) {
+                return back()->withErrors(
+                    'That card is not an active pass, so it cannot be transferred. Scan the old card again.'
+                )->withInput();
+            }
+
+            // Safety: the card must belong to the person being registered. Either the duplicate check
+            // lands on this exact pass, or the submitted identity equals the card's (Transfer Mode copies it).
+            $dup = $this->findActiveDuplicate(
+                $data['id_type'] ?? null, $data['id_ref'] ?? null,
+                $data['first_name'] ?? null, $data['last_name'] ?? null, $data['contact_no'] ?? null
+            );
+            $isSamePass = $dup && (int) $dup['pass']['id'] === (int) $old->id;
+            if (! $isSamePass && ! $this->sameIdentity($old, $data)) {
+                return back()->withErrors(
+                    "That card (#{$old->pass_number}, held by {$old->visitor_name}) does not belong to this visitor. Scan the right card, or cancel the transfer."
+                )->withInput();
+            }
+
+            $data['transfer_from_pass_id'] = $old->id;
+        } elseif ($dup = $this->findActiveDuplicate(
             $data['id_type'] ?? null, $data['id_ref'] ?? null,
             $data['first_name'] ?? null, $data['last_name'] ?? null, $data['contact_no'] ?? null
         )) {
+            // Workflow 1: refuse a second pass for someone who already holds an active one.
             $p = $dup['pass'];
-            $token = trim((string) $request->input('transfer_qr_token'));
 
-            if ($token !== '') {
-                // Workflow 2: the guard is holding the old card. Its QR token must belong to
-                // the exact pass this person matched, otherwise nothing gets closed.
-                $old = VisitorPass::where('qr_token', $token)->first();
-                if (! $old || (int) $old->id !== (int) $p['id']) {
-                    return back()->withErrors(
-                        "That card is not the active pass for this visitor (found #{$p['pass_number']}, {$p['buildings']}). Scan the old card again."
-                    )->withInput();
-                }
-                $data['transfer_from_pass_id'] = $old->id;
-            } elseif ($dup['level'] === 'exact') {
+            if ($dup['level'] === 'exact') {
                 return back()->withErrors(
                     "This ID already has an active pass (#{$p['pass_number']}, {$p['buildings']}). A new pass cannot be issued."
                 )->withInput();
-            } elseif (! $request->boolean('confirm_different_person')) {
+            }
+
+            if (! $request->boolean('confirm_different_person')) {
                 return back()->withErrors(
                     "Possible match: {$p['holder']} already has active pass #{$p['pass_number']} ({$p['buildings']}). Confirm this is a different person to continue."
                 )->withInput();
@@ -174,6 +194,37 @@ class PassController extends Controller
      * deliberately NOT scoped to the guard's building, and returns only the
      * fields the warning needs.
      */
+        // True when the submitted visitor identity equals the one stored on the old pass.
+    // Same normalisation as findActiveDuplicate(); blank-vs-blank counts as equal, so a card
+    // with no recorded details can still be transferred in Transfer Mode.
+    private function sameIdentity(VisitorPass $old, array $data): bool
+    {
+        $name = fn ($v) => mb_strtolower(preg_replace('/[^\p{L}]/u', '', (string) $v));
+        $idKey = fn ($v) => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $v));
+        $phone = fn ($v) => substr(preg_replace('/\D/', '', (string) $v), -10);
+
+        return $name($old->first_name) === $name($data['first_name'] ?? null)
+            && $name($old->last_name) === $name($data['last_name'] ?? null)
+            && strtolower(trim((string) $old->id_type)) === strtolower(trim((string) ($data['id_type'] ?? '')))
+            && $idKey($old->id_ref) === $idKey($data['id_ref'] ?? null)
+            && $phone($old->contact_no) === $phone($data['contact_no'] ?? null);
+    }
+
+    // Flash message after a registration; transfers say which card was returned.
+    private function registrationMessage(VisitorPass $pass, ?array $transferred, string $where, bool $multi = false): string
+    {
+        $holder = $pass->visitor_name;
+
+        if ($transferred) {
+            return "Transferred: Pass #{$transferred['pass_number']} ({$transferred['building']}) was returned. "
+                . "New Pass #{$pass->pass_number} issued to {$holder} for {$where}.";
+        }
+
+        return $multi
+            ? "North Gate Access pass #{$pass->pass_number} issued to {$holder} for {$where}."
+            : "Pass #{$pass->pass_number} assigned to {$holder} ({$where}).";
+    }
+
     public function checkDuplicate(Request $request)
     {
         $match = $this->findActiveDuplicate(
@@ -224,6 +275,7 @@ class PassController extends Controller
                 'pass_number'   => $pass->pass_number,
                 'holder'        => trim(collect([$pass->first_name, $pass->middle_name, $pass->last_name])->filter()->join(' ')),
                 'building'      => $building,
+                'building_ids'  => $pass->is_multi_building ? $pass->buildings->pluck('id')->all() : [$pass->building_id],
                 'first_name'    => $pass->first_name,
                 'middle_name'   => $pass->middle_name,
                 'last_name'     => $pass->last_name,
@@ -267,7 +319,7 @@ class PassController extends Controller
         // date guards cover a nightly sweep that hasn't run yet, so a stale pass
         // can never block a returning visitor. System-wide: no building filter.
         $today = now()->startOfDay();
-        $candidates = VisitorPass::with(['building', 'buildings', 'currentBuilding'])
+        $candidates = VisitorPass::query()
             ->where('status', 'active')
             ->where(function ($q) use ($today) {
                 $q->where(fn ($d) => $d->where('pass_class', 'day')->where('issued_at', '>=', $today))
@@ -298,6 +350,7 @@ class PassController extends Controller
         // An exact match always outranks a possible one when choosing which pass to show.
         usort($matches, fn ($a, $b) => ($a[0] === 'exact' ? 0 : 1) <=> ($b[0] === 'exact' ? 0 : 1));
         [$level, $pass] = $matches[0];
+        $pass->loadMissing(['building', 'buildings', 'currentBuilding']);
 
         return [
             'level' => $level,
@@ -329,10 +382,10 @@ class PassController extends Controller
             return back()->withErrors('No available passes left for that building. Please choose another building.')->withInput();
         }
 
-        DB::transaction(fn () => $this->assignVisitorToPass($pass, $data, $request));
+        $transferred = DB::transaction(fn () => $this->assignVisitorToPass($pass, $data, $request));
 
-                return redirect()->route('passes.index')
-            ->with('success', "Pass #{$pass->pass_number} assigned to {$pass->visitor_name} ({$pass->building->name}).")
+        return redirect()->route('passes.index')
+            ->with('success', $this->registrationMessage($pass, $transferred, $pass->building->name))
             ->with('success_pass_number', $pass->pass_number);
     }
 
@@ -371,14 +424,17 @@ class PassController extends Controller
             ]);
         }
 
-           DB::transaction(function () use ($pass, $data, $request) {
-               $this->assignVisitorToPass($pass, $data, $request);
-               $pass->buildings()->sync($data['building_ids']);
-           });
+        $transferred = DB::transaction(function () use ($pass, $data, $request) {
+            $transferred = $this->assignVisitorToPass($pass, $data, $request);
+            $pass->buildings()->sync($data['building_ids']);
+
+            return $transferred;
+        });
 
         $buildingCount = count($data['building_ids']);
+
         return redirect()->route('passes.index')
-            ->with('success', "North Gate Access pass #{$pass->pass_number} issued to {$pass->visitor_name} for {$buildingCount} buildings.")
+            ->with('success', $this->registrationMessage($pass, $transferred, "{$buildingCount} buildings", true))
             ->with('success_pass_number', $pass->pass_number);
     }
 
@@ -547,7 +603,7 @@ class PassController extends Controller
         abort_unless((int) $pass->building_id === (int) session('assigned_building_id'), 403);
     }
 
-       private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): void
+private function assignVisitorToPass(VisitorPass $pass, array $data, Request $request): ?array
     {
         $idPhotoPath = $this->storeIdPhoto($request) ?? $pass->id_photo_path;
 
@@ -630,9 +686,18 @@ class PassController extends Controller
 
         // Close out the old card now that the new one is issued — otherwise
         // it stays active and the visitor ends up holding two passes at once.
+        $transferred = null;
         if ($oldPass && $oldRegistration) {
+            $transferred = [
+                'pass_number' => $oldPass->pass_number,
+                'building' => $oldPass->is_multi_building
+                    ? 'North Gate Access'
+                    : optional($oldPass->building)->name,
+            ];
             $this->closeForTransfer($oldPass, $oldRegistration);
         }
+
+        return $transferred;
 }
     /**
      * One-line "who they're visiting" text kept in office_to_visit so the info

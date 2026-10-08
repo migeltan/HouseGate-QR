@@ -41,9 +41,11 @@
 
             <div id="congressmanField">
                 <div class="cong-picker" id="congPicker">
-                    <div class="cong-chips" id="congChips"></div>
-                    <input type="text" id="congSearch" autocomplete="off" disabled
-                        placeholder="Select a building first…">
+                    <div class="cong-box" id="congBox">
+                        <div class="cong-chips" id="congChips"></div>
+                        <input type="text" id="congSearch" autocomplete="off" disabled
+                            placeholder="Select a building first…">
+                    </div>
                     <div class="cong-list" id="congList"></div>
                 </div>
                 <div id="congHiddenInputs"></div>

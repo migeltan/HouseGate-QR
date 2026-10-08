@@ -2288,3 +2288,342 @@ select.gov-location-badge option {
         transition: none;
     }
 }
+/* ---------- Transfer UX, congressman picker, submit lock ---------- */
+
+/* Transfer banner (under the modal header, visible on every step) */
+.reg-transfer-banner {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 28px;
+    background: linear-gradient(180deg, #eef5ff, #e6f0fd);
+    border-bottom: 1px solid #c9dcf5;
+    color: #1e3a8a;
+}
+.reg-transfer-banner.hidden {
+    display: none;
+}
+.reg-transfer-banner-icon {
+    width: 2.2rem;
+    height: 2.2rem;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 0.7rem;
+    background: #fff;
+    color: var(--brand-blue);
+    box-shadow: 0 2px 8px rgba(35, 90, 166, 0.18);
+}
+.reg-transfer-banner-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font:
+        600 0.82rem/1.3 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.reg-transfer-banner-text strong {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+.reg-transfer-banner.is-verified {
+    background: linear-gradient(180deg, #effaf4, #e5f6ee);
+    border-bottom-color: #bfe5d0;
+    color: #14532d;
+}
+.reg-transfer-banner.is-verified .reg-transfer-banner-icon {
+    color: #1c9a5b;
+}
+.reg-transfer-banner-cancel {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    border-radius: 9999px;
+    background: #fff;
+    color: #334155;
+    font:
+        700 0.78rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.reg-transfer-banner-cancel:hover {
+    background: #f1f5f9;
+}
+@media (max-width: 640px) {
+    .reg-transfer-banner {
+        padding: 10px 18px;
+        flex-wrap: wrap;
+    }
+}
+
+/* Step 2: verified old-card summary replaces the scan UI */
+.reg-transfer-summary {
+    display: block;
+    margin-top: 12px;
+    padding: 16px 18px;
+    background: #fff;
+    border: 1px solid #bfe5d0;
+    border-left: 4px solid #1c9a5b;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(28, 154, 91, 0.08);
+    font-size: inherit;
+    color: var(--ink);
+}
+.reg-transfer-summary.hidden {
+    display: none;
+}
+.reg-transfer-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.reg-transfer-passno {
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: #eef4fc;
+    color: var(--brand-blue);
+    font:
+        900 1.25rem ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+}
+.reg-transfer-who {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.reg-transfer-who strong {
+    font:
+        700 1.05rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.reg-transfer-who span {
+    font:
+        600 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+.reg-transfer-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font:
+        700 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #1c9a5b;
+}
+.reg-transfer-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px 20px;
+    margin: 14px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid #e2e8f0;
+}
+.reg-transfer-details.hidden {
+    display: none;
+}
+.reg-transfer-details dt {
+    font:
+        700 0.68rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
+.reg-transfer-details dd {
+    margin: 2px 0 0;
+    font:
+        600 0.9rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    overflow-wrap: anywhere;
+}
+.reg-transfer-copied {
+    margin: 12px 0 0;
+    font:
+        600 0.76rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+/* Once verified: summary first, scan UI collapses, only "Change card" remains */
+#transferModeBlock.is-verified {
+    display: flex;
+    flex-direction: column;
+}
+#transferModeSummary {
+    order: -1;
+}
+#transferModeBlock.is-verified .reg-dup-transfer-label,
+#transferModeBlock.is-verified .reg-dup-transfer-input-row,
+#transferModeBlock.is-verified .reg-switch,
+#transferModeBlock.is-verified #transferModeScanArea,
+#transferModeBlock.is-verified #transferModeStatus {
+    display: none;
+}
+#transferModeBlock.is-verified .reg-transfer-footer {
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+/* Step 3: the old card's building */
+.reg-current-tag {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background: #fff4dc;
+    color: #8a5a00;
+    font:
+        700 0.65rem/1.4 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    font-style: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+.reg-building-option.is-current {
+    border-style: dashed;
+}
+
+/* Congressman picker: chips inside the field, list that flips and stays open */
+.cong-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    max-height: 132px;
+    overflow-y: auto;
+    padding: 6px 10px;
+    background: #fff;
+    border: 1px solid #cfd8e3;
+    border-radius: 10px;
+    cursor: text;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+.cong-box:focus-within {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 3px rgba(36, 91, 166, 0.15);
+}
+.cong-chips {
+    display: contents;
+}
+.cong-box #congSearch {
+    flex: 1 1 160px;
+    min-width: 140px;
+    height: 30px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.cong-box #congSearch:focus {
+    border: 0;
+    box-shadow: none;
+}
+.cong-box #congSearch:disabled {
+    cursor: not-allowed;
+}
+.cong-list {
+    margin-top: 6px;
+    border-color: #cfd8e3;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+.cong-list.is-up {
+    top: auto;
+    bottom: 100%;
+    margin: 0 0 6px;
+}
+.cong-item.is-active,
+.cong-item:hover {
+    background: #eef4fc;
+}
+.cong-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    font:
+        600 0.78rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+.cong-footer button {
+    border: 0;
+    background: transparent;
+    color: var(--brand-blue);
+    font:
+        700 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+
+/* Saving state: progress bar on top, window locked */
+.reg-modal {
+    position: relative;
+}
+#registerSubmitSpinner {
+    margin-right: 0.5rem;
+}
+.reg-modal.is-submitting {
+    pointer-events: none;
+}
+.reg-modal.is-submitting .reg-modal-body {
+    opacity: 0.7;
+}
+.reg-modal.is-submitting::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 5;
+    background: linear-gradient(
+            90deg,
+            transparent,
+            var(--brand-blue),
+            transparent
+        )
+        no-repeat;
+    background-size: 50% 100%;
+    animation: regSubmitBar 1.1s linear infinite;
+}
+@keyframes regSubmitBar {
+    from {
+        background-position: -50% 0;
+    }
+    to {
+        background-position: 150% 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reg-modal.is-submitting::before {
+        animation: none;
+        background: var(--brand-blue);
+        opacity: 0.5;
+    }
+}

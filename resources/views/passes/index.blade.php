@@ -16,12 +16,22 @@
             <header class="reg-modal-header">
                 <i class="fa-solid fa-desktop header-icon"></i>
                 <div>
-                    <p class="reg-eyebrow">Registration</p>
+<p class="reg-eyebrow" id="registerEyebrow">Registration</p>
                     <h1 id="registration-title">Register Visitor and Issue Pass</h1>
                 </div>
                 <button type="button" class="reg-close-button" aria-label="Close"
                     onclick="closeRegisterModal()">&times;</button>
             </header>
+
+            {{-- Transfer banner: visible on every step while a transfer is in progress --}}
+            <div id="transferBanner" class="reg-transfer-banner hidden" role="status">
+                <span class="reg-transfer-banner-icon"><i class="fa-solid fa-right-left"></i></span>
+                <div class="reg-transfer-banner-text">
+                    <strong id="transferBannerTitle">Transfer in progress</strong>
+                    <span id="transferBannerDetail">Scan the visitor’s old card to begin.</span>
+                </div>
+                <button type="button" class="reg-transfer-banner-cancel" onclick="cancelTransfer()">Cancel transfer</button>
+            </div>
 
             <form method="POST" action="{{ route('passes.register') }}" id="registerForm">
                 @csrf
@@ -35,8 +45,10 @@
                 <footer class="reg-modal-footer">
                     <button type="button" class="reg-button" onclick="closeRegisterModal()">Cancel</button>
                     <span id="registerHint" class="reg-footer-hint" aria-live="polite"></span>
-                    <button type="submit" id="registerSubmitBtn" class="reg-button reg-button-green">Admit and
-                        Auto-assign</button>
+                    <button type="submit" id="registerSubmitBtn" class="reg-button reg-button-green">
+                        <i class="fa-solid fa-spinner fa-spin hidden" id="registerSubmitSpinner"></i>
+                        <span id="registerSubmitLabel">Admit and Auto-assign</span>
+                    </button>
                 </footer>
             </form>
         </section>
@@ -80,7 +92,6 @@
             renderCongChips();
             renderCongList();
         }
-
         function renderCongChips() {
             const chips = document.getElementById('congChips');
             const hidden = document.getElementById('congHiddenInputs');
@@ -96,11 +107,7 @@
                 x.type = 'button';
                 x.textContent = '×';
                 x.setAttribute('aria-label', 'Remove ' + c.name);
-                x.onclick = () => {
-                    selectedCong.delete(c.id);
-                    renderCongChips();
-                    renderCongList();
-                };
+                x.onclick = () => removeCong(c.id);
                 chip.appendChild(x);
                 chips.appendChild(chip);
 
@@ -113,7 +120,67 @@
 
             // "Other" is only mandatory when no congressman is picked.
             document.getElementById('officeOther').required = selectedCong.size === 0;
+            if (document.getElementById('congList').classList.contains('is-open')) positionCongList();
             refreshSubmitState();
+        }
+
+        let congShown = [];   // the matches currently listed, in order
+        let congActive = -1;  // keyboard-highlighted row
+
+        function pickCong(c) {
+            selectedCong.set(c.id, c);
+            const search = document.getElementById('congSearch');
+            search.value = '';
+            renderCongChips();
+            renderCongList();   // list stays open so several can be picked in a row
+            positionCongList();
+            search.focus();
+        }
+
+        function removeCong(id) {
+            selectedCong.delete(id);
+            renderCongChips();
+            renderCongList();
+        }
+
+        function closeCongList() {
+            document.getElementById('congList').classList.remove('is-open');
+        }
+
+        function setCongActive(i) {
+            const items = document.querySelectorAll('#congList .cong-item');
+            if (!items.length) { congActive = -1; return; }
+            congActive = (i + items.length) % items.length;
+            items.forEach((el, n) => el.classList.toggle('is-active', n === congActive));
+            items[congActive].scrollIntoView({ block: 'nearest' });
+        }
+
+        // Opens upward when there isn't room below, and sizes itself to the space it has,
+        // so it never runs off the bottom of the window.
+        function positionCongList() {
+            const list = document.getElementById('congList');
+            const box = document.getElementById('congBox');
+            const bounds = box.closest('.reg-modal-body').getBoundingClientRect();
+            const rect = box.getBoundingClientRect();
+            const below = bounds.bottom - rect.bottom - 12;
+            const above = rect.top - bounds.top - 12;
+            const openUp = below < 200 && above > below;
+            list.classList.toggle('is-up', openUp);
+            list.style.maxHeight = Math.max(120, Math.min(300, openUp ? above : below)) + 'px';
+        }
+
+        function appendCongFooter(list) {
+            const foot = document.createElement('div');
+            foot.className = 'cong-footer';
+            const count = document.createElement('span');
+            count.textContent = selectedCong.size ? `${selectedCong.size} selected` : 'Pick one or more';
+            const done = document.createElement('button');
+            done.type = 'button';
+            done.textContent = 'Done';
+            // mousedown (not click) so the search box doesn't blur first
+            done.addEventListener('mousedown', e => { e.preventDefault(); closeCongList(); });
+            foot.append(count, done);
+            list.appendChild(foot);
         }
 
         function renderCongList() {
@@ -121,6 +188,8 @@
             const ids = checkedBuildingIds();
             const q = document.getElementById('congSearch').value.trim().toLowerCase();
             list.innerHTML = '';
+            congShown = [];
+            congActive = -1;
             if (!ids.length) return;
 
             const multi = ids.length > 1;
@@ -133,13 +202,15 @@
             if (!matches.length) {
                 const empty = document.createElement('div');
                 empty.className = 'cong-empty';
-                empty.textContent = 'No matching congressman.';
+                empty.textContent = selectedCong.size ? 'No more matches.' : 'No matching congressman.';
                 list.appendChild(empty);
+                appendCongFooter(list);
                 return;
             }
 
+            congShown = matches;
             let lastB = null;
-            matches.forEach(c => {
+            matches.forEach((c, idx) => {
                 if (multi && c.b !== lastB) {
                     const g = document.createElement('div');
                     g.className = 'cong-group';
@@ -158,14 +229,11 @@
                 // mousedown (not click) so the search box doesn't blur before we register the pick
                 item.addEventListener('mousedown', e => {
                     e.preventDefault();
-                    selectedCong.set(c.id, c);
-                    document.getElementById('congSearch').value = '';
-                    renderCongChips();
-                    renderCongList();
-                    list.classList.remove('is-open');
+                    pickCong(matches[idx]);
                 });
                 list.appendChild(item);
             });
+            appendCongFooter(list);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -173,16 +241,38 @@
             const list = document.getElementById('congList');
             const open = () => {
                 renderCongList();
+                positionCongList();
                 list.classList.add('is-open');
             };
             search.addEventListener('focus', open);
             search.addEventListener('input', open);
             search.addEventListener('keydown', e => {
-                if (e.key === 'Enter') e.preventDefault();
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (list.classList.contains('is-open')) {
+                        const c = congShown[congActive >= 0 ? congActive : 0];
+                        if (c) pickCong(c);
+                    }
+                } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!list.classList.contains('is-open')) open();
+                    setCongActive(congActive + (e.key === 'ArrowDown' ? 1 : -1));
+                } else if (e.key === 'Escape') {
+                    closeCongList();
+                } else if (e.key === 'Backspace' && !search.value && selectedCong.size) {
+                    removeCong(Array.from(selectedCong.keys()).pop());
+                }
+            });
+            // Clicking anywhere in the box (not on a chip's ×) focuses the search.
+            document.getElementById('congBox').addEventListener('click', e => {
+                if (!e.target.closest('.cong-chip button')) search.focus();
             });
             document.addEventListener('click', e => {
-                if (!e.target.closest('#congPicker')) list.classList.remove('is-open');
+                if (!e.target.closest('#congPicker')) closeCongList();
             });
+            const reposition = () => { if (list.classList.contains('is-open')) positionCongList(); };
+            window.addEventListener('resize', reposition);
+            document.querySelector('#registerModal .reg-modal-body').addEventListener('scroll', reposition);
             refreshCongPicker();
         });
         // ---- End congressman picker ----
@@ -713,7 +803,6 @@
             if (e.target.matches('[name="id_type"]')) scheduleDuplicateCheck();
             refreshSubmitState(); // any change (building, reason, dates, confirm box) can flip readiness
         });
-        document.getElementById('registerForm').addEventListener('input', refreshSubmitState);
         document.getElementById('registerForm').addEventListener('submit', (e) => {
             if (dupBlocked()) {
                 e.preventDefault();
@@ -721,8 +810,39 @@
                     behavior: 'smooth',
                     block: 'center'
                 });
+                return;
             }
+            lockRegisterSubmit();
         });
+
+        // Visible "saving" state: blocks double-submits and tells the guard when it's slow.
+        let registerSlowTimer = null;
+        function lockRegisterSubmit() {
+            const btn = document.getElementById('registerSubmitBtn');
+            // Next tick: disabling inside the submit event can cancel the submission in some browsers.
+            setTimeout(() => {
+                btn.disabled = true;
+                btn.style.opacity = '0.9';
+                document.getElementById('registerSubmitSpinner').classList.remove('hidden');
+                document.getElementById('registerSubmitLabel').textContent = transferModeActive ? 'Transferring…' : 'Issuing pass…';
+                document.getElementById('registerHint').textContent = 'Saving — please keep this window open.';
+                document.getElementById('registerModal').classList.add('is-submitting');
+            }, 0);
+            registerSlowTimer = setTimeout(() => {
+                document.getElementById('registerHint').textContent =
+                    'Still working… this is taking longer than usual. Please wait and don’t click again.';
+            }, 8000);
+        }
+
+        function unlockRegisterSubmit() {
+            clearTimeout(registerSlowTimer);
+            document.getElementById('registerSubmitSpinner').classList.add('hidden');
+            document.getElementById('registerModal').classList.remove('is-submitting');
+            syncTransferUi();
+            refreshSubmitState();
+        }
+        // Coming back via the browser's Back button restores the page frozen mid-submit.
+        window.addEventListener('pageshow', (e) => { if (e.persisted) unlockRegisterSubmit(); });
         // ---- End duplicate check ----
         // ---- Transfer: scan the visitor's OLD physical card (Workflow 2) ----
         // Primary path: a Honeywell 2D scanner is a keyboard wedge — it types the
@@ -796,17 +916,33 @@
             document.getElementById('transferQrVideo').classList.add('hidden');
         }
 
+        // QR decode helper shared by both camera-scan paths. A 1080p frame is far more pixels than
+        // jsQR needs, so cap the long edge and reuse one canvas instead of allocating one every tick.
+        const qrScanCanvas = document.createElement('canvas');
+        const qrScanCtx = qrScanCanvas.getContext('2d', { willReadFrequently: true });
+        function decodeQrFrame(video) {
+            const scale = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
+            const w = Math.round(video.videoWidth * scale);
+            const h = Math.round(video.videoHeight * scale);
+            if (qrScanCanvas.width !== w) qrScanCanvas.width = w;
+            if (qrScanCanvas.height !== h) qrScanCanvas.height = h;
+            qrScanCtx.drawImage(video, 0, 0, w, h);
+            const img = qrScanCtx.getImageData(0, 0, w, h);
+            const qr = window.jsQR ? jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' }) : null;
+            return qr && qr.data ? qr.data.trim() : null;
+        }
+
+        let transferScanBusy = false;
         function scanTransferFrame() {
             const video = document.getElementById('transferQrVideo');
-            if (!video.videoWidth) return;
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
-            if (qr && qr.data) verifyTransferToken(qr.data.trim());
+            if (transferScanBusy || !video.videoWidth) return;
+            transferScanBusy = true;
+            try {
+                const token = decodeQrFrame(video);
+                if (token) verifyTransferToken(token);
+            } finally {
+                transferScanBusy = false;
+            }
         }
 
         async function verifyTransferToken(token) {
@@ -852,6 +988,8 @@
         let transferModeScanTimer = null;
         let transferModeHwDebounce = null;
         let transferModeActive = false;
+                let transferSource = null;          // the verified old pass, or null
+        let transferModeScanBusy = false;
         const transferModeLockedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'contact_no', 'visitor_email',
             'id_type', 'id_ref'
         ];
@@ -870,7 +1008,13 @@
             } else {
                 clearTransferModeScan();
             }
+            syncTransferUi();
             refreshSubmitState();
+        }
+
+        function cancelTransfer() {
+            document.getElementById('transferModeToggle').checked = false;
+            toggleTransferMode(false);
         }
 
         const transferModeHwInput = document.getElementById('transferModeHwInput');
@@ -938,17 +1082,15 @@
 
         function scanTransferModeFrame() {
             const video = document.getElementById('transferModeVideo');
-            if (!video.videoWidth) return;
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const qr = window.jsQR ? jsQR(imageData.data, imageData.width, imageData.height) : null;
-            if (qr && qr.data) lookupTransferSource(qr.data.trim());
+            if (transferModeScanBusy || !video.videoWidth) return;
+            transferModeScanBusy = true;
+            try {
+                const token = decodeQrFrame(video);
+                if (token) lookupTransferSource(token);
+            } finally {
+                transferModeScanBusy = false;
+            }
         }
-
         async function lookupTransferSource(token) {
             if (!token) return;
             if (document.getElementById('transferModeCameraToggle').checked) stopTransferModeCamera();
@@ -974,6 +1116,7 @@
 
         function applyTransferModeMatch(pass, token) {
             document.getElementById('transferQrTokenInput').value = token;
+            transferSource = pass;
 
             const form = document.getElementById('registerForm');
             const setField = (name, value) => {
@@ -988,18 +1131,19 @@
 
             document.getElementById('transferModeSuccess').classList.remove('hidden');
             document.getElementById('transferModeClearBtn').classList.remove('hidden');
+            fillTransferSummary(pass);
             document.getElementById('transferModeSummary').classList.remove('hidden');
-            document.getElementById('transferModeSummaryText').textContent =
-                `Pass #${pass.pass_number} · ${pass.holder} · currently at ${pass.building}`;
             document.getElementById('transferDestinationNote').classList.remove('hidden');
             document.getElementById('transferDestinationNoteText').textContent =
                 `Pass #${pass.pass_number} · ${pass.holder}`;
             setTransferModeStatus('', 'neutral');
+            syncTransferUi();
             refreshSubmitState();
         }
 
         function clearTransferModeScan() {
             stopTransferModeCamera();
+            transferSource = null;
             document.getElementById('transferModeCameraToggle').checked = false;
             document.getElementById('transferModeScanArea').classList.add('hidden');
             document.getElementById('transferQrTokenInput').value = '';
@@ -1019,6 +1163,7 @@
                 el.style.pointerEvents = '';
             });
 
+            syncTransferUi();
             refreshSubmitState();
             focusTransferModeHwInput();
         }
@@ -1035,6 +1180,73 @@
             el.style.color = colors[tone] || colors.neutral;
             el.classList.toggle('is-busy', tone === 'busy');
         }
+
+        // One place that keeps every transfer cue consistent: banner, title, button label, "Current" tags.
+        function syncTransferUi() {
+            const on = transferModeActive;
+            const verified = on && !!transferSource;
+
+            const banner = document.getElementById('transferBanner');
+            banner.classList.toggle('hidden', !on);
+            banner.classList.toggle('is-verified', verified);
+            document.getElementById('transferModeBlock').classList.toggle('is-verified', verified);
+
+            document.getElementById('registerEyebrow').textContent = on ? 'Transfer' : 'Registration';
+            document.getElementById('registration-title').textContent = on ? 'Transfer Visitor Pass' : 'Register Visitor and Issue Pass';
+            document.getElementById('registerSubmitLabel').textContent = on ? 'Transfer and re-issue pass' : 'Admit and Auto-assign';
+
+            document.getElementById('transferBannerTitle').textContent = verified
+                ? `Transferring Pass #${transferSource.pass_number} · ${transferSource.holder || 'Unnamed Visitor'}`
+                : 'Transfer in progress';
+            document.getElementById('transferBannerDetail').textContent = verified
+                ? `From ${transferSource.building}. Choose where they’re headed — the old card returns to stock when you confirm.`
+                : 'Scan the visitor’s old card to begin.';
+
+            // Tag the building(s) the old card is currently authorised for.
+            const current = verified ? (transferSource.building_ids || []).map(Number) : [];
+            document.querySelectorAll('#registerModal .reg-building-option').forEach(opt => {
+                const id = Number(opt.querySelector('input')?.value);
+                const isCurrent = current.includes(id);
+                opt.classList.toggle('is-current', isCurrent);
+                const name = opt.querySelector('.reg-building-name');
+                let tag = name.querySelector('.reg-current-tag');
+                if (isCurrent && !tag) {
+                    tag = document.createElement('em');
+                    tag.className = 'reg-current-tag';
+                    tag.textContent = 'Current';
+                    name.appendChild(tag);
+                } else if (!isCurrent && tag) {
+                    tag.remove();
+                }
+            });
+        }
+
+        function fillTransferSummary(pass) {
+            document.getElementById('tmPassNo').textContent = pass.pass_number;
+            document.getElementById('tmHolder').textContent = pass.holder || 'Unnamed Visitor';
+            document.getElementById('tmFrom').textContent = `Currently at ${pass.building || '—'}`;
+
+            const rows = [
+                ['Gender', pass.gender],
+                ['Contact No.', pass.contact_no],
+                ['Email', pass.visitor_email],
+                ['ID', [pass.id_type, pass.id_ref].filter(Boolean).join(' · ')],
+            ].filter(([, value]) => value);
+
+            const dl = document.getElementById('tmDetails');
+            dl.replaceChildren();
+            rows.forEach(([label, value]) => {
+                const wrap = document.createElement('div');
+                const dt = document.createElement('dt');
+                dt.textContent = label;
+                const dd = document.createElement('dd');
+                dd.textContent = value;
+                wrap.append(dt, dd);
+                dl.append(wrap);
+            });
+            dl.classList.toggle('hidden', rows.length === 0);
+        }
+
         // ---- End Transfer Mode ----
 
         function closeRegisterModal() {
