@@ -510,8 +510,9 @@
         const preview = byId('efPreview'), noPreview = byId('efNoPreview');
         const confirmBox = byId('dirConfirm'), confirmBtn = byId('dirConfirmBtn'), confirmErr = byId('dirConfirmError');
         const notice = byId('dirNotice');
-        const TOKEN = form.querySelector('[name=_token]').value;        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-        const failMsg = () => navigator.onLine ? 'Something went wrong. Please try again.' : "You're offline. Changes can only be saved while online.";        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const TOKEN = form.querySelector('[name=_token]').value;
+        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const failMsg = () => navigator.onLine ? 'Something went wrong. Please try again.' : "You're offline. Changes can only be saved while online.";
         const field = n => form.querySelector('[name="' + n + '"]');
         let editing = null, active = null;
 
