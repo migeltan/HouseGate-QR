@@ -7,19 +7,17 @@
     <title>@yield('title', 'Visitor Access Control')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    {{-- Google Font imports: UnifrakturMaguntia (header title, Old English Text MT fallback),
-         Source Serif 4 (subtitles / eyebrows), Source Sans 3 (nav/body/UI) --}}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+    {{-- Self-hosted fonts (Source Sans 3 / Source Serif 4) and Font Awesome: no external CDN dependency --}}
+    <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}?v={{ filemtime(public_path('css/registration-modal.css')) }}">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
     <link rel="stylesheet" href="{{ asset('css/theme-govt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/scanner-restyle.css') }}">
     <link rel="stylesheet" href="{{ asset('css/sidebar.css') }}?v={{ filemtime(public_path('css/sidebar.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/glass-status.css') }}?v={{ filemtime(public_path('css/glass-status.css')) }}">
+    {{-- Pre-built Tailwind v3 (replaces the Play CDN). Kept LAST because the CDN used to inject its <style> at the end of <head>. --}}
+    <link rel="stylesheet" href="{{ asset('css/tailwind.css') }}?v={{ filemtime(public_path('css/tailwind.css')) }}">
     <script>try{if(localStorage.getItem('hg.sidebar')==='collapsed')document.documentElement.classList.add('sb-collapsed')}catch(e){}</script>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased gov-page-bg">

@@ -45,6 +45,55 @@ class CongressmanController extends Controller
         return view('congressmen.index', compact('members', 'buildings', 'isAdmin'));
     }
 
+    /**
+     * Whole roster as JSON for the browser's local cache (~324 rows).
+     * Guards get active members only; admins get everyone. Answers 304 when the caller's copy is current.
+     */
+    public function roster(Request $request)
+    {
+        $isAdmin = $request->user()->isAdmin();
+
+        $scope = fn () => Congressman::query()->when(! $isAdmin, fn ($q) => $q->active());
+
+        // Cheap fingerprint first, so a background "anything new?" check never loads the full roster.
+        $stamp = $scope()->toBase()->selectRaw('count(*) as n, max(updated_at) as latest')->first();
+        $version = md5(($isAdmin ? 'admin' : 'guard') . '|' . $stamp->n . '|' . $stamp->latest);
+
+        $probe = response('')->setEtag($version)->header('Cache-Control', 'private, no-cache');
+        if ($probe->isNotModified($request)) {
+            return $probe; // 304: the browser's copy is still current
+        }
+
+        $members = $scope()->with('building:id,name,color_hex')->orderBy('name')->get()
+            ->map(fn (Congressman $m) => [
+                'id' => $m->id,
+                'member_id' => $m->member_id,
+                'name' => $m->name,
+                'type' => $m->rep_type,
+                'detail' => $m->rep_detail,
+                'building_id' => $m->building_id,
+                'building' => $m->building->name ?? null,
+                'color' => $m->building->color_hex ?? '#94a3b8',
+                'floor' => $m->floor,
+                'room' => $m->room,
+                'photo' => $m->photo_url,
+                'active' => $m->is_active,
+            ])->values();
+
+        return response()->json([
+            'version' => $version,
+            'generated_at' => now()->toIso8601String(),
+            'is_admin' => $isAdmin,
+            // One URL template per action instead of three URLs per member; the client swaps __ID__ for the member's id.
+            'urls' => $isAdmin ? [
+                'update' => route('congressmen.update', ['congressman' => '__ID__']),
+                'deactivate' => route('congressmen.deactivate', ['congressman' => '__ID__']),
+                'reactivate' => route('congressmen.reactivate', ['congressman' => '__ID__']),
+            ] : null,
+            'members' => $members,
+        ])->setEtag($version)->header('Cache-Control', 'private, no-cache');
+    }
+
     // ------------------------------------------------------------------
     // Admin-only edits (routes sit inside the `admin` middleware group)
     // ------------------------------------------------------------------

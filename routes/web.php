@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
 
         Route::get('/directory', [CongressmanController::class, 'index'])->name('congressmen.index');
+        Route::get('/directory/roster', [CongressmanController::class, 'roster'])->name('congressmen.roster');
 
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/export', [LogController::class, 'export'])->name('logs.export');

@@ -44,7 +44,8 @@
 {{-- ============================= FILTERS + RESULTS ============================= --}}
 <div class="mt-6 overflow-hidden rounded-xl border border-slate-300 bg-white">
 
-    <form id="dirFilters" data-url="{{ route('congressmen.index') }}" onsubmit="return false;"
+    <form id="dirFilters" data-url="{{ route('congressmen.index') }}" data-roster="{{ route('congressmen.roster') }}"
+          data-role="{{ $isAdmin ? 'admin' : 'guard' }}" onsubmit="return false;"
           class="flex flex-col gap-3 border-b border-slate-300 px-10 py-6 sm:flex-row sm:items-center">
         <div class="relative min-w-0 flex-1">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
@@ -77,7 +78,10 @@
     </form>
 
     <div class="px-10 py-5">
-        <p id="dirNotice" class="mb-2 h-5 text-sm font-semibold"></p>
+        <div class="flex flex-wrap items-start gap-x-4">
+            <p id="dirNotice" class="mb-2 h-5 text-sm font-semibold"></p>
+            <p id="dirStatus" class="ml-auto flex h-5 items-center gap-1.5 text-xs text-slate-500" aria-live="polite"></p>
+        </div>
         <div id="dirResults">
             @include('congressmen.table')
         </div>
@@ -218,46 +222,252 @@
 (function () {
     const filters = document.getElementById('dirFilters');
     const results = document.getElementById('dirResults');
-    let ctrl = null, debounce, current = null;
+    const PER_PAGE = 20;
+    const CACHE_KEY = 'roster:' + filters.dataset.role;   // guards and admins are served different rosters
+    let current = null, roster = null, inflight = null, failure = null;   // failure: null | 'network' | 'auth'
+    let page = Number(new URLSearchParams(location.search).get('page')) || 1;
+    const hay = new WeakMap();                            // member -> normalised searchable fields
 
-    function buildUrl() {
-        const p = new URLSearchParams();
-        new FormData(filters).forEach((v, k) => { if (v) p.set(k, v); });
-        const qs = p.toString();
-        return filters.dataset.url + (qs ? '?' + qs : '');
+    // ---------- Local cache (IndexedDB) ----------
+    let dbp = null;
+    const idb = () => dbp || (dbp = new Promise((resolve, reject) => {
+        const req = indexedDB.open('hg-directory', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('kv');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    }));
+    async function cacheGet() {
+        try {
+            const db = await idb();
+            return await new Promise((resolve, reject) => {
+                const r = db.transaction('kv').objectStore('kv').get(CACHE_KEY);
+                r.onsuccess = () => resolve(r.result || null);
+                r.onerror = () => reject(r.error);
+            });
+        } catch (e) { return null; }
+    }
+    async function cachePut(value) {
+        try {
+            const db = await idb();
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction('kv', 'readwrite');
+                tx.objectStore('kv').put(value, CACHE_KEY);
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (e) { /* storage unavailable or full: the page still works from memory */ }
     }
 
-    async function load(url) {
-        if (ctrl) ctrl.abort();
-        ctrl = new AbortController();
-        current = url || buildUrl();
-        results.classList.add('is-loading');
-        try {
-            const res = await fetch(current, {
-                signal: ctrl.signal, credentials: 'same-origin',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            results.innerHTML = await res.text();
-            history.replaceState(null, '', current);
-        } catch (e) {
-            if (e.name === 'AbortError') return;
+    // ---------- Roster sync ----------
+    // Lowercase + strip accents, so "pena" finds "Peña" (the old server search was accent-insensitive too).
+    const norm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    function prepare(r) {
+        r.members.forEach(m => hay.set(m, [m.name, m.detail, m.room, m.member_id].map(norm)));
+        return r;
+    }
+
+    // Asks the server whether the roster changed. Resolves 'updated' | 'current' | 'failed'.
+    function sync(force = false) {
+        if (inflight) return force ? inflight.then(() => sync(true)) : inflight;
+        inflight = (async () => {
+            try {
+                const headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+                if (roster && !force) headers['If-None-Match'] = '"' + roster.version + '"';
+                const res = await fetch(filters.dataset.roster, { credentials: 'same-origin', headers });
+                if (res.status === 401 || res.status === 419 || res.redirected) { failure = 'auth'; return 'failed'; }
+                if (res.status === 304 && roster) {
+                    failure = null;
+                    roster.checkedAt = Date.now();
+                    cachePut(roster);
+                    return 'current';
+                }
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                roster = prepare(await res.json());
+                failure = null;
+                roster.checkedAt = Date.now();
+                await cachePut(roster);
+                return 'updated';
+            } catch (e) {
+                failure = 'network';   // offline or server error: keep whatever we already have
+                return 'failed';
+            } finally {
+                inflight = null;
+                paintStatus();
+            }
+        })();
+        paintStatus();
+        return inflight;
+    }
+
+    // ---------- Freshness status ("Updated 5 min ago" / "Offline") ----------
+    const statusEl = document.getElementById('dirStatus');
+    function ago(ts) {
+        const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+        if (sec < 45) return 'just now';
+        const min = Math.round(sec / 60);
+        if (min < 60) return min + ' min ago';
+        const hr = Math.round(min / 60);
+        if (hr < 24) return hr + ' hr ago';
+        const d = Math.round(hr / 24);
+        return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+    function paintStatus() {
+        if (!statusEl) return;
+        if (inflight) {
+            statusEl.innerHTML = '<i class="fa-solid fa-rotate fa-spin text-[10px]"></i>Checking for updates…';
+            return;
+        }
+        const age = roster && roster.checkedAt ? ago(roster.checkedAt) : null;
+        const since = age ? ' · last updated ' + age : '';
+        let dot = 'bg-emerald-500', text = '';
+        if (failure === 'auth') { dot = 'bg-red-500'; text = 'Session expired · sign in again to refresh'; }
+        else if (!navigator.onLine) { dot = 'bg-amber-500'; text = 'Offline' + since; }
+        else if (failure === 'network') { dot = 'bg-amber-500'; text = "Can't reach server" + since; }
+        else if (age) { text = 'Updated ' + age; }
+        statusEl.innerHTML = text ? '<span class="h-1.5 w-1.5 rounded-full ' + dot + '"></span>' + text : '';
+    }
+
+    // ---------- Rendering (same markup the server-side table.blade.php produces) ----------
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function rowHtml(m, admin) {
+        const partyList = (m.type || '').includes('Party');
+        const fill = u => u.replace('__ID__', m.id);
+        const payload = {
+            member_id: m.member_id, name: m.name, type: m.type, detail: m.detail, building: m.building,
+            color: m.color, floor: m.floor, room: m.room, photo: m.photo, building_id: m.building_id, active: m.active,
+            urls: admin && roster.urls ? {
+                update: fill(roster.urls.update), deactivate: fill(roster.urls.deactivate), reactivate: fill(roster.urls.reactivate)
+            } : null,
+        };
+        return `<tr data-member="${esc(JSON.stringify(payload))}" class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60 ${m.active ? '' : 'bg-slate-50/70'}">
+            <td class="py-2.5 px-4">
+                <div class="flex items-center gap-3">
+                    ${m.photo
+                        ? `<img src="${esc(m.photo)}" alt="" loading="lazy" class="h-14 w-11 shrink-0 rounded-md border border-slate-200 object-cover object-top">`
+                        : `<span class="grid h-14 w-11 shrink-0 place-items-center rounded-md border border-slate-200 bg-slate-100 text-slate-300"><i class="fa-solid fa-user"></i></span>`}
+                    <div>
+                        <p class="font-semibold ${m.active ? 'text-slate-900' : 'text-slate-400'}">${esc(m.name)}</p>
+                        ${m.detail ? `<p class="text-[11px] text-slate-500">${esc(m.detail)}</p>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${partyList ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}">${partyList ? 'Party-list' : 'District'}</span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">
+                    <span class="h-2 w-2 rounded-full" style="background: ${esc(m.color || '#94a3b8')}"></span>${esc(m.building ?? '—')}
+                </span>
+            </td>
+            <td class="py-3 px-4 text-slate-700 whitespace-nowrap">${esc(m.floor ?? '—')}</td>
+            <td class="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">${esc(m.room ?? '—')}</td>
+            ${admin ? `<td class="py-3 px-4 whitespace-nowrap">
+                <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">${m.active ? 'Active' : 'Inactive'}</span>
+            </td>` : ''}
+        </tr>`;
+    }
+
+    function pagerLink(n, glyph, label, disabled) {
+        return `<a href="#" data-page="${n}" class="js-dir-page grid h-7 w-7 place-items-center rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-100 ${disabled ? 'pointer-events-none opacity-40' : ''}" aria-label="${label}">${glyph}</a>`;
+    }
+
+    function tableHtml(rows, total, last, admin) {
+        const empty = `<tr><td colspan="${admin ? 6 : 5}" class="py-14 text-center">
+            <i class="fa-solid fa-address-book text-2xl text-slate-300"></i>
+            <p class="mt-2 text-sm font-semibold text-slate-600">No members found</p>
+            <p class="text-xs text-slate-400">Try adjusting your search or building filter.</p>
+        </td></tr>`;
+        return `<div class="overflow-hidden rounded-xl border border-slate-300">
+            <div class="max-h-[440px] overflow-auto">
+                <table class="w-full min-w-[820px] border-collapse text-left text-xs">
+                    <thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
+                        <tr>
+                            <th class="py-3 px-4 font-bold">Member</th>
+                            <th class="py-3 px-4 font-bold">Type</th>
+                            <th class="py-3 px-4 font-bold">Building</th>
+                            <th class="py-3 px-4 font-bold">Floor</th>
+                            <th class="py-3 px-4 font-bold">Room</th>
+                            ${admin ? '<th class="py-3 px-4 font-bold">Status</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">${rows.length ? rows.map(m => rowHtml(m, admin)).join('') : empty}</tbody>
+                </table>
+            </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+            <p class="text-sm text-slate-500">${total ? total + ' members · page ' + page + ' of ' + last : 'No results'}</p>
+            ${last > 1 ? `<div class="flex gap-1">${pagerLink(page - 1, '&lsaquo;', 'Previous page', page === 1)}${pagerLink(page + 1, '&rsaquo;', 'Next page', page === last)}</div>` : ''}
+        </div>`;
+    }
+
+    // Search / building / status filtering runs here in the browser, no request.
+    function render() {
+        const q = norm(filters.querySelector('[name=q]').value).trim();
+        const b = filters.querySelector('[name=building]').value;
+        const statusSel = filters.querySelector('[name=status]');
+        const st = statusSel ? statusSel.value : '';
+        const list = roster.members.filter(m =>
+            (!b || String(m.building_id) === b)
+            && (!st || (st === 'active') === !!m.active)
+            && (!q || hay.get(m).some(f => f.includes(q))));
+        const last = Math.max(1, Math.ceil(list.length / PER_PAGE));
+        page = Math.min(Math.max(1, page), last);
+        results.innerHTML = tableHtml(list.slice((page - 1) * PER_PAGE, page * PER_PAGE), list.length, last, roster.is_admin);
+        current = urlForState();
+        history.replaceState(null, '', current);
+        paintStatus();
+    }
+
+    function urlForState() {
+        const p = new URLSearchParams();
+        new FormData(filters).forEach((v, k) => { if (v) p.set(k, v); });
+        if (page > 1) p.set('page', page);
+        const qs = p.toString();
+        return location.pathname + (qs ? '?' + qs : '');
+    }
+
+    async function show() {
+        if (!roster) await sync();
+        if (!roster) {
             results.innerHTML = '<div class="py-14 text-center"><i class="fa-solid fa-triangle-exclamation text-2xl text-slate-300"></i>'
                 + '<p class="mt-2 text-sm font-semibold text-slate-600">Couldn\'t load the directory.</p>'
                 + '<button type="button" data-retry class="gov-btn-glass-outline mt-3"><i class="fa-solid fa-rotate-right"></i> Try again</button></div>';
+            return;
         }
-        results.classList.remove('is-loading');
+        render();
     }
 
-    filters.querySelector('[name=q]').addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => load(), 300); });
-    filters.querySelectorAll('select').forEach(s => s.addEventListener('change', () => load()));
+    // Used after an admin save / deactivate / reactivate: always re-fetch, then redraw.
+    async function load() { await sync(true); await show(); }
+
+    filters.querySelector('[name=q]').addEventListener('input', () => { page = 1; show(); });
+    filters.querySelectorAll('select').forEach(s => s.addEventListener('change', () => { page = 1; show(); }));
 
     results.addEventListener('click', e => {
-        const page = e.target.closest('a.js-dir-page');
-        if (page) { e.preventDefault(); if (page.getAttribute('href') !== '#') load(page.href); return; }
+        const pg = e.target.closest('a.js-dir-page');
+        if (pg) {
+            e.preventDefault();
+            const n = Number(pg.dataset.page || new URL(pg.href, location.href).searchParams.get('page'));
+            if (n && !pg.classList.contains('pointer-events-none')) { page = n; show(); }
+            return;
+        }
         if (e.target.closest('[data-retry]')) { load(); return; }
         const row = e.target.closest('tr[data-member]');
         if (row) openMember(JSON.parse(row.dataset.member));
+    });
+
+    // Boot: show the cached roster immediately, then check for a newer one in the background.
+    (async () => {
+        const cached = await cacheGet();
+        if (cached && Array.isArray(cached.members)) { roster = prepare(cached); render(); }
+        if (await sync() === 'updated') render();
+    })();
+    window.addEventListener('online', () => { paintStatus(); sync().then(r => { if (r === 'updated') render(); }); });
+    window.addEventListener('offline', paintStatus);
+    setInterval(paintStatus, 30000);   // keeps "5 min ago" honest
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && roster && Date.now() - (roster.checkedAt || 0) > 60000) sync().then(r => { if (r === 'updated') render(); });
     });
 
     // ---------- Member details (photo expand) ----------
@@ -300,8 +510,8 @@
         const preview = byId('efPreview'), noPreview = byId('efNoPreview');
         const confirmBox = byId('dirConfirm'), confirmBtn = byId('dirConfirmBtn'), confirmErr = byId('dirConfirmError');
         const notice = byId('dirNotice');
-        const TOKEN = form.querySelector('[name=_token]').value;
-        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const TOKEN = form.querySelector('[name=_token]').value;        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const failMsg = () => navigator.onLine ? 'Something went wrong. Please try again.' : "You're offline. Changes can only be saved while online.";        const HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
         const field = n => form.querySelector('[name="' + n + '"]');
         let editing = null, active = null;
 
@@ -386,7 +596,7 @@
                     load(current);
                 }
             } catch (err) {
-                formError.textContent = 'Something went wrong. Please try again.';
+                formError.textContent = failMsg();
                 formError.classList.remove('hidden');
             }
             saveBtn.disabled = false;
@@ -400,7 +610,7 @@
                 const data = await res.json().catch(() => ({}));
                 return { ok: res.ok, message: data.message || (res.ok ? 'Done.' : 'Something went wrong. Please try again.') };
             } catch (err) {
-                return { ok: false, message: 'Something went wrong. Please try again.' };
+                return { ok: false, message: failMsg() };
             }
         }
 
