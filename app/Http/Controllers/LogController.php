@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Building; // ASSUMPTION: adjust to your actual Building model namespace/path
+use App\Models\AdminLog;
 use App\Models\ScanLog;
 use App\Models\PassRegistration;
 use Illuminate\Http\Request;
@@ -103,7 +104,8 @@ class LogController extends Controller
     }
 
     /**
-     * Option A — delete logs
+     * Option A — delete scan logs recorded between two dates.
+     */
     public function purgeRange(Request $request)
     {
         $validated = $request->validate([
@@ -115,6 +117,8 @@ class LogController extends Controller
             $validated['start_date'] . ' 00:00:00',
             $validated['end_date'] . ' 23:59:59',
         ])->delete();
+
+        AdminLog::record('log.purged_range', "{$validated['start_date']} to {$validated['end_date']}", "{$count} scan log(s) deleted.");
 
         return redirect()->route('logs.index')
             ->with('success', "Purged {$count} log(s) between {$validated['start_date']} and {$validated['end_date']}.");
@@ -138,6 +142,8 @@ class LogController extends Controller
 
         $count = ScanLog::query()->count();
         ScanLog::query()->delete();
+
+        AdminLog::record('log.purged_all', 'All scan logs', "{$count} scan log(s) deleted.");
 
         return redirect()->route('logs.index')
             ->with('success', "All {$count} log(s) were permanently deleted.");

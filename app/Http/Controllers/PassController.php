@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminLog;
 use App\Models\Building;
 use App\Models\Congressman;
 use App\Models\VisitorPass;
@@ -571,13 +572,15 @@ class PassController extends Controller
         $this->authorizeGuardScope($request, $pass);
 
         $photoPaths = [];
-        $already = DB::transaction(function () use ($pass, &$photoPaths) {
+        $holder = null;
+        $already = DB::transaction(function () use ($pass, &$photoPaths, &$holder) {
             $this->lockFresh($pass);
 
             if ($pass->status === 'available') {
                 return true;
             }
 
+            $holder = $pass->visitor_name;
             $photoPaths = array_filter([$pass->photo_path, $pass->id_photo_path]);
 
             $pass->openRegistration()?->update([
@@ -609,6 +612,8 @@ class PassController extends Controller
         foreach ($photoPaths as $path) {
             Storage::disk('public')->delete($path);
         }
+
+        AdminLog::record('pass.unassigned', $holder, "Pass #{$pass->pass_number} returned to available stock.");
 
         return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} unassigned and returned to available stock.");
     }
@@ -647,6 +652,8 @@ class PassController extends Controller
 
             return $this->passActionResponse($request, $pass, $msg, false, 409);
         }
+
+        AdminLog::record('pass.revoked', $pass->visitor_name, "Pass #{$pass->pass_number} revoked.");
 
         return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} revoked.");
     }
@@ -720,6 +727,8 @@ class PassController extends Controller
      */
     private function registerResponse(Request $request, VisitorPass $pass, ?array $transferred, string $message)
     {
+        AdminLog::record($transferred ? 'pass.transferred' : 'pass.registered', $pass->visitor_name, $message);
+
         if ($request->expectsJson()) {
             $updates = [$this->passPayload($pass)];
             if ($transferred) {

@@ -85,10 +85,9 @@
                 <div class="sidebar-hint">Edit your account credentials<br>under here.</div>
             </div>
             <div class="sidebar-actions">
-                {{-- Placeholder: no account-edit route/UI yet --}}
-                <button type="button" class="sidebar-btn" aria-disabled="true" title="Coming soon" data-label="Edit Info">
+                <a href="{{ route('account.edit') }}" class="sidebar-btn {{ request()->routeIs('account.*') ? 'is-active' : '' }}" data-label="Edit Info">
                     <i class="fa-solid fa-user-pen"></i><span class="sidebar-label">Edit Info</span>
-                </button>
+                </a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" class="sidebar-btn is-logout" data-label="Log Out">
