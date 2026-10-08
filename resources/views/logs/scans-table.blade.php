@@ -31,7 +31,7 @@
                         </span>
                     @else
                         <div class="gov-location-wrap w-full">
-                            <select name="building" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+                            <select name="building" onchange="applyRecordsFilter()" class="gov-location-badge w-full h-11">
                                <option value="ALL">Building</option>
                                 @foreach ($buildings as $b)
                                     <option value="{{ $b->id }}" {{ (string) request('building') === (string) $b->id ? 'selected' : '' }}>
@@ -49,7 +49,7 @@
                 {{-- ========================= --}}
                 <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
                 <div class="gov-location-wrap w-full">
-                   <select name="result" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+                   <select name="result" onchange="applyRecordsFilter()" class="gov-location-badge w-full h-11">
                         <option value="ALL">Results</option>
                         <option value="AUTHORIZED" {{ request('result') === 'AUTHORIZED' ? 'selected' : '' }}>Authorized</option>
                         <option value="UNAUTHORIZED" {{ request('result') === 'UNAUTHORIZED' ? 'selected' : '' }}>Unauthorized</option>
@@ -74,10 +74,10 @@
     {{-- =====>>> TABLE  ===== --}}
     {{-- ======================================================================== --}}
         <div class="px-10 pb-5">
-            <div class="overflow-hidden rounded-xl border border-slate-400">
-                <div class="overflow-x-auto">
+<div class="overflow-hidden rounded-xl border border-slate-300">
+<div class="max-h-[440px] overflow-auto">
                     <table class="w-full min-w-[950px] border-collapse text-center text-xs">
-                        <thead class="bg-slate-400 text-slate-800 uppercase tracking-wide">
+<thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
                             <tr>
                                 <th class="py-3 px-4 font-bold">Timestamp</th>
                                 <th class="py-3 px-4 font-bold">Visitor</th>
@@ -90,7 +90,7 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @forelse ($logs as $l)
-                                <tr class="cursor-pointer hover:bg-slate-50"
+<tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60"
                                     data-type="scan"
                                     data-timestamp="{{ $l->created_at->format('Y-m-d h:i:s A') }}"
                                     data-visitor="{{ $l->visitor_name_snapshot }}"
@@ -101,12 +101,12 @@
                                     data-reason="{{ $l->reason }}"
                                     data-photo="{{ $l->verificationPhoto ? \Illuminate\Support\Facades\Storage::disk('public')->url($l->verificationPhoto->photo_path) : '' }}"
                                     onclick="openRowModal(this)">
-                                    <td class="border-r border-slate-100 py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
-                                    <td class="border-r border-slate-100 py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $l->visitor_name_snapshot }}</td>
-                                    <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->contact_person_snapshot ?? '—' }}</td>
-                                    <td class="border-r border-slate-100 py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ $l->pass_number_snapshot }}</td>
-                                    <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->scannedBuilding->name ?? '' }}</td>
-                                    <td class="border-r border-slate-100 py-3 px-4">
+                                    <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $l->visitor_name_snapshot }}</td>
+                                    <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->contact_person_snapshot ?? '—' }}</td>
+                                    <td class="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ $l->pass_number_snapshot }}</td>
+                                    <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->scannedBuilding->name ?? '' }}</td>
+                                    <td class="py-3 px-4">
                                         <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold
                                             {{ match($l->result) {
                                                 'AUTHORIZED' => 'bg-emerald-100 text-emerald-700',
@@ -118,10 +118,14 @@
                                             {{ ucfirst(strtolower($l->result)) }}
                                         </span>
                                     </td>
-                                    <td class="py-3 px-4 text-slate-600 truncate max-w-xs" title="{{ $l->reason }}">{{ $l->reason }}</td>
+<td class="py-3 px-4 text-left text-slate-600 truncate max-w-[320px]" title="{{ $l->reason }}">{{ $l->reason }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="py-10 text-center text-slate-400">No scan events recorded yet.</td></tr>
+<tr><td colspan="7" class="py-14 text-center">
+    <i class="fa-solid fa-clipboard-list text-2xl text-slate-300"></i>
+    <p class="mt-2 text-sm font-semibold text-slate-600">No scan events found</p>
+    <p class="text-xs text-slate-400">Try adjusting your search or filters.</p>
+</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -159,14 +163,14 @@
                     </nav>
                 @endif
 
-                <a href="{{ route('logs.export', request()->query()) }}"
-                    class="inline-flex items-center gap-2 rounded-[8px] bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
-                    <i class="fa-solid fa-file-csv text-sm"></i> Export CSV
+                <a href="{{ route('logs.export', request()->query()) }}" class="gov-btn-glass-outline">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
                 </a>
                 @if (auth()->user()->isAdmin())
+                    <span class="mx-1 hidden h-6 w-px bg-slate-300 sm:block" aria-hidden="true"></span>
                     <button type="button" onclick="openDeleteModal()"
-                            class="inline-flex items-center gap-2 rounded-[8px] bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors">
-                        <i class="fa-solid fa-trash-can text-xs"></i> Delete Logs
+                            class="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-[0.45rem] text-[0.8rem] font-semibold text-red-700 transition-colors hover:border-red-600 hover:bg-red-600 hover:text-white">
+                        <i class="fa-solid fa-trash-can"></i> Delete Logs
                     </button>
                 @endif
             </div>

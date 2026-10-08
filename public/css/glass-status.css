@@ -2717,3 +2717,86 @@ select.gov-location-badge option {
     color: #b42318;
     font-weight: 700;
 }
+/* ---------- Record details modal (audit page) ---------- */
+.gov-info-modal-panel.is-record {
+    width: min(680px, 100%);
+}
+.gov-info-modal-panel.is-record .gov-info-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+}
+.gov-info-modal-panel.is-record .gov-info-modal-body {
+    gap: 1.1rem;
+}
+.gov-info-modal-panel.is-record .gov-info-modal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+.gov-info-modal-panel.is-record .gov-info-photo {
+    aspect-ratio: 4 / 3;
+    max-height: 200px;
+}
+.gov-info-modal-panel.is-record .gov-info-photos.is-single .gov-info-photo {
+    max-width: 240px;
+}
+
+.gov-rec-section {
+    border: 1px solid var(--line);
+    border-radius: 0.8rem;
+    background: rgba(248, 250, 252, 0.85);
+    padding: 0.85rem 1rem;
+}
+.gov-rec-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.6rem;
+}
+.gov-rec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1rem;
+}
+.gov-rec-grid .is-wide {
+    grid-column: 1 / -1;
+}
+@media (max-width: 520px) {
+    .gov-rec-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.gov-rec-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.1rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.gov-rec-badge.is-ok {
+    background: #d1fae5;
+    color: #047857;
+}
+.gov-rec-badge.is-info {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+.gov-rec-badge.is-warn {
+    background: #fef3c7;
+    color: #b45309;
+}
+.gov-rec-badge.is-neutral {
+    background: #f1f5f9;
+    color: #475569;
+}
+.gov-rec-badge.is-bad {
+    background: #fee2e2;
+    color: #b91c1c;
+}

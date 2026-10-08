@@ -110,7 +110,7 @@
         </div>
     @endauth
 
-        <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+<main class="flex-grow max-w-7xl w-full mx-auto p-4 pt-10 md:p-6 md:pt-12 space-y-6">
         @yield('content')
       </main>
 

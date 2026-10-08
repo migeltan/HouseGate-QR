@@ -3,7 +3,7 @@
 
 @section('content')
 
-<style>
+<style hidden>
     @import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
     .font-source-sans {
         font-family: 'Source Sans Pro', sans-serif;
@@ -13,6 +13,18 @@
     }
     .no-scrollbar::-webkit-scrollbar {
         display: none;
+    }
+    /* Async filter loading state */
+    .records-pane { position: relative; }
+    .records-pane.is-loading table { opacity: .45; transition: opacity .15s ease; }
+    .records-pane.is-loading::before {
+        content: ''; position: absolute; top: 0; left: 0; z-index: 20;
+        height: 2px; width: 40%; background: #235aa6;
+        animation: records-bar 1s ease-in-out infinite;
+    }
+    @keyframes records-bar {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
     }
 </style>
 
@@ -175,11 +187,83 @@
             input.addEventListener('input', function () {
                 clearTimeout(t);
                 t = setTimeout(function () {
-                    input.form.submit();
+                    applyRecordsFilter();
                 }, 300);
             });
         });
     })();
+
+    // ---- Async filtering / pagination (no page reload) ----
+    let recordsCtrl = null;
+
+    // Combines both panes' filters so each pane keeps its own state.
+    function recordsUrl() {
+        const params = new URLSearchParams();
+        document.querySelectorAll('.records-pane').forEach(function (f) {
+            new FormData(f).forEach(function (v, k) {
+                if (v !== '' && v !== 'ALL') params.set(k, v);
+            });
+        });
+        const qs = params.toString();
+        return window.location.pathname + (qs ? '?' + qs : '');
+    }
+
+    function applyRecordsFilter() {
+        loadRecords(recordsUrl());
+    }
+
+    async function loadRecords(url) {
+        if (recordsCtrl) recordsCtrl.abort();
+        recordsCtrl = new AbortController();
+        const panes = document.querySelectorAll('.records-pane');
+        panes.forEach(function (p) { p.classList.add('is-loading'); });
+
+        try {
+            const res = await fetch(url, {
+                signal: recordsCtrl.signal,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            if (!doc.getElementById('scansPane')) throw new Error('Unexpected response');
+
+            panes.forEach(function (cur) {
+                const fresh = doc.getElementById(cur.id);
+                if (!fresh) return;
+                const oldKids = Array.from(cur.children);
+                const newKids = Array.from(fresh.children);
+                // child 0 = filter bar (kept, so typing focus isn't lost); the rest = table + footer
+                for (let i = 1; i < oldKids.length; i++) {
+                    if (newKids[i]) oldKids[i].replaceWith(newKids[i]);
+                }
+            });
+
+            history.replaceState(null, '', url);
+            panes.forEach(function (p) { p.classList.remove('is-loading'); });
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            window.location.href = url; // fallback: normal full load
+        }
+    }
+
+    // Enter key in a search box
+    document.querySelectorAll('.records-pane').forEach(function (f) {
+        f.addEventListener('submit', function (e) {
+            e.preventDefault();
+            applyRecordsFilter();
+        });
+    });
+
+    // Pagination links
+    document.addEventListener('click', function (e) {
+        const a = e.target.closest('nav[aria-label="Log pagination"] a, nav[aria-label="Registration pagination"] a');
+        if (!a || a.getAttribute('href') === '#') return;
+        e.preventDefault();
+        const u = new URL(a.href, window.location.href);
+        loadRecords(u.pathname + u.search);
+    });
 
     function openDeleteModal() {
         const overlay = document.getElementById('purgeModalOverlay');

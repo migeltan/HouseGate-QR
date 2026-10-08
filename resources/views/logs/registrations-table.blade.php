@@ -61,10 +61,10 @@
 {{-- =====>>> TABLE  ===== --}}
 {{-- ======================================================================== --}}
     <div class="px-10 pb-5">
-        <div class="overflow-hidden rounded-xl border border-slate-400">
-            <div class="overflow-x-auto">
+<div class="overflow-hidden rounded-xl border border-slate-300">
+<div class="max-h-[440px] overflow-auto">
                 <table class="w-full min-w-[1500px] border-collapse text-center text-xs">
-                                        <thead class="bg-slate-400 text-slate-800 uppercase tracking-wide">
+<thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
                         <tr>
                             <th class="py-3 px-4 font-bold">Photos</th>
                             <th class="py-3 px-4 font-bold">Registered at</th>
@@ -91,8 +91,18 @@
                                         default => 'Returned',
                                     };
                                 $regPassClassLabel = $r->pass_class === 'long_term' ? 'Long-term' : 'Day';
+                                // Day passes store no return date: they expire at the daily cutoff after issue.
+                                if ($r->expected_return_date) {
+                                    $regReturnLabel = $r->expected_return_date->format('M j, Y');
+                                } elseif ($r->pass_class === 'long_term') {
+                                    $regReturnLabel = '—';
+                                } else {
+                                    $regCutoff = $r->registered_at->copy()->setTimeFromTimeString(\App\Models\VisitorPass::DAY_PASS_CUTOFF);
+                                    if ($regCutoff->lte($r->registered_at)) { $regCutoff->addDay(); }
+                                    $regReturnLabel = $regCutoff->format('M j, g:i A');
+                                }
                             @endphp
-                            <tr class="cursor-pointer hover:bg-slate-50"
+<tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60"
                                 data-type="registration"
                                 data-timestamp="{{ $r->registered_at->format('Y-m-d h:i:s A') }}"
                                 data-visitor="{{ $r->visitor_name }}"
@@ -101,13 +111,13 @@
                                 data-contact-person="{{ $r->contact_person ?? '—' }}"
                                 data-id-ref="{{ $r->id_type }} · {{ $r->id_ref }}"
                                 data-pass-class="{{ $regPassClassLabel }}"
-                                data-expected-return="{{ $r->expected_return_date?->format('Y-m-d') ?? '—' }}"
+                                data-expected-return="{{ $regReturnLabel }}"
                                 data-registered-by="{{ $r->registered_by ?? '—' }}"
                                 data-status="{{ $regStatusLabel }}"
                                 @if ($r->photo_path) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
                                 @if ($r->id_photo_path) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
                                 onclick="openRowModal(this)">
-                                <td class="border-r border-slate-100 py-3 px-4">
+                                <td class="py-3 px-4">
                                     <div class="flex justify-center gap-1.5">
                                         @if ($r->photo_path)
                                             <img src="{{ asset('storage/' . $r->photo_path) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
@@ -117,17 +127,17 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="border-r border-slate-100 py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $r->visitor_name }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 max-w-[260px] truncate" title="{{ $r->office_to_visit }}">{{ $r->office_to_visit ?? '—' }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->contact_person ?? '—' }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->id_type }} &middot; {{ $r->id_ref }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4">
+                                <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</td>
+                                <td class="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $r->visitor_name }}</td>
+                                <td class="py-3 px-4 text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
+                                <td class="py-3 px-4 text-slate-700 max-w-[260px] truncate" title="{{ $r->office_to_visit }}">{{ $r->office_to_visit ?? '—' }}</td>
+                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->contact_person ?? '—' }}</td>
+                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->id_type }} &middot; {{ $r->id_ref }}</td>
+                                <td class="py-3 px-4">
                                     <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700">{{ $regPassClassLabel }}</span>
                                 </td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->expected_return_date?->format('Y-m-d') ?? '—' }}</td>
-                                <td class="border-r border-slate-100 py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->registered_by ?? '—' }}</td>
+                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $regReturnLabel }}</td>
+                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->registered_by ?? '—' }}</td>
                                 <td class="py-3 px-4">
                                     <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : ($r->unassign_reason === 'transferred' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700') }}">
                                         {{ $regStatusLabel }}
@@ -135,7 +145,11 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="11" class="py-10 text-center text-slate-400">No pass registrations recorded yet.</td></tr>
+<tr><td colspan="11" class="py-14 text-center">
+    <i class="fa-solid fa-id-card text-2xl text-slate-300"></i>
+    <p class="mt-2 text-sm font-semibold text-slate-600">No registrations found</p>
+    <p class="text-xs text-slate-400">Try adjusting your search or filters.</p>
+</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -144,7 +158,7 @@
     </div>
 
     {{-- Footer: page count + export — no Delete/Purge here on purpose --}}
-    <div class="flex flex-col gap-3 bg-white px-10 pb-5 sm:flex-row sm:items-center sm:justify-between">
+<div class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/60 px-10 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm text-slate-500">
             @if ($registrations->total() > 0)
                 Showing page {{ $registrations->currentPage() }} out of {{ $registrations->lastPage() }}
@@ -162,7 +176,7 @@
 
                     @foreach ($registrations->getUrlRange(1, $registrations->lastPage()) as $page => $url)
                         <a href="{{ $url }}"
-                           class="grid h-7 w-7 place-items-center rounded-md text-sm font-medium {{ $page == $registrations->currentPage() ? 'bg-blue-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100' }}">
+                           class="grid h-7 w-7 place-items-center rounded-md text-sm font-medium {{ $page == $registrations->currentPage() ? 'bg-[#235aa6] text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100' }}">
                             {{ $page }}
                         </a>
                     @endforeach
@@ -173,11 +187,10 @@
                 </nav>
             @endif
 
-            <a href="{{ route('logs.registrations.export', request()->query()) }}"
-                class="inline-flex items-center gap-2 rounded-[8px] bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 transition-colors">
-                <i class="fa-solid fa-file-csv text-sm"></i> Export CSV
+            <a href="{{ route('logs.registrations.export', request()->query()) }}" class="gov-btn-glass-outline">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
             </a>
         </div>
     </div>
-</div>
+</form>
 {{-- ===================== END PASS REGISTRATION RECORDS PANE ===================== --}}
