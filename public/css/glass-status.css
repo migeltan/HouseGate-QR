@@ -2128,6 +2128,52 @@ select.gov-location-badge option {
     color: var(--ink-soft);
 }
 
+/* ID capture: tap-a-line-to-assign chips */
+.id-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.id-chips.hidden,
+.id-chip-assign.hidden {
+    display: none;
+}
+.id-chips-label {
+    font:
+        600 0.75rem/1.2 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: var(--ink-soft);
+}
+.id-chip-list,
+.id-chip-assign {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.id-chip,
+.id-chip-assign button {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #0f172a;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    font:
+        600 0.78rem/1.2 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.id-chip.is-selected {
+    background: var(--brand-blue);
+    border-color: var(--brand-blue);
+    color: #fff;
+}
+.id-chip-assign button {
+    background: #f1f5f9;
+}
+
 /* Form: sub-headings, inputs, focus ring */
 .reg-subhead {
     grid-column: 1 / -1;

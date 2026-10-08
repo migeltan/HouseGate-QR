@@ -53,6 +53,15 @@
             </div>
             <p class="reg-camera-help" id="idCaptureStatus" style="font-weight:700; color:#64748b;">Capture the
                 visitor's ID — front, then back.</p>
+            <div id="idOcrChips" class="id-chips hidden">
+                <span class="id-chips-label">Tap a line from the ID, then choose the field:</span>
+                <div id="idChipList" class="id-chip-list"></div>
+                <div id="idChipAssign" class="id-chip-assign hidden">
+                    <button type="button" data-assign="last_name">Last Name</button>
+                    <button type="button" data-assign="first_name">First Name</button>
+                    <button type="button" data-assign="middle_name">Middle Name</button>
+                </div>
+            </div>
             <input type="hidden" name="id_photo_data" id="idPhotoDataInput">
         </div>
     </div>

@@ -433,9 +433,12 @@
             try {
                 idPhotoStream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: 'environment'
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
                     }
                 });
+                if (idSlide === 0 && window.Tesseract) getOcrWorker().catch(() => {}); // load OCR while the guard lines up the card
                 document.getElementById('idPhotoVideo').srcObject = idPhotoStream;
                 idCameraActive = true;
                 updateIdSlideUI();
@@ -444,13 +447,28 @@
             }
         }
 
-        function captureCurrentIdSlide() {
+        async function captureCurrentIdSlide() {
+            if (captureCurrentIdSlide.busy) return; // ignore double-taps during the burst
+            captureCurrentIdSlide.busy = true;
             const video = document.getElementById('idPhotoVideo');
             const canvas = document.getElementById('idPhotoCanvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
+
+            // Burst: grab 4 frames ~120ms apart and keep the sharpest (hand shake / autofocus hunting).
+            let bestFrame = null, bestScore = -1;
+            for (let i = 0; i < 4; i++) {
+                ctx.drawImage(video, 0, 0);
+                const score = measureSharpness(canvas);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                }
+                if (i < 3) await new Promise(r => setTimeout(r, 120));
+            }
+            ctx.putImageData(bestFrame, 0, 0);
+            captureCurrentIdSlide.busy = false;
             const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
             stopIdCameraStream();
@@ -460,7 +478,7 @@
                 idPhotos.front = dataUrl;
                 document.getElementById('idPhotoDataInput').value = dataUrl;
                 updateIdSlideUI();
-                runIdOcr(dataUrl);
+                runIdOcr(canvas);
                 if (!idPhotos.back) setTimeout(() => goToIdSlide(1), 400);
             } else {
                 idPhotos.back = dataUrl; // in-memory only — never uploaded or stored
@@ -489,6 +507,7 @@
             idCameraActive = false;
             document.getElementById('idPhotoDataInput').value = '';
             setIdCaptureStatus("Capture the visitor's ID — front, then back.", 'neutral');
+            clearIdChips();
             updateIdSlideUI();
         }
 
@@ -505,62 +524,292 @@
             el.style.color = colors[tone] || colors.neutral;
         }
 
-        // ---- ID OCR auto-fill (National ID / PhilSys front, client-side via Tesseract.js) ----
-        async function runIdOcr(dataUrl) {
+        // ---- ID OCR auto-fill (any ID type; client-side via Tesseract.js, images never leave the device) ----
+        const ID_BLUR_THRESHOLD = 40; // Laplacian variance on a 640px copy; raise it if blurry shots slip through
+
+        const ID_FIELD_LABELS = {
+            last: [/Apelyido/i, /Last\s*Nam/i, /Sur\s*name/i, /Family\s*Nam/i],
+            first: [/Pangalan/i, /G\w{2,4}n\s*Nam/i, /First\s*Nam/i],
+            middle: [/Gitnang/i, /Middle\s*Nam/i],
+        };
+        const ID_LABEL_RX = [
+            ...Object.values(ID_FIELD_LABELS).flat(),
+            /\bPetsa\b|Date\s*of\s*Birth|\bBirth/i, /Tirahan|\bAddress\b/i,
+            /Republika|Philippines|Identification|National\s*ID|\bLicense\b|\bPassport\b/i,
+            /\b(Sex|Kasarian|Nationality|Signature|Expiry|Expiration|Valid|Blood|Height|Weight|Agency|Conditions|Restrictions)\b/i,
+        ];
+        const ID_ADDRESS_RX = /\d|\b(city|brgy|barangay|st|street|ave|avenue|metro|manila|province|blk|lot)\b/i;
+
+        const isIdLabel = (s) => ID_LABEL_RX.some(p => p.test(s));
+        const idClean = (s) => s.replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú.,' -]/g, '').replace(/\s+/g, ' ').trim();
+        const idNameLike = (s) => (s.match(/[A-Za-zÑñÁÉÍÓÚáéíóú]/g) || []).length >= 2 && !isIdLabel(s);
+        const splitCombined = (s) => { // "DELA CRUZ, JUAN SANTOS"
+            const [l, ...rest] = s.split(',');
+            const r = rest.join(' ').trim();
+            return (l.trim().length >= 2 && r.length >= 2) ? { last: l.trim(), given: r } : null;
+        };
+
+        const isCapsLine = (s) => /^[A-ZÑ][A-ZÑ.' -]+$/.test(s);
+        const PHILSYS_NOISE_RX = /PHL|REPUBLIK|PILIPINAS|PAMBANSANG|PAGKAKA|PHILIPPINE|IDENTIF|CARD/;
+
+        // PhilSys front: card number, then LAST / FIRST / MIDDLE in large caps, then the birth date.
+        // Position-based, so it still works when the tiny italic labels are misread.
+        function philsysLayoutNames(lines) {
+            let start = lines.findIndex(l => /\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}/.test(l));
+            if (start < 0) {
+                start = lines.reduce((acc, l, i) => (/PAMBANSANG|PAGKAKA|PILIPINAS/i.test(l) ? i : acc), -1);
+            }
+            if (start < 0) return null;
+            const names = [];
+            for (const raw of lines.slice(start + 1)) {
+                if (/\d/.test(raw)) { if (names.length) break; else continue; } // the date line ends the name block
+                const c = idClean(raw).replace(/\s+[a-zñ]{1,2}$/, '');
+                if (!isCapsLine(c) || c.replace(/[^A-ZÑ]/g, '').length < 2 || PHILSYS_NOISE_RX.test(c)) continue;
+                names.push(c);
+                if (names.length === 3) break;
+            }
+            return names.length >= 2 ? [names[0], names[1], names[2] || null] : null;
+        }
+
+        // One shared OCR worker: the language data downloads once, later captures start instantly.
+        let ocrWorkerPromise = null;
+
+        function getOcrWorker() {
+            if (!ocrWorkerPromise) {
+                ocrWorkerPromise = Tesseract.createWorker('eng').then(async (w) => {
+                    await w.setParameters({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' }); // sparse text suits cards
+                    return w;
+                }).catch((e) => { ocrWorkerPromise = null; throw e; });
+            }
+            return ocrWorkerPromise;
+        }
+
+        // Grayscale + contrast stretch + upscale small frames. Makes camera shots far easier for Tesseract.
+        function preprocessIdCanvas(src) {
+            const scale = Math.min(2, Math.max(1, 1800 / src.width));
+            const c = document.createElement('canvas');
+            c.width = Math.round(src.width * scale);
+            c.height = Math.round(src.height * scale);
+            const ctx = c.getContext('2d', { willReadFrequently: true });
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(src, 0, 0, c.width, c.height);
+            const img = ctx.getImageData(0, 0, c.width, c.height);
+            const d = img.data, n = d.length / 4;
+            const gray = new Uint8ClampedArray(n);
+            const hist = new Uint32Array(256);
+            for (let i = 0; i < n; i++) {
+                const g = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0;
+                gray[i] = g;
+                hist[g]++;
+            }
+            let lo = 0, hi = 255, acc = 0;
+            for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.02) { lo = v; break; } }
+            acc = 0;
+            for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.02) { hi = v; break; } }
+            const range = Math.max(40, hi - lo);
+            for (let i = 0; i < n; i++) {
+                const v = Math.max(0, Math.min(255, ((gray[i] - lo) * 255 / range) | 0));
+                d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+            }
+            ctx.putImageData(img, 0, 0);
+            return c;
+        }
+
+        // Variance of the Laplacian on a 640px copy: low = blurry.
+        function measureSharpness(src) {
+            const w = 640, h = Math.max(3, Math.round(src.height * w / src.width));
+            const c = document.createElement('canvas');
+            c.width = w;
+            c.height = h;
+            const ctx = c.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(src, 0, 0, w, h);
+            const d = ctx.getImageData(0, 0, w, h).data;
+            const g = new Float32Array(w * h);
+            for (let i = 0; i < w * h; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+            let sum = 0, sumSq = 0, cnt = 0;
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    const i = y * w + x;
+                    const l = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - w] - g[i + w];
+                    sum += l; sumSq += l * l; cnt++;
+                }
+            }
+            const mean = sum / cnt;
+            return sumSq / cnt - mean * mean;
+        }
+
+        async function runIdOcr(srcCanvas) {
+            clearIdChips();
             setIdCaptureStatus('Reading ID… this can take a few seconds.', 'busy');
             try {
-                const {
-                    data: {
-                        text
-                    }
-                } = await Tesseract.recognize(dataUrl, 'eng');
+                // Do the canvas work first: the shared capture canvas is reused for the back side.
+                const prepared = preprocessIdCanvas(srcCanvas);
+                const blurry = measureSharpness(srcCanvas) < ID_BLUR_THRESHOLD;
+
+                const worker = await getOcrWorker();
+                const { data } = await worker.recognize(prepared);
+                const lines = (data.lines || []).map(l => ({ text: l.text.trim(), conf: l.confidence })).filter(l => l.text);
+                const text = lines.length ? lines.map(l => l.text).join('\n') : (data.text || '');
+
                 const filled = applyIdOcrText(text);
-                setIdCaptureStatus(filled.length ? `Auto-filled: ${filled.join(', ')}. Please review.` :
-                    'Could not read the ID clearly — please fill in manually.', filled.length ? 'success' : 'warn');
+                const chips = renderIdChips(lines.length ? lines : text.split('\n').map(t => ({ text: t.trim() })));
+                if (filled.includes('Last Name') && filled.includes('First Name')) clearIdChips(); // no manual picking needed
+                const note = blurry ? ' The image looks blurry. Retake for a better read.' : '';
+
+                if (filled.length) {
+                    setIdCaptureStatus(`Auto-filled: ${filled.join(', ')}. Please review.${note}`, 'success');
+                } else if (chips) {
+                    setIdCaptureStatus(`Could not pick out the name. Tap a line below, or type it.${note}`, 'warn');
+                } else {
+                    setIdCaptureStatus(`Could not read the ID clearly. Please fill in manually.${note}`, 'warn');
+                }
             } catch (err) {
                 console.error('ID OCR failed:', err);
-                setIdCaptureStatus('ID reading failed — please fill in manually.', 'error');
+                setIdCaptureStatus('ID reading failed. Please fill in manually.', 'error');
             }
         }
 
         function applyIdOcrText(rawText) {
             const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-            const allLabelPatterns = [/Apelyido/i, /Last\s*Name/i, /Mga\s*Pangalan/i, /Given\s*Name/i,
-                /Gitnang\s*Apelyido/i, /Middle\s*Name/i, /Petsa|Date\s*of\s*Birth/i, /Tirahan|Address/i,
-                /Republika|Philippines|Identification/i
-            ];
-            const looksLikeName = (line) => {
-                const clean = line.replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
-                return clean.length >= 2 && !allLabelPatterns.some(p => p.test(clean));
-            };
-            const findValueAfter = (labelPatterns) => {
+
+            // Value next to a label: after a ':' on the same line, else the next ALL-CAPS line (values print in
+            // caps; labels are small mixed-case text that OCR garbles), else any name-like line within 3 lines.
+            const findValue = (patterns, exclude = []) => {
                 for (let i = 0; i < lines.length; i++) {
-                    if (!labelPatterns.some(p => p.test(lines[i]))) continue;
-                    for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
-                        if (looksLikeName(lines[j])) return lines[j].replace(/[^A-Za-zÑñÁÉÍÓÚáéíóú' -]/g, '').trim();
+                    const hit = patterns.find(p => p.test(lines[i]));
+                    if (!hit || exclude.some(p => p.test(lines[i]))) continue;
+                    if (lines[i].includes(':')) {
+                        const same = idClean(lines[i].split(':').slice(1).join(':'));
+                        if (idNameLike(same)) return same;
                     }
+                    const next = lines.slice(i + 1, i + 4).map(idClean).filter(idNameLike);
+                    const v = next.find(isCapsLine) || next[0];
+                    if (v) return v;
                 }
                 return null;
             };
 
-            const lastName = findValueAfter([/Apelyido/i, /Last\s*Name/i]);
-            const firstName = findValueAfter([/Mga\s*Pangalan/i, /Given\s*Name/i]);
-            const middleName = findValueAfter([/Gitnang\s*Apelyido/i, /Middle\s*Name/i]);
+            // PhilSys by layout first; every other ID falls back to labels.
+            let [last, first, middle] = philsysLayoutNames(lines) || [
+                findValue(ID_FIELD_LABELS.last, ID_FIELD_LABELS.middle),
+                findValue(ID_FIELD_LABELS.first),
+                findValue(ID_FIELD_LABELS.middle),
+            ];
+
+            // "LAST, FIRST MIDDLE" on a single line (licenses, many other IDs).
+            let parts = null;
+            const combined = [last, first, middle].find(v => v && v.includes(','));
+            if (combined) {
+                parts = splitCombined(combined);
+                last = first = middle = null;
+            }
+            if (!parts && !last && !first) {
+                for (const line of lines) {
+                    const c = idClean(line);
+                    if (!c.includes(',') || ID_ADDRESS_RX.test(line) || isIdLabel(c)) continue;
+                    parts = splitCombined(c);
+                    if (parts) break;
+                }
+            }
+            if (parts) {
+                last = parts.last;
+                first = parts.given; // the guard can move a middle name with the tap chips
+            }
+
+            // Passport machine-readable zone: P<PHLDELA<CRUZ<<JUAN<SANTOS<<<<  (best effort, OCR-B is hard for Tesseract)
+            let isPassport = false;
+            if (!last && !first) {
+                for (const raw of lines) {
+                    const m = raw.toUpperCase().replace(/\s/g, '').replace(/[«‹]/g, '<')
+                        .match(/^P[<A-Z][A-Z]{3}([A-Z]+(?:<[A-Z]+)*)<<([A-Z]+(?:<[A-Z]+)*)/);
+                    if (m) {
+                        last = m[1].replace(/</g, ' ');
+                        first = m[2].replace(/</g, ' ');
+                        isPassport = true;
+                        break;
+                    }
+                }
+            }
+
+            [last, first, middle] = [last, first, middle].map(v => v ? v.replace(/,/g, ' ').replace(/\s+/g, ' ').trim() : null);
+
             const idMatch = rawText.match(/\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}/);
             const idRef = idMatch ? idMatch[0].replace(/\s/g, '-') : null;
 
             const filled = [];
-            setAutofillValue('last_name', lastName, 'Last Name', filled);
-            setAutofillValue('first_name', firstName, 'First Name', filled);
-            setAutofillValue('middle_name', middleName, 'Middle Name', filled);
+            setAutofillValue('last_name', last, 'Last Name', filled);
+            setAutofillValue('first_name', first, 'First Name', filled);
+            setAutofillValue('middle_name', middle, 'Middle Name', filled);
             setAutofillValue('id_ref', idRef, 'ID Number', filled);
 
-            if (lastName || firstName) {
-                const idTypeSelect = document.querySelector('[name="id_type"]');
-                if (idTypeSelect && !idTypeSelect.value) idTypeSelect.value = 'PhilSys (National ID)';
+            // Only guess the ID type when it is unmistakable; otherwise leave it for the guard.
+            const idTypeSelect = document.querySelector('[name="id_type"]');
+            if (idTypeSelect && !idTypeSelect.value) {
+                if (isPassport) idTypeSelect.value = 'Passport';
+                else if (idMatch || /Mga\s*Pangalan/i.test(rawText)) idTypeSelect.value = 'PhilSys (National ID)';
             }
             return filled;
         }
+
+        // ---- Tap-a-line-to-assign chips: works on any ID, no layout knowledge needed ----
+        let selectedIdChip = null;
+
+        function clearIdChips() {
+            selectedIdChip = null;
+            document.getElementById('idChipList')?.replaceChildren();
+            document.getElementById('idChipAssign')?.classList.add('hidden');
+            document.getElementById('idOcrChips')?.classList.add('hidden');
+        }
+
+        function renderIdChips(lines) {
+            const seen = new Set();
+            const texts = [];
+            lines.forEach(l => {
+                if (l.conf !== undefined && l.conf < 30) return;
+                idClean(l.text).split(',').map(s => s.trim()).forEach(t => {
+                    const key = t.toUpperCase();
+                    if (t.length < 2 || t.length > 40 || !idNameLike(t) || seen.has(key)) return;
+                    seen.add(key);
+                    texts.push(t);
+                });
+            });
+
+            const list = document.getElementById('idChipList');
+            list.replaceChildren(...texts.slice(0, 14).map(t => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'id-chip';
+                b.textContent = t; // textContent: OCR output is untrusted
+                return b;
+            }));
+            document.getElementById('idChipAssign').classList.add('hidden');
+            document.getElementById('idOcrChips').classList.toggle('hidden', texts.length === 0);
+            return texts.length > 0;
+        }
+
+        document.addEventListener('click', (e) => {
+            const chip = e.target.closest('.id-chip');
+            if (chip) {
+                const wasSelected = chip.classList.contains('is-selected');
+                document.querySelectorAll('.id-chip.is-selected').forEach(c => c.classList.remove('is-selected'));
+                selectedIdChip = wasSelected ? null : chip.textContent;
+                chip.classList.toggle('is-selected', !wasSelected);
+                document.getElementById('idChipAssign').classList.toggle('hidden', !selectedIdChip);
+                return;
+            }
+            const assign = e.target.closest('#idChipAssign [data-assign]');
+            if (assign && selectedIdChip) {
+                const input = document.querySelector(`[name="${assign.dataset.assign}"]`);
+                if (!input) return;
+                input.value = selectedIdChip; // an explicit tap is a deliberate choice: overrides earlier auto-fill
+                delete input.dataset.autofilled;
+                scheduleDuplicateCheck();
+                setIdCaptureStatus(`${assign.textContent} set to "${selectedIdChip}". Please review.`, 'success');
+                document.querySelectorAll('.id-chip.is-selected').forEach(c => c.classList.remove('is-selected'));
+                selectedIdChip = null;
+                document.getElementById('idChipAssign').classList.add('hidden');
+            }
+        });
 
         function setAutofillValue(name, value, label, filledList) {
             if (!value) return;
