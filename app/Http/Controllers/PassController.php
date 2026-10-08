@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PassController extends Controller
 {
@@ -106,9 +107,9 @@ class PassController extends Controller
             // leaving the visitor holding two passes).
             $old = VisitorPass::where('qr_token', $token)->where('status', 'active')->first();
             if (! $old) {
-                return back()->withErrors(
+                throw ValidationException::withMessages(['register' =>
                     'That card is not an active pass, so it cannot be transferred. Scan the old card again.'
-                )->withInput();
+                ]);
             }
 
             // Safety: the card must belong to the person being registered. Either the duplicate check
@@ -119,9 +120,9 @@ class PassController extends Controller
             );
             $isSamePass = $dup && (int) $dup['pass']['id'] === (int) $old->id;
             if (! $isSamePass && ! $this->sameIdentity($old, $data)) {
-                return back()->withErrors(
+                throw ValidationException::withMessages(['register' =>
                     "That card (#{$old->pass_number}, held by {$old->visitor_name}) does not belong to this visitor. Scan the right card, or cancel the transfer."
-                )->withInput();
+                ]);
             }
 
             $data['transfer_from_pass_id'] = $old->id;
@@ -133,15 +134,15 @@ class PassController extends Controller
             $p = $dup['pass'];
 
             if ($dup['level'] === 'exact') {
-                return back()->withErrors(
+                throw $this->duplicateError($request, $dup,
                     "This ID already has an active pass (#{$p['pass_number']}, {$p['buildings']}). A new pass cannot be issued."
-                )->withInput();
+                );
             }
 
             if (! $request->boolean('confirm_different_person')) {
-                return back()->withErrors(
+                throw $this->duplicateError($request, $dup,
                     "Possible match: {$p['holder']} already has active pass #{$p['pass_number']} ({$p['buildings']}). Confirm this is a different person to continue."
-                )->withInput();
+                );
             }
         }
 
@@ -163,11 +164,11 @@ class PassController extends Controller
             ->get();
 
         if ($congressmen->count() !== count($congressmanIds)) {
-            return back()->withErrors('One or more selected congressmen are not in the selected building(s).')->withInput();
+            throw ValidationException::withMessages(['register' => 'One or more selected congressmen are not in the selected building(s).']);
         }
 
         if ($congressmen->isEmpty() && $other === '') {
-            return back()->withErrors('Choose at least one congressman, or fill in "Other".')->withInput();
+            throw ValidationException::withMessages(['register' => 'Choose at least one congressman, or fill in "Other".']);
         }
 
         $data['congressman_ids'] = $congressmen->pluck('id')->all();
@@ -177,10 +178,10 @@ class PassController extends Controller
         if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
             $cap = VisitorPass::addWorkingDays(now(), VisitorPass::MAX_LONG_TERM_WORKING_DAYS);
             if (\Carbon\Carbon::parse($data['expected_return_date'])->gt($cap)) {
-                return back()->withErrors(
+                throw ValidationException::withMessages(['register' =>
                     'Expected return date exceeds the 30-working-day cap for long-term passes ('
                     . $cap->format('M j, Y') . ' latest).'
-                )->withInput();
+                ]);
             }
         }
 
@@ -379,14 +380,12 @@ class PassController extends Controller
             ->first();
 
         if (! $pass) {
-            return back()->withErrors('No available passes left for that building. Please choose another building.')->withInput();
+            throw ValidationException::withMessages(['register' => 'No available passes left for that building. Please choose another building.']);
         }
 
         $transferred = DB::transaction(fn () => $this->assignVisitorToPass($pass, $data, $request));
 
-        return redirect()->route('passes.index')
-            ->with('success', $this->registrationMessage($pass, $transferred, $pass->building->name))
-            ->with('success_pass_number', $pass->pass_number);
+        return $this->registerResponse($request, $pass, $transferred, $this->registrationMessage($pass, $transferred, $pass->building->name));
     }
 
     /**
@@ -433,9 +432,7 @@ class PassController extends Controller
 
         $buildingCount = count($data['building_ids']);
 
-        return redirect()->route('passes.index')
-            ->with('success', $this->registrationMessage($pass, $transferred, "{$buildingCount} buildings", true))
-            ->with('success_pass_number', $pass->pass_number);
+        return $this->registerResponse($request, $pass, $transferred, $this->registrationMessage($pass, $transferred, "{$buildingCount} buildings", true));
     }
 
     public function updateBuildings(Request $request, VisitorPass $pass)
@@ -458,11 +455,6 @@ class PassController extends Controller
         $pass->openRegistration()?->update([
             'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
         ]);
-
-        return redirect()->route('passes.index')
-            ->with('success', "Updated authorized buildings for Pass #{$pass->pass_number}.");
-
-        
         // Buildings removed → drop those buildings' congressmen from the open registration
         // and rebuild the summary so it no longer names people the pass doesn't cover.
         if ($registration = $pass->openRegistration()) {
@@ -478,6 +470,9 @@ class PassController extends Controller
                 $pass->update(['office_to_visit' => $summary]);
             }
         }
+
+        return redirect()->route('passes.index')
+            ->with('success', "Updated authorized buildings for Pass #{$pass->pass_number}.");
     }
 
     public function show(Request $request, VisitorPass $pass)
@@ -502,38 +497,50 @@ class PassController extends Controller
     {
         $this->authorizeGuardScope($request, $pass);
 
-        if ($pass->photo_path) {
-            Storage::disk('public')->delete($pass->photo_path);
+        $photoPaths = [];
+        $already = DB::transaction(function () use ($pass, &$photoPaths) {
+            $this->lockFresh($pass);
+
+            if ($pass->status === 'available') {
+                return true;
+            }
+
+            $photoPaths = array_filter([$pass->photo_path, $pass->id_photo_path]);
+
+            $pass->openRegistration()?->update([
+                'unassigned_at' => now(),
+                'unassign_reason' => 'returned',
+            ]);
+
+            $pass->update([
+                'visitor_name' => null, 'first_name' => null, 'middle_name' => null, 'last_name' => null,
+                'gender' => null, 'contact_no' => null, 'id_ref' => null, 'id_type' => null,
+                'purpose' => null, 'office_to_visit' => null, 'contact_person' => null, 'vehicle' => null,
+                'status' => 'available', 'issued_at' => null,
+                'photo_path' => null, 'id_photo_path' => null, 'pass_class' => 'day',
+                'expected_return_date' => null, 'visitor_email' => null, 'registered_by' => null,
+                'current_building_id' => null, 'checked_in_at' => null, 'last_egress_at' => null,
+            ]);
+
+            if ($pass->is_multi_building) {
+                $pass->buildings()->detach();
+            }
+
+            return false;
+        });
+
+        if ($already) {
+            return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} is already available.", false, 409);
         }
-        if ($pass->id_photo_path) {
-            Storage::disk('public')->delete($pass->id_photo_path);
+
+        foreach ($photoPaths as $path) {
+            Storage::disk('public')->delete($path);
         }
 
-        $pass->openRegistration()?->update([
-            'unassigned_at' => now(),
-            'unassign_reason' => 'returned',
-        ]);
-
-        $pass->update([
-            'visitor_name' => null, 'first_name' => null, 'middle_name' => null, 'last_name' => null,
-            'gender' => null, 'contact_no' => null, 'id_ref' => null, 'id_type' => null,
-                        'purpose' => null, 'office_to_visit' => null, 'contact_person' => null, 'vehicle' => null,
-            'status' => 'available', 'issued_at' => null,
-            'photo_path' => null, 'id_photo_path' => null, 'pass_class' => 'day',
-            'expected_return_date' => null, 'visitor_email' => null, 'registered_by' => null,
-            'current_building_id' => null, 'checked_in_at' => null, 'last_egress_at' => null,
-        ]);
-
-        if ($pass->is_multi_building) {
-            $pass->buildings()->detach();
-        }
-
-        return redirect()->route('passes.index')
-            ->with('success', "Pass #{$pass->pass_number} unassigned and returned to available stock.");
+        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} unassigned and returned to available stock.");
     }
 
-
-        /**
+    /**
      * Immediately deny a pass without closing out the visit the way
      * unassign() does — visitor data, dates, and building assignment stay
      * intact so the record remains visible/auditable; only status changes
@@ -544,14 +551,135 @@ class PassController extends Controller
     {
         $this->authorizeGuardScope($request, $pass);
 
-        $pass->update([
-            'status' => 'revoked',
-            'current_building_id' => null,
-            'checked_in_at' => null,
-        ]);
+        $already = DB::transaction(function () use ($pass) {
+            $this->lockFresh($pass);
+
+            if (in_array($pass->status, ['available', 'revoked'], true)) {
+                return true;
+            }
+
+            $pass->update([
+                'status' => 'revoked',
+                'current_building_id' => null,
+                'checked_in_at' => null,
+            ]);
+
+            return false;
+        });
+
+        if ($already) {
+            $msg = $pass->status === 'revoked'
+                ? "Pass #{$pass->pass_number} is already revoked."
+                : "Pass #{$pass->pass_number} is unassigned, so there is nothing to revoke.";
+
+            return $this->passActionResponse($request, $pass, $msg, false, 409);
+        }
+
+        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} revoked.");
+    }
+
+    /** Re-read the pass under a row lock so two screens can't both act on stale state. */
+    private function lockFresh(VisitorPass $pass): void
+    {
+        $pass->setRawAttributes(VisitorPass::whereKey($pass->id)->lockForUpdate()->firstOrFail()->getAttributes(), true);
+    }
+
+    /**
+     * Counts for the pass's building pool (same scoping the building cards use:
+     * building_id + multi/single). One grouped query.
+     */
+    private function buildingCounts(VisitorPass $pass): array
+    {
+        $by = VisitorPass::where('building_id', $pass->building_id)
+            ->where('is_multi_building', $pass->is_multi_building)
+            ->selectRaw('status, COUNT(*) as n')
+            ->groupBy('status')
+            ->pluck('n', 'status');
+
+        return [
+            'building_id' => $pass->building_id,
+            'available'   => (int) ($by['available'] ?? 0),
+            'active'      => (int) ($by['active'] ?? 0),
+            'inactive'    => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0)),
+            'total'       => (int) $by->sum(),
+        ];
+    }
+
+    /**
+     * Duplicate-pass refusal. fetch() callers also get the match, so the page can show the
+     * Step 2 warning card instead of just a message; plain posts redirect back as before.
+     */
+    private function duplicateError(Request $request, array $dup, string $message): ValidationException
+    {
+        $e = ValidationException::withMessages(['register' => $message]);
+
+        if ($request->expectsJson()) {
+            $e->response = response()->json([
+                'message'   => $message,
+                'errors'    => ['register' => [$message]],
+                'duplicate' => $dup,
+            ], 422);
+        }
+
+        return $e;
+    }
+
+    /** Everything the page needs to update one pass in place: fresh row HTML + building counts. */
+    private function passPayload(VisitorPass $pass): array
+    {
+        $pass->refresh()->load(['building', 'buildings']);
+
+        return [
+            'pass_id'     => $pass->id,
+            'pass_number' => (int) $pass->pass_number,
+            'status'      => $pass->status,
+            'row'         => view('passes._pass-row', [
+                'p' => $pass,
+                'allBuildingsCount' => Building::where('code', '!=', 'NG')->count(),
+            ])->render(),
+            'counts'      => $this->buildingCounts($pass),
+        ];
+    }
+
+    /**
+     * Success exit for register/transfer. fetch() callers get the new pass (and, on a
+     * transfer, the returned old pass) as in-place updates; plain posts still redirect.
+     */
+    private function registerResponse(Request $request, VisitorPass $pass, ?array $transferred, string $message)
+    {
+        if ($request->expectsJson()) {
+            $updates = [$this->passPayload($pass)];
+            if ($transferred) {
+                $updates[] = $this->passPayload(VisitorPass::findOrFail($transferred['id']));
+            }
+
+            return response()->json([
+                'ok'          => true,
+                'message'     => $message,
+                'pass_number' => (int) $pass->pass_number,
+                'updates'     => $updates,
+            ]);
+        }
 
         return redirect()->route('passes.index')
-            ->with('success', "Pass #{$pass->pass_number} revoked.");
+            ->with('success', $message)
+            ->with('success_pass_number', $pass->pass_number);
+    }
+
+    /**
+     * One exit for unassign/revoke. fetch() callers (Accept: application/json) get the
+     * re-rendered row + counts; plain form posts keep the old redirect behaviour.
+     * $ok=false means the pass was already in the target state (stale screen).
+     */
+    private function passActionResponse(Request $request, VisitorPass $pass, string $message, bool $ok = true, int $status = 200)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => $ok, 'message' => $message] + $this->passPayload($pass), $status);
+        }
+
+        $redirect = redirect()->route('passes.index');
+
+        return $ok ? $redirect->with('success', $message) : $redirect->withErrors($message);
     }
     
     /**
@@ -689,6 +817,7 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
         $transferred = null;
         if ($oldPass && $oldRegistration) {
             $transferred = [
+                'id' => $oldPass->id,
                 'pass_number' => $oldPass->pass_number,
                 'building' => $oldPass->is_multi_building
                     ? 'North Gate Access'

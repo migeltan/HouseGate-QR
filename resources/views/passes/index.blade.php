@@ -708,9 +708,11 @@
             const hint = document.getElementById('registerHint');
             if (hint) {
                 const missing = btn.disabled && !blocked ? missingFields() : [];
-                hint.textContent = blocked
-                    ? 'Resolve the duplicate-pass warning above to continue.'
-                    : (missing.length ? 'Still needed: ' + missing.join(', ') : '');
+                const err = hint.dataset.error || '';   // set by submitRegisterInPlace(); cleared when the user edits
+                hint.classList.toggle('is-error', !!err);
+                hint.textContent = err || (blocked
+                    ? (transferModeActive ? 'Scan the visitor’s old card above to continue.' : 'Resolve the duplicate-pass warning above to continue.')
+                    : (missing.length ? 'Still needed: ' + missing.join(', ') : ''));
             }
         }
 
@@ -804,16 +806,71 @@
             refreshSubmitState(); // any change (building, reason, dates, confirm box) can flip readiness
         });
         document.getElementById('registerForm').addEventListener('submit', (e) => {
+            e.preventDefault();
             if (dupBlocked()) {
-                e.preventDefault();
                 document.getElementById('dupWarning').scrollIntoView({
                     behavior: 'smooth',
                     block: 'center'
                 });
                 return;
             }
-            lockRegisterSubmit();
+            submitRegisterInPlace(e.currentTarget);
         });
+        // Editing anything dismisses a previous server error (runs before the document-level handlers).
+        ['input', 'change'].forEach(ev => document.getElementById('registerForm').addEventListener(ev, () => {
+            delete document.getElementById('registerHint').dataset.error;
+        }));
+
+        // Register / Transfer in the background: errors stay inside this window with every field and
+        // photo intact; success updates rows + counts live and closes the window. If this script
+        // never loads, the form still posts normally (server redirects as before).
+        async function submitRegisterInPlace(form) {
+            if (form.dataset.busy) return;
+            form.dataset.busy = '1';
+            delete document.getElementById('registerHint').dataset.error;
+            lockRegisterSubmit();
+
+            let errorMsg = '';
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                });
+                let data = null;
+                try { data = await res.json(); } catch (_) {}
+
+                if (res.ok && data && data.ok) {
+                    (data.updates || []).forEach(applyPassPayload);
+                    const num = data.pass_number;
+                    closeRegisterModal();
+                    showToast(data.message, 'success', null, {
+                        label: 'View Pass',
+                        onClick: () => document.querySelector(`[data-pass-number="${num}"][onclick^="openPassInfoModal"]`)?.click(),
+                    });
+                } else {
+                    if (data && data.duplicate) {   // server caught a duplicate the live check hadn't shown
+                        renderDuplicate(data.duplicate, false);
+                        document.getElementById('dupWarning').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    errorMsg = (data && data.errors && Object.values(data.errors).flat()[0])
+                        || (data && data.message && res.status !== 419 && res.status !== 500 ? data.message : '')
+                        || (res.status === 419 ? 'Your session expired. Sign in again in a new tab, then reload this page.'
+                            : res.status === 403 ? 'You are not allowed to do that.'
+                            : 'Something went wrong on the server. Your entries are still here. Try again.');
+                }
+            } catch (e) {
+                errorMsg = 'Network error. Your entries are still here. Try again.';
+            } finally {
+                delete form.dataset.busy;
+                unlockRegisterSubmit();
+                if (errorMsg) {
+                    document.getElementById('registerHint').dataset.error = errorMsg;
+                    refreshSubmitState();
+                }
+            }
+        }
 
         // Visible "saving" state: blocks double-submits and tells the guard when it's slow.
         let registerSlowTimer = null;

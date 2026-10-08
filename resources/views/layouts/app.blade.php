@@ -230,7 +230,12 @@ document.addEventListener('submit', async (e) => {
         title: d.confirmTitle, subject: d.confirmSubject, message: d.confirmMessage,
         confirmLabel: d.confirmLabel, tone: d.confirmTone || 'danger',
     });
-    if (ok) HTMLFormElement.prototype.submit.call(form); // .submit() skips this handler
+    if (!ok) return;
+    if (form.hasAttribute('data-inplace') && typeof window.submitPassAction === 'function') {
+        window.submitPassAction(form);                    // background request, no reload
+    } else {
+        HTMLFormElement.prototype.submit.call(form);      // .submit() skips this handler
+    }
 });
 
     @if (session('success'))

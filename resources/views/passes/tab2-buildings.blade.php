@@ -52,9 +52,9 @@
             class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
                 <h3>{{ $b->name }}</h3>
-                <p class="is-active"><b>{{ $activeCount }}</b> Active Passes</p>
-                <p class="is-available"><b>{{ $availableCount }}</b> Available Passes</p>
-                <p class="is-inactive" title="Expired or revoked"><b>{{ $inactiveCount }}</b> Inactive Passes</p>
+<p class="is-active"><b data-card-count="active">{{ $activeCount }}</b> Active Passes</p>
+<p class="is-available"><b data-card-count="available">{{ $availableCount }}</b> Available Passes</p>
+                <p class="is-inactive" title="Expired or revoked"><b data-card-count="inactive">{{ $inactiveCount }}</b> Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
                 <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"
@@ -106,98 +106,7 @@
                      class="hidden flex flex-col gap-2"
                      data-building-color="{{ $b->color_hex }}">
                     @forelse ($passes->where('building_id', $b->id)->where('is_multi_building', $b->code === 'NG') as $p)
-                        @php
-                            $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
-                            $searchText = strtolower($p->pass_number . ' ' . ($p->visitor_name ?? 'unassigned'));
-                            $badgeMap = [
-                                'active'    => ['is-active', 'Active'],
-                                'available' => ['is-available', 'Available'],
-                                'expired'   => ['is-expired', 'Expired'],
-                                'revoked'   => ['is-revoked', 'Revoked'],
-                            ];
-                            [$badgeClass, $badgeLabel] = $badgeMap[$p->status] ?? ['is-available', 'Available'];
-                            $infoPayload = [
-                                'pass_number' => $p->pass_number,
-                                'status' => $p->status,
-                                'building' => $p->building->name,
-                                'qr_url' => route('passes.show', $p),
-                                'visitor_name' => $p->visitor_name,
-                                'gender' => $p->gender,
-                                'contact_no' => $p->contact_no,
-                                'visitor_email' => $p->visitor_email,
-                                'id_type' => $p->id_type,
-                                'id_ref' => $p->id_ref,
-                                'office_to_visit' => $p->office_to_visit,
-                                'contact_person' => $p->contact_person,
-                                'purpose' => $p->purpose,
-                                'vehicle' => $p->vehicle,
-                                'registered_by' => $p->registered_by,
-                                'pass_class' => $p->pass_class,
-                                'issued_at' => $p->issued_at?->format('M j, Y g:i A'),
-                                'expected_return_date' => $p->expected_return_date?->format('M j, Y'),
-                                'photo_url' => $p->photo_path ? asset('storage/' . $p->photo_path) : null,
-                                'id_photo_url' => $p->id_photo_path ? asset('storage/' . $p->id_photo_path) : null,
-                            ];
-                        @endphp
-                        <div class="gov-pass-card" data-status="{{ $p->status }}" data-search="{{ $searchText }}">
-                            <div class="gov-pass-card-info">
-                                <span class="gov-pass-card-number">#{{ $p->pass_number }}</span>
-                                <div class="gov-pass-card-details">
-                                    @if ($p->visitor_name)
-                                        <div class="gov-pass-card-name">{{ $p->visitor_name }}</div>
-                                        @if ($p->pass_class === 'day')
-                                            <div class="gov-pass-card-meta">1 Day Access</div>
-                                        @else
-                                            <div class="gov-pass-card-meta">{{ $p->issued_at?->format('n/j/Y') }} - {{ $p->expected_return_date?->format('n/j/Y') }}</div>
-                                        @endif
-                                        @if ($p->is_multi_building)
-                                            <div class="gov-pass-card-buildings">
-                                                @if ($p->buildings->isEmpty())
-                                                    Awaiting building assignment
-                                                @elseif ($p->buildings->count() >= $buildings->count())
-                                                    All Buildings
-                                                @else
-                                                    {{ $p->buildings->pluck('name')->join(', ') }}
-                                                @endif
-                                            </div>
-                                        @endif
-                                    @else
-                                        <span class="gov-pass-card-unassigned">Unassigned</span>
-                                    @endif
-                                </div>
-                            </div>
-
-                            <div class="gov-pass-card-right">
-                                <span class="gov-pass-badge {{ $badgeClass }}">{{ $badgeLabel }}</span>
-
-                                <div class="gov-pass-card-actions">
-                                    @if ($p->visitor_name)
-                                        <form method="POST" action="{{ route('passes.unassign', $p) }}"
-                                            data-confirm data-confirm-tone="warning"
-                                            data-confirm-title="Unassign this pass?"
-                                            data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $p->visitor_name }}"
-                                            data-confirm-message="The card will be reset and returned to available stock."
-                                            data-confirm-label="Unassign">
-                                            @csrf
-<button type="submit" class="gov-pass-row-btn is-ghost is-warn"><i class="fa-solid fa-link-slash"></i> Unassign</button>
-                                        </form>
-<button type="button" class="gov-pass-row-btn is-ghost" data-qr-url="{{ route('passes.show', $p) }}" data-pass-number="{{ $p->pass_number }}" onclick="openPassQrModal(this)"><i class="fa-solid fa-qrcode"></i> View QR</button>
-                                        <form method="POST" action="{{ route('passes.revoke', $p) }}"
-                                            data-confirm data-confirm-tone="danger"
-                                            data-confirm-title="Revoke this pass?"
-                                            data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $p->visitor_name }}"
-                                            data-confirm-message="The visitor will be denied on their next scan."
-                                            data-confirm-label="Revoke pass">
-                                            @csrf
-<button type="submit" class="gov-pass-row-btn is-ghost is-danger"><i class="fa-solid fa-ban"></i> Revoke</button>
-                                        </form>
-                                        <button type="button" class="gov-pass-row-btn is-ghost" data-pass-number="{{ $p->pass_number }}" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
-                                    @else
-                                        <a href="{{ route('passes.show', $p) }}" class="gov-pass-row-btn is-ghost"><i class="fa-solid fa-qrcode"></i> View QR</a>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
+                        @include('passes._pass-row', ['p' => $p, 'allBuildingsCount' => $buildings->count()])
                     @empty
                         <p class="text-sm text-slate-400 text-center py-8">No passes exist for this building yet.</p>
                     @endforelse
@@ -539,5 +448,90 @@ function clearModalSearch() {
     applyModalFilters();
     input.focus();
 }
+// ---- In-place Unassign / Revoke ----
+// Called by the confirm handler in layouts/app.blade.php for <form data-inplace>.
+// Without JS (or if this function is missing) the form posts normally and redirects.
+window.submitPassAction = async function (form) {
+    if (form.dataset.busy) return;                 // double-click guard
+    form.dataset.busy = '1';
+
+    const row = form.closest('.gov-pass-card');
+    const btn = form.querySelector('button[type="submit"]');
+    const rowButtons = row.querySelectorAll('button');
+    const original = btn.innerHTML;
+    rowButtons.forEach(b => { b.disabled = true; });
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + btn.textContent.trim();
+
+    try {
+        const res = await fetch(form.action, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form),                // includes @csrf token
+            credentials: 'same-origin',
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+
+        if (data && data.row) applyPassPayload(data);   // fresh row also on "already done" (409)
+
+        if (res.ok && data && data.ok) {
+            showToast(data.message, 'success');
+        } else if (data && data.row) {
+            showToast(data.message, 'error', 'Already Updated');
+        } else {
+            showToast(data?.message || (res.status === 419 ? 'Your session expired. Reload the page and try again.'
+                : res.status === 403 ? 'You are not allowed to do that.'
+                : 'Something went wrong. Please try again.'), 'error');
+        }
+    } catch (e) {
+        showToast('Network error. Nothing was changed.', 'error');
+    } finally {
+        delete form.dataset.busy;
+        if (row.isConnected) {                        // row wasn't replaced -> unlock it
+            rowButtons.forEach(b => { b.disabled = false; });
+            btn.innerHTML = original;
+        }
+    }
+};
+
+// Swaps one row and refreshes everything that is derived from pass statuses.
+// Applies one pass update ({pass_id, pass_number, status, row, counts}) from the server:
+// swaps the row (or inserts it if the pass is new), then refreshes everything derived from statuses.
+function applyPassPayload(p) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = p.row.trim();
+    const fresh = tpl.content.firstElementChild;
+
+    const existing = document.querySelector(`.gov-pass-card[data-pass-id="${p.pass_id}"]`);
+    if (existing) {
+        existing.replaceWith(fresh);
+    } else {
+        const group = document.getElementById('buildingPassGroup-' + p.counts.building_id);
+        if (group) {
+            group.querySelectorAll(':scope > p:not(.gov-pass-row-empty)').forEach(n => n.remove()); // "No passes exist…"
+            group.querySelector('.gov-pass-row-empty').before(fresh);
+        }
+    }
+
+    const c = p.counts;
+    const card = document.querySelector(`.gov-building-card[data-building-id="${c.building_id}"]`);
+    if (card) {
+        ['active', 'available', 'inactive'].forEach(k => {
+            const el = card.querySelector(`[data-card-count="${k}"]`);
+            if (el) el.textContent = c[k];
+        });
+    }
+
+    // Inventory modal stats (admin only; INV lives in tab1-instructions)
+    if (typeof INV !== 'undefined' && INV[c.building_id]) {
+        const entry = INV[c.building_id].passes.find(x => x[0] === p.pass_number);
+        if (entry) entry[1] = p.status; else INV[c.building_id].passes.push([p.pass_number, p.status]);
+        if (typeof invRefresh === 'function' && document.getElementById('invBuilding')) invRefresh();
+    }
+
+    applyModalFilters();   // pill counts, "Showing x of y", keeps active filter + search
+}
+// ---- End in-place Unassign / Revoke ----
+
 // ---- End Tab 2 ----
 </script>
