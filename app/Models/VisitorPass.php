@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class VisitorPass extends Model
 {
@@ -33,6 +34,7 @@ class VisitorPass extends Model
     const MAX_LONG_TERM_WORKING_DAYS = 30;
     const WORKING_WEEKDAYS = [1, 2, 3, 4]; // Mon–Thu, HOR's compressed 4-day week
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
+    const DAY_PASS_CUTOFF = '19:00';       // day passes expire at the first 19:00 on/after issue
 
     public function currentBuilding(): BelongsTo
     {
@@ -110,6 +112,89 @@ class VisitorPass extends Model
             return null;
         }
         return now()->startOfDay()->diffInDays($this->expected_return_date, false);
+    }
+
+    /** Moment this pass stops being valid (app timezone). Derived from existing fields. */
+    public function expiresAt(): ?Carbon
+    {
+        if ($this->isLongTerm()) {
+            return $this->expected_return_date?->copy()->endOfDay();   // valid through the whole return date
+        }
+
+        if (! $this->issued_at) {
+            return null;
+        }
+
+        $cutoff = $this->issued_at->copy()->setTimeFromTimeString(self::DAY_PASS_CUTOFF);
+
+        return $cutoff->lte($this->issued_at) ? $cutoff->addDay() : $cutoff;
+    }
+
+    /** True for an 'active' pass whose expiry moment has passed. Pure date check, no DB write. */
+    public function isPastExpiry(): bool
+    {
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        $at = $this->expiresAt();
+
+        return $at !== null && now()->gte($at);
+    }
+
+    /**
+     * Marks this pass expired if it is due. Used by the scanner (authoritative) and the scheduler.
+     * Re-reads the row under lock and only touches a still-active, still-due pass, so it is
+     * idempotent and cannot overwrite a concurrent revoke/unassign/reassignment.
+     */
+    public function expireIfDue(): bool
+    {
+        if (! $this->isPastExpiry()) {
+            return false;
+        }
+
+        $expired = DB::transaction(function () {
+            $locked = static::whereKey($this->id)->lockForUpdate()->first();
+            if (! $locked || ! $locked->isPastExpiry()) {
+                return false;
+            }
+
+            $locked->openRegistration()?->update([
+                'unassigned_at' => now(),
+                'unassign_reason' => 'auto_expired',
+            ]);
+
+            $update = ['status' => 'expired'];
+            if (! $locked->isLongTerm()) {   // same as the old sweep: day passes also clear occupancy
+                $update += [
+                    'current_building_id' => null,
+                    'checked_in_at' => null,
+                    'last_egress_at' => $locked->current_building_id ? now() : $locked->last_egress_at,
+                ];
+            }
+            $locked->update($update);
+
+            return true;
+        });
+
+        $this->refresh();
+
+        return $expired;
+    }
+
+    /** Expires every due active pass. Safe to re-run. Returns how many were expired. */
+    public static function expireDue(): int
+    {
+        $n = 0;
+        static::where('status', 'active')->chunkById(200, function ($chunk) use (&$n) {
+            foreach ($chunk as $pass) {
+                if ($pass->expireIfDue()) {
+                    $n++;
+                }
+            }
+        });
+
+        return $n;
     }
 
     public function hasStaleOccupancy(): bool

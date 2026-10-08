@@ -61,6 +61,7 @@ class ScannerController extends Controller
 
         $scannerBuilding = Building::findOrFail($scannedBuildingId);
         $pass = VisitorPass::with(['building', 'buildings'])->where('qr_token', $data['token'])->first();
+        $pass?->expireIfDue();   // authoritative: never trust the scheduler to have run
 
         $direction = null;
         $result = 'INVALID';
@@ -96,7 +97,8 @@ class ScannerController extends Controller
                 $visitorName = 'No person assigned';
             } elseif ($pass->status === 'expired') {
                 $result = 'EXPIRED';
-                $reason = 'Visitor pass status marked as EXPIRED.';
+                $expiredAt = $pass->expiresAt();
+                $reason = 'Visitor pass has EXPIRED' . ($expiredAt ? ' (valid until ' . $expiredAt->format('M j, Y g:i A') . ')' : '') . '.';
             } elseif ($pass->status === 'revoked') {
                 $result = 'REVOKED';
                 $reason = 'Visitor pass is REVOKED by Security.';

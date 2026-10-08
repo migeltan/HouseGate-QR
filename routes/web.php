@@ -32,6 +32,7 @@ Route::middleware('auth')->group(function () {
         // Must stay ABOVE /passes/{pass}, otherwise {pass} swallows these fixed segments.
         Route::get('/passes/check-duplicate', [PassController::class, 'checkDuplicate'])->name('passes.check-duplicate');
         Route::get('/passes/lookup-transfer-source', [PassController::class, 'lookupTransferSource'])->name('passes.lookup-transfer-source');
+        Route::get('/passes/building/{building}/rows', [PassController::class, 'buildingRows'])->name('passes.building.rows');
         Route::post('/passes/register', [PassController::class, 'register'])->name('passes.register');
         Route::get('/passes/{pass}', [PassController::class, 'show'])->name('passes.show');
         Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');

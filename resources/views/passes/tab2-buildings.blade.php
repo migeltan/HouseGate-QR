@@ -1,6 +1,6 @@
 {{-- TAB 2 - BUILDINGS (legend + building grid + per-building passes modal + pass info modal)
      Script for this tab is at the bottom of this file.
-     Expects: $displayBuildings, $buildings, $passes --}}
+     Expects: $displayBuildings, $buildings, $passStats --}}
 @php
     // Maps each building code to its image filename in public/images/buildings/.
     // SWA has no photo yet — falls back to RVM's until one is supplied.
@@ -42,13 +42,11 @@
             // North Gate's own pool must only ever contain multi-building passes;
             // any single-building pass homed there is stale legacy data and is
             // deliberately excluded rather than counted.
-            $buildingPasses = $passes->where('building_id', $b->id)
-                ->where('is_multi_building', $b->code === 'NG');
-            $activeCount = $buildingPasses->where('status', 'active')->count();
-            $availableCount = $buildingPasses->where('status', 'available')->count();
-            $inactiveCount = $buildingPasses->whereIn('status', ['expired', 'revoked'])->count();
+            $activeCount = $passStats[$b->id]['active'];
+            $availableCount = $passStats[$b->id]['available'];
+            $inactiveCount = $passStats[$b->id]['inactive'];
         @endphp
-        <button type="button" onclick="openBuildingModal({{ $b->id }}, '{{ $b->name }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
+        <button type="button" data-building-id="{{ $b->id }}" onclick="openBuildingModal({{ $b->id }}, '{{ $b->name }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
             class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
                 <h3>{{ $b->name }}</h3>
@@ -105,11 +103,11 @@
                 <div id="buildingPassGroup-{{ $b->id }}"
                      class="hidden flex flex-col gap-2"
                      data-building-color="{{ $b->color_hex }}">
-                    @forelse ($passes->where('building_id', $b->id)->where('is_multi_building', $b->code === 'NG') as $p)
-                        @include('passes._pass-row', ['p' => $p, 'allBuildingsCount' => $buildings->count()])
-                    @empty
-                        <p class="text-sm text-slate-400 text-center py-8">No passes exist for this building yet.</p>
-                    @endforelse
+                    <div class="bp-skeleton hidden flex flex-col gap-2" aria-hidden="true">
+                        @foreach (range(1, 6) as $n)
+                            <div class="sk" style="height:68px;border-radius:12px"></div>
+                        @endforeach
+                    </div>
                     <p class="gov-pass-row-empty hidden text-sm text-slate-400 text-center py-8">No passes match your search.</p>
                 </div>
             @endforeach
@@ -191,6 +189,45 @@
 // ---- Tab 2: Buildings ----
 let currentModalFilter = 'all';
 
+const BUILDING_ROWS_URL = @json(route('passes.building.rows', ['building' => '__ID__']));
+
+// Fetches a building's rows the first time its window opens; reopening reuses them.
+async function loadBuildingRows(group, buildingId) {
+    if (group.dataset.loaded === '1' || group.dataset.loading === '1') return;
+    group.dataset.loading = '1';
+    group.querySelectorAll(':scope > .bp-load-error').forEach(n => n.remove());
+    document.querySelectorAll('#buildingPassesModal [data-count]').forEach(el => { el.textContent = '–'; });
+    const sk = group.querySelector('.bp-skeleton');
+    sk.classList.remove('hidden');
+    try {
+        const res = await fetch(BUILDING_ROWS_URL.replace('__ID__', buildingId), {
+            headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const html = (await res.text()).trim();
+        sk.classList.add('hidden');
+        group.querySelector('.gov-pass-row-empty').insertAdjacentHTML('beforebegin',
+            html || '<p class="text-sm text-slate-400 text-center py-8">No passes exist for this building yet.</p>');
+        group.dataset.loaded = '1';
+    } catch (e) {
+        sk.classList.add('hidden');
+        const err = document.createElement('p');
+        err.className = 'bp-load-error text-sm text-slate-400 text-center py-8';
+        err.textContent = "Couldn't load passes. ";
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'underline';
+        retry.textContent = 'Retry';
+        retry.addEventListener('click', () => loadBuildingRows(group, buildingId));
+        err.append(retry);
+        group.querySelector('.gov-pass-row-empty').before(err);
+    } finally {
+        delete group.dataset.loading;
+    }
+    applyModalFilters();
+}
+
 function openBuildingModal(buildingId, buildingName, colorName) {
     document.querySelectorAll('[id^="buildingPassGroup-"]').forEach(el => el.classList.add('hidden'));
     const group = document.getElementById('buildingPassGroup-' + buildingId);
@@ -209,6 +246,7 @@ function openBuildingModal(buildingId, buildingName, colorName) {
     applyModalFilters();
 
     document.getElementById('buildingPassesModal').classList.remove('hidden');
+    loadBuildingRows(group, buildingId);
 }
 
 function closeBuildingModal() {
@@ -507,7 +545,7 @@ function applyPassPayload(p) {
         existing.replaceWith(fresh);
     } else {
         const group = document.getElementById('buildingPassGroup-' + p.counts.building_id);
-        if (group) {
+        if (group && group.dataset.loaded === '1') {   // unloaded groups fetch fresh rows when opened
             group.querySelectorAll(':scope > p:not(.gov-pass-row-empty)').forEach(n => n.remove()); // "No passes exist…"
             group.querySelector('.gov-pass-row-empty').before(fresh);
         }
@@ -524,8 +562,10 @@ function applyPassPayload(p) {
 
     // Inventory modal stats (admin only; INV lives in tab1-instructions)
     if (typeof INV !== 'undefined' && INV[c.building_id]) {
-        const entry = INV[c.building_id].passes.find(x => x[0] === p.pass_number);
-        if (entry) entry[1] = p.status; else INV[c.building_id].passes.push([p.pass_number, p.status]);
+        const inv = INV[c.building_id];
+        inv.total = c.total; inv.available = c.available; inv.active = c.active; inv.inactive = c.inactive;
+        inv.all.add(p.pass_number);
+        if (p.status === 'available') inv.avail.add(p.pass_number); else inv.avail.delete(p.pass_number);
         if (typeof invRefresh === 'function' && document.getElementById('invBuilding')) invRefresh();
     }
 

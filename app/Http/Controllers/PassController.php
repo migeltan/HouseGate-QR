@@ -39,11 +39,54 @@ class PassController extends Controller
         }
         $displayBuildings = $displayBuildingsQuery->get();
 
-        $passesQuery = VisitorPass::with(['building', 'buildings']);
-        if ($user->isGuard()) {
-            $passesQuery->where('building_id', session('assigned_building_id'))->where('is_multi_building', false);
+        // Card counts + inventory stats: one grouped query, no pass rows loaded.
+        $statRows = VisitorPass::query()
+            ->selectRaw('building_id, is_multi_building, status, COUNT(*) as n')
+            ->when($user->isGuard(), fn ($q) => $q
+                ->where('building_id', session('assigned_building_id'))
+                ->where('is_multi_building', false))
+            ->groupBy('building_id', 'is_multi_building', 'status')
+            ->toBase()
+            ->get();
+
+        // North Gate's pool is multi-building passes only; every other building's is single-building.
+        $passStats = $displayBuildings->mapWithKeys(function ($b) use ($statRows) {
+            $by = $statRows
+                ->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'))
+                ->pluck('n', 'status');
+
+            return [$b->id => [
+                'available' => (int) ($by['available'] ?? 0),
+                'active'    => (int) ($by['active'] ?? 0),
+                'inactive'  => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0)),
+                'total'     => (int) $by->sum(),
+            ]];
+        });
+
+        // Inventory modal (admin only): stats + compact number ranges, not pass rows.
+        $invData = [];
+        if ($user->isAdmin()) {
+            $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building', 'status', 'pass_number']);
+            $toRanges = function ($list) {
+                $ranges = [];
+                foreach ($list->map(fn ($n) => (int) $n)->unique()->sort()->values() as $n) {
+                    $i = count($ranges) - 1;
+                    if ($i >= 0 && $ranges[$i][1] === $n - 1) {
+                        $ranges[$i][1] = $n;
+                    } else {
+                        $ranges[] = [$n, $n];
+                    }
+                }
+                return $ranges;
+            };
+            foreach ($displayBuildings as $b) {
+                $own = $nums->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'));
+                $invData[$b->id] = $passStats[$b->id] + [
+                    'all'   => $toRanges($own->pluck('pass_number')),
+                    'avail' => $toRanges($own->where('status', 'available')->pluck('pass_number')),
+                ];
+            }
         }
-        $passes = $passesQuery->orderBy('building_id')->orderBy('pass_number')->get();
 
         // Congressman roster for the registration modal. $buildings is already
         // guard-scoped and excludes North Gate, so guards only get their own building.
@@ -59,7 +102,37 @@ class PassController extends Controller
             ])
             ->values();
 
-        return view('passes.index', compact('buildings', 'passes', 'displayBuildings', 'roster'));
+        return view('passes.index', compact('buildings', 'displayBuildings', 'roster', 'passStats', 'invData'));
+    }
+
+    /**
+     * Rows for one building, fetched when its window is opened. Same scoping the
+     * index page used: guards only get their own building's single-building passes.
+     */
+    public function buildingRows(Request $request, Building $building)
+    {
+        $user = $request->user();
+        if ($user->isGuard() && (int) $building->id !== (int) session('assigned_building_id')) {
+            abort(403);
+        }
+
+        $multi = $building->code === 'NG';
+        $passes = VisitorPass::with($multi ? ['building', 'buildings'] : ['building'])
+            ->where('building_id', $building->id)
+            ->where('is_multi_building', $multi)
+            ->when($user->isGuard(), fn ($q) => $q->where('is_multi_building', false))
+            ->orderBy('pass_number')
+            ->get();
+
+        $passes->each->expireIfDue();   // rows reflect expiry even if the scheduler hasn't run
+
+        $allBuildingsCount = $multi ? Building::where('code', '!=', 'NG')->count() : 0;
+
+        $html = $passes
+            ->map(fn ($p) => view('passes._pass-row', ['p' => $p, 'allBuildingsCount' => $allBuildingsCount])->render())
+            ->implode('');
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     public function register(Request $request)

@@ -17,40 +17,9 @@ class DailyPassSweep extends Command
     {
         $today = now()->toDateString();
 
-        // 1. Auto-expire day passes past 7:00 PM cutoff (this command is
-        // scheduled dailyAt('19:00'), so "active + still day-class" at run
-        // time is enough — no extra time check needed here). Also closes
-        // the matching pass_registrations row, same as long_term below, so
-        // the audit trail never has a stale "currently assigned" row for a
-        // pass that's actually expired and free to be reassigned.
-        VisitorPass::where('pass_class', 'day')
-    ->where('status', 'active')
-    ->get()
-    ->each(function (VisitorPass $pass) {
-        $pass->openRegistration()?->update([
-            'unassigned_at' => now(),
-            'unassign_reason' => 'auto_expired',
-        ]);
-
-        $pass->update([
-            'status' => 'expired',
-            'current_building_id' => null,
-            'checked_in_at' => null,
-            'last_egress_at' => $pass->current_building_id ? now() : $pass->last_egress_at,
-        ]);
-    });
-        // 2. Auto-expire long_term passes past their expected_return_date
-        VisitorPass::where('pass_class', 'long_term')
-            ->where('status', 'active')
-            ->whereDate('expected_return_date', '<', $today)
-            ->get()
-            ->each(function (VisitorPass $pass) {
-                $pass->openRegistration()?->update([
-                    'unassigned_at' => now(),
-                    'unassign_reason' => 'auto_expired',
-                ]);
-                $pass->update(['status' => 'expired']);
-            });
+        // 1+2. Auto-expire due day / long_term passes. Same rule as the scan-time check
+        // (VisitorPass::expireIfDue); safe to re-run. Runs first so expired passes never get reminders.
+        VisitorPass::expireDue();
 
         // 3. Missing-egress reminders — checked in, never scanned out, still active
         VisitorPass::whereNotNull('current_building_id')
@@ -62,13 +31,17 @@ class DailyPassSweep extends Command
                 $pass->update(['egress_reminder_sent_on' => $today]);
             });
 
-        // 4. Expiring-soon reminders for long_term passes (e.g. within 3 days)
+        // 4. Expiring-soon reminder for long_term passes: ONCE per pass per return date, sent when the
+        // return date is within 3 days. A reminder already sent inside this window is never repeated;
+        // an older one (from a previous use of the card) doesn't block it.
         VisitorPass::where('pass_class', 'long_term')
             ->where('status', 'active')
             ->whereNotNull('visitor_email')
-            ->whereDate('expected_return_date', '<=', now()->addDays(3))
-            ->where(fn ($q) => $q->whereNull('expiry_reminder_sent_on')->orWhereDate('expiry_reminder_sent_on', '<', $today))
+            ->whereDate('expected_return_date', '>=', $today)
+            ->whereDate('expected_return_date', '<=', now()->addDays(3)->toDateString())
             ->get()
+            ->filter(fn (VisitorPass $pass) => ! $pass->expiry_reminder_sent_on
+                || $pass->expiry_reminder_sent_on->lt($pass->expected_return_date->copy()->subDays(3)))
             ->each(function (VisitorPass $pass) use ($today) {
                 Mail::to($pass->visitor_email)->queue(new PassExpiringSoon($pass));
                 $pass->update(['expiry_reminder_sent_on' => $today]);

@@ -157,15 +157,12 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
 @endif
 
 @if (auth()->user()->isAdmin())
-@php
-    $invData = $displayBuildings->mapWithKeys(function ($b) use ($passes) {
-        $own = $passes->where('building_id', $b->id)->where('is_multi_building', $b->code === 'NG');
-        return [$b->id => ['passes' => $own->map(fn ($p) => [(int) $p->pass_number, $p->status])->values()]];
-    });
-@endphp
 <script>
 // ---- Inventory modal ----
+// $invData comes from PassController@index: grouped stats + number ranges (no pass rows).
 const INV = @json($invData);
+const expandRanges = r => { const s = new Set(); r.forEach(([a, b]) => { for (let n = a; n <= b; n++) s.add(n); }); return s; };
+Object.values(INV).forEach(e => { e.all = expandRanges(e.all); e.avail = expandRanges(e.avail); });
 const $i = id => document.getElementById(id);
 const passWord = n => (n === 1 ? 'pass' : 'passes');
 
@@ -229,17 +226,15 @@ function invParse() {
 
 function invRefresh() {
     const id = $i('invBuilding').value;
-    const have = new Map(INV[id].passes); // number -> status
+    const inv = INV[id];
     $i('invGenBuilding').value = id;
     $i('invPrintBuilding').value = id;
 
     // Stats
-    let avail = 0, active = 0, inactive = 0;
-    have.forEach(s => { s === 'available' ? avail++ : s === 'active' ? active++ : inactive++; });
-    $i('invStatTotal').textContent = have.size;
-    $i('invStatAvail').textContent = avail;
-    $i('invStatActive').textContent = active;
-    $i('invStatInactive').textContent = inactive;
+    $i('invStatTotal').textContent = inv.total;
+    $i('invStatAvail').textContent = inv.available;
+    $i('invStatActive').textContent = inv.active;
+    $i('invStatInactive').textContent = inv.inactive;
 
     // Generate summary
     const ga = +$i('invGenFrom').value, gb = +$i('invGenTo').value;
@@ -251,7 +246,7 @@ function invRefresh() {
         gSum.textContent = 'Max 1000 at a time.'; gSum.classList.add('is-error'); gBtn.disabled = true;
     } else {
         let fresh = 0;
-        for (let n = ga; n <= gb; n++) if (!have.has(n)) fresh++;
+        for (let n = ga; n <= gb; n++) if (!inv.all.has(n)) fresh++;
         const total = gb - ga + 1;
         gSum.textContent = fresh
             ? `${fresh} new ${passWord(fresh)} will be created · ${total - fresh} already exist`
@@ -271,8 +266,8 @@ function invRefresh() {
     const onlyAvail = $i('invOnlyAvail').checked;
     let found = 0, missing = 0, skipped = 0;
     sel.nums.forEach(n => {
-        if (!have.has(n)) missing++;
-        else if (onlyAvail && have.get(n) !== 'available') skipped++;
+        if (!inv.all.has(n)) missing++;
+        else if (onlyAvail && !inv.avail.has(n)) skipped++;
         else found++;
     });
     const per = invPerPage();
