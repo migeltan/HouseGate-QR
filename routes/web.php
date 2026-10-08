@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuildingSelectController;
+use App\Http\Controllers\CongressmanController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\PassController;
 use App\Http\Controllers\PassInventoryController;
@@ -44,6 +45,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/account/profile', [AccountController::class, 'updateProfile'])->name('account.profile');
         Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
 
+        Route::get('/directory', [CongressmanController::class, 'index'])->name('congressmen.index');
+
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/export', [LogController::class, 'export'])->name('logs.export');
         Route::get('/logs/registrations/export', [LogController::class, 'exportRegistrations'])->name('logs.registrations.export');
@@ -52,6 +55,18 @@ Route::middleware('auth')->group(function () {
         Route::middleware('admin')->group(function () {
             Route::delete('/logs/purge/range', [LogController::class, 'purgeRange'])->name('logs.purge.range');
             Route::delete('/logs/purge/all', [LogController::class, 'purgeAll'])->name('logs.purge.all');
+
+            Route::get('/account/users', [AccountController::class, 'users'])->name('account.users');
+            Route::post('/account/users', [AccountController::class, 'storeUser'])->name('account.users.store');
+            Route::put('/account/users/{user}', [AccountController::class, 'updateUser'])->name('account.users.update');
+            Route::put('/account/users/{user}/password', [AccountController::class, 'resetPassword'])->name('account.users.password');
+            Route::post('/account/users/{user}/deactivate', [AccountController::class, 'deactivate'])->name('account.users.deactivate');
+            Route::post('/account/users/{user}/reactivate', [AccountController::class, 'reactivate'])->name('account.users.reactivate');
+
+            Route::post('/directory', [CongressmanController::class, 'store'])->name('congressmen.store');
+            Route::put('/directory/{congressman}', [CongressmanController::class, 'update'])->name('congressmen.update');
+            Route::post('/directory/{congressman}/deactivate', [CongressmanController::class, 'deactivate'])->name('congressmen.deactivate');
+            Route::post('/directory/{congressman}/reactivate', [CongressmanController::class, 'reactivate'])->name('congressmen.reactivate');
 
             Route::post('/passes/inventory/generate', [PassInventoryController::class, 'generate'])->name('passes.inventory.generate');
             Route::get('/passes/inventory/print', [PassInventoryController::class, 'print'])->name('passes.inventory.print');

@@ -52,7 +52,7 @@ class CongressmanSeeder extends Seeder
                 );
             }
 
-            Congressman::updateOrCreate(
+            Congressman::firstOrCreate(
                 ['member_id' => $data['member_id']],
                 [
                     'name' => $data['name'],
@@ -74,8 +74,9 @@ class CongressmanSeeder extends Seeder
             throw new RuntimeException('Roster CSV had no valid rows — refusing to deactivate everyone.');
         }
 
-        // Anyone previously loaded but missing from this CSV is deactivated.
-        Congressman::whereNotIn('member_id', $seen)->update(['is_active' => false]);
+        // Admins now manage members in the Directory page, so the CSV only adds
+        // members that don't exist yet. It no longer overwrites edits or
+        // deactivates members that were added by hand.
 
         $this->command?->info(count($seen) . ' congressmen loaded.');
     }

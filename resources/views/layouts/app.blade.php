@@ -38,6 +38,7 @@
             ['scanner.index', 'scanner.*', 'fa-qrcode', 'Scanner'],
             ['passes.index',  'passes.*',  'fa-clipboard-list', 'Registry'],
             ['logs.index',    'logs.*',    'fa-clock-rotate-left', 'Audit Trail'],
+            ['congressmen.index', 'congressmen.*', 'fa-address-book', 'Directory'],
         ];
     @endphp
 

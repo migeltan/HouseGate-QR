@@ -436,3 +436,10 @@
         animation: none;
     }
 }
+
+/* Modal overlays are direct children of <main class="space-y-6">. Once "hidden" is
+   removed, that utility adds margin-top: 1.5rem to the fixed, inset-0 box, which
+   leaves an undimmed strip along the top of the screen. Overlays get no margin. */
+main > .fixed.inset-0 {
+    margin: 0 !important;
+}

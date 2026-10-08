@@ -5,7 +5,7 @@
 @php
     $user = auth()->user();
     $isAdmin = $user->isAdmin();
-    $initialTab = ($isAdmin && request('tab') === 'log') ? 'log' : 'profile';
+    $initialTab = ($isAdmin && in_array(request('tab'), ['log', 'accounts'], true)) ? request('tab') : 'profile';
     $initials = collect(preg_split('/\s+/', trim($user->name)))->filter()->take(2)
         ->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->join('');
 @endphp
@@ -22,6 +22,7 @@
         padding: 0 .75rem; font-size: .875rem; outline: none; transition: border-color .15s, box-shadow .15s; }
     .acct-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
     .acct-input.has-error { border-color: #f87171; }
+    .acct-input.has-icon { padding-left: 2.25rem; }
     .acct-input:disabled { cursor: not-allowed; opacity: .7; }
     .acct-field-error { margin-top: .25rem; font-size: .75rem; color: #dc2626; }
     .acct-eye { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); padding: .35rem;
@@ -37,9 +38,9 @@
     .acct-status.is-ok { color: #047857; }
     .acct-status.is-error { color: #dc2626; }
     .acct-save:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-    #logResults { position: relative; transition: opacity .15s; }
-    #logResults.is-loading { opacity: .5; pointer-events: none; }
-    #logResults.is-loading::before { content: ''; position: absolute; top: 0; left: 0; z-index: 20; height: 2px;
+    #logResults, #userResults { position: relative; transition: opacity .15s; }
+    #logResults.is-loading, #userResults.is-loading { opacity: .5; pointer-events: none; }
+    #logResults.is-loading::before, #userResults.is-loading::before { content: ''; position: absolute; top: 0; left: 0; z-index: 20; height: 2px;
         width: 40%; background: #235aa6; animation: acct-bar 1s ease-in-out infinite; }
     @keyframes acct-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 </style>
@@ -61,7 +62,8 @@
             <li><span class="gov-instr-num">1</span><span>Update your name and email</span></li>
             <li><span class="gov-instr-num">2</span><span>Keep your password current</span></li>
             @if ($isAdmin)
-                <li><span class="gov-instr-num">3</span><span>Review the Admin Log</span></li>
+                <li><span class="gov-instr-num">3</span><span>Manage staff accounts</span></li>
+                <li><span class="gov-instr-num">4</span><span>Review the Admin Log</span></li>
             @endif
         </ol>
     </div>
@@ -74,6 +76,9 @@
             <i class="fa-solid fa-user mr-2"></i>My Profile
         </button>
         @if ($isAdmin)
+            <button type="button" class="acct-tab {{ $initialTab === 'accounts' ? 'is-active' : '' }}" data-tab="accounts">
+                <i class="fa-solid fa-users mr-2"></i>Accounts
+            </button>
             <button type="button" class="acct-tab {{ $initialTab === 'log' ? 'is-active' : '' }}" data-tab="log">
                 <i class="fa-solid fa-list-check mr-2"></i>Admin Log
             </button>
@@ -161,20 +166,61 @@
             </div>
         </div>
 
-        {{-- ===================== ADMIN LOG ===================== --}}
         @if ($isAdmin)
+        {{-- ===================== ACCOUNTS ===================== --}}
+        <div id="pane-accounts" class="{{ $initialTab === 'accounts' ? '' : 'hidden' }}">
+            <form id="userFilters" data-url="{{ route('account.users') }}" class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center" onsubmit="return false;">
+                <div class="relative min-w-0 flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                    <input type="text" name="q" placeholder="Search by name, email or HREP ID..." autocomplete="off" class="acct-input has-icon text-xs">
+                </div>
+                <div class="gov-location-wrap w-full shrink-0 lg:w-44">
+                    <select name="role" class="gov-location-badge h-11 w-full">
+                        <option value="">Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="guard">Guard</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+                </div>
+                <div class="gov-location-wrap w-full shrink-0 lg:w-44">
+                    <select name="status" class="gov-location-badge h-11 w-full">
+                        <option value="">Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Deactivated</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+                </div>
+                <button type="button" id="addUserBtn" class="gov-btn-camera h-11 shrink-0 whitespace-nowrap"><i class="fa-solid fa-user-plus"></i> Add Account</button>
+            </form>
+
+            <div class="mb-3 h-5"><span id="userNotice" class="acct-status"></span></div>
+
+            <div id="userResults">
+                <div class="animate-pulse space-y-3 py-2">
+                    <div class="h-9 rounded-lg bg-slate-100"></div>
+                    <div class="h-9 rounded-lg bg-slate-100"></div>
+                    <div class="h-9 rounded-lg bg-slate-100"></div>
+                    <div class="h-9 rounded-lg bg-slate-100"></div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ===================== ADMIN LOG ===================== --}}
         <div id="pane-log" class="{{ $initialTab === 'log' ? '' : 'hidden' }}">
             <form id="logFilters" data-url="{{ route('account.log') }}" class="mb-4 flex flex-col gap-3 sm:flex-row" onsubmit="return false;">
                 <div class="relative flex-1">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
-                    <input type="text" name="q" placeholder="Search by person, subject, details..." autocomplete="off" class="acct-input pl-9 text-xs">
+                    <input type="text" name="q" placeholder="Search by person, subject, details..." autocomplete="off" class="acct-input has-icon text-xs">
                 </div>
-                <select name="action" class="acct-input sm:w-60">
-                    <option value="">All actions</option>
-                    @foreach ($actions as $a)
-                        <option value="{{ $a }}">{{ ucfirst(str_replace(['.', '_'], ' ', $a)) }}</option>
-                    @endforeach
-                </select>
+                <div class="gov-location-wrap w-full shrink-0 sm:w-60">
+                    <select name="action" class="gov-location-badge h-11 w-full">
+                        <option value="">Action</option>
+                        @foreach ($actions as $a)
+                            <option value="{{ $a }}">{{ ucfirst(str_replace(['.', '_'], ' ', $a)) }}</option>
+                        @endforeach
+                    </select>
+                    <i class="fa-solid fa-chevron-down gov-location-chevron" aria-hidden="true"></i>
+                </div>
             </form>
 
             <div id="logResults">
@@ -190,6 +236,82 @@
 
     </div>
 </div>
+@if ($isAdmin)
+{{-- Add / Edit / Reset password: one modal, fields shown per mode --}}
+<div id="userModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+    <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div class="gov-card-header flex items-start justify-between gap-3" style="padding: 1.25rem 1.5rem;">
+            <div class="flex items-start gap-3">
+                <i id="userModalIcon" class="fa-solid fa-user-plus gov-card-header-icon"></i>
+                <div>
+                    <span class="gov-eyebrow">Admin Action</span>
+                    <h3 class="gov-card-title" id="userModalTitle">Add Account</h3>
+                </div>
+            </div>
+            <button type="button" data-close class="mt-1 text-slate-400 hover:text-slate-700" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <form id="userForm" data-create-url="{{ route('account.users.store') }}" novalidate class="px-6 py-5">
+            @csrf
+            <p id="userModalSub" class="mb-4 hidden text-sm text-slate-600"></p>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div data-modes="create edit">
+                    <label class="acct-label" for="u-name">Full name</label>
+                    <input id="u-name" name="name" type="text" class="acct-input">
+                    <p class="acct-field-error hidden" data-error="name"></p>
+                </div>
+                <div data-modes="create edit">
+                    <label class="acct-label" for="u-hrep">HREP ID</label>
+                    <input id="u-hrep" name="hrep_id" type="text" autocomplete="off" class="acct-input">
+                    <p class="acct-field-error hidden" data-error="hrep_id"></p>
+                </div>
+                <div data-modes="create edit">
+                    <label class="acct-label" for="u-email">Email</label>
+                    <input id="u-email" name="email" type="email" autocomplete="off" class="acct-input">
+                    <p class="acct-field-error hidden" data-error="email"></p>
+                </div>
+                <div data-modes="create edit">
+                    <label class="acct-label" for="u-role">Role</label>
+                    <select id="u-role" name="role" class="acct-input">
+                        <option value="guard">Guard</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                    <p class="acct-field-error hidden" data-error="role"></p>
+                </div>
+                <div class="sm:col-span-2" data-modes="create password">
+                    <label class="acct-label" for="u-password">Password</label>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input id="u-password" name="password" type="password" autocomplete="new-password" class="acct-input pr-9">
+                            <button type="button" class="acct-eye" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                        <button type="button" data-generate class="gov-btn-glass-outline"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate</button>
+                    </div>
+                    <p class="acct-field-error hidden" data-error="password"></p>
+                    <p class="mt-1 text-[11px] text-slate-400">At least 8 characters. Share it with the user securely; they can change it under My Profile.</p>
+                </div>
+            </div>
+            <p class="acct-field-error hidden mt-3" data-form-error></p>
+            <div class="mt-5 flex justify-end gap-3">
+                <button type="button" data-close class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="submit" class="gov-btn-camera acct-save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Deactivate confirmation --}}
+<div id="userConfirm" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 px-4">
+    <div class="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-2xl">
+        <p id="userConfirmMsg" class="mb-2 text-sm text-slate-700"></p>
+        <p id="userConfirmError" class="acct-field-error mb-3"></p>
+        <div class="mt-3 flex justify-center gap-3">
+            <button type="button" data-cancel class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+            <button type="button" id="userConfirmBtn" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">Deactivate</button>
+        </div>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('scripts')
@@ -197,14 +319,21 @@
 (function () {
     // ---------- Tabs (no reload) ----------
     const tabs = document.querySelectorAll('.acct-tab');
-    const panes = { profile: document.getElementById('pane-profile'), log: document.getElementById('pane-log') };
+    const panes = {
+        profile: document.getElementById('pane-profile'),
+        accounts: document.getElementById('pane-accounts'),
+        log: document.getElementById('pane-log')
+    };
     let logLoaded = false;
+    let usersLoaded = false;
+    let loadUsers = () => {};   // assigned below for admins
 
     function showTab(name) {
         tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === name));
         Object.entries(panes).forEach(([k, el]) => el && el.classList.toggle('hidden', k !== name));
-        history.replaceState(null, '', name === 'log' ? '?tab=log' : window.location.pathname);
+        history.replaceState(null, '', name === 'profile' ? window.location.pathname : '?tab=' + name);
         if (name === 'log' && !logLoaded) loadLog();
+        if (name === 'accounts' && !usersLoaded) loadUsers();
     }
     tabs.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
@@ -250,6 +379,208 @@
             const page = e.target.closest('a.js-log-page');
             if (page) { e.preventDefault(); if (page.getAttribute('href') !== '#') loadLog(page.href); return; }
             if (e.target.closest('[data-retry]')) loadLog();
+        });
+    }
+
+    // ---------- Accounts (admin only) ----------
+    const userResults = document.getElementById('userResults');
+    if (userResults) {
+        const userFilters = document.getElementById('userFilters');
+        const notice = document.getElementById('userNotice');
+        const modal = document.getElementById('userModal');
+        const form = document.getElementById('userForm');
+        const formError = form.querySelector('[data-form-error]');
+        const saveBtn = form.querySelector('button[type=submit]');
+        const confirmBox = document.getElementById('userConfirm');
+        const confirmBtn = document.getElementById('userConfirmBtn');
+        const confirmErr = document.getElementById('userConfirmError');
+        const TOKEN = form.querySelector('[name=_token]').value;
+        const JSON_HEADERS = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const field = n => form.querySelector('[name="' + n + '"]');
+        let userCtrl = null, userDebounce, currentUrl = null, mode = 'create', target = null, confirmUser = null;
+
+        function flash(msg, ok = true) { setStatus(notice, msg, ok ? 'ok' : 'error'); }
+
+        // List (async filter + pagination, keeps the current page after an action)
+        loadUsers = async function (url) {
+            if (userCtrl) userCtrl.abort();
+            userCtrl = new AbortController();
+            if (url) {
+                currentUrl = url;
+            } else {
+                const p = new URLSearchParams();
+                new FormData(userFilters).forEach((v, k) => { if (v) p.set(k, v); });
+                const qs = p.toString();
+                currentUrl = userFilters.dataset.url + (qs ? '?' + qs : '');
+            }
+            userResults.classList.add('is-loading');
+            try {
+                const res = await fetch(currentUrl, {
+                    signal: userCtrl.signal, credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                userResults.innerHTML = await res.text();
+                usersLoaded = true;
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                userResults.innerHTML = '<div class="py-14 text-center"><i class="fa-solid fa-triangle-exclamation text-2xl text-slate-300"></i>'
+                    + '<p class="mt-2 text-sm font-semibold text-slate-600">Couldn\'t load accounts.</p>'
+                    + '<button type="button" data-retry class="gov-btn-glass-outline mt-3"><i class="fa-solid fa-rotate-right"></i> Try again</button></div>';
+            }
+            userResults.classList.remove('is-loading');
+        };
+
+        userFilters.querySelector('[name=q]').addEventListener('input', () => { clearTimeout(userDebounce); userDebounce = setTimeout(() => loadUsers(), 300); });
+        userFilters.querySelectorAll('select').forEach(s => s.addEventListener('change', () => loadUsers()));
+        document.getElementById('addUserBtn').addEventListener('click', () => openForm('create'));
+
+        // Row actions + pagination
+        userResults.addEventListener('click', e => {
+            const page = e.target.closest('a.js-user-page');
+            if (page) { e.preventDefault(); if (page.getAttribute('href') !== '#') loadUsers(page.href); return; }
+            if (e.target.closest('[data-retry]')) { loadUsers(); return; }
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const u = JSON.parse(btn.closest('tr').dataset.user);
+            if (btn.dataset.action === 'edit') openForm('edit', u);
+            else if (btn.dataset.action === 'password') openForm('password', u);
+            else if (btn.dataset.action === 'deactivate') openConfirm(u);
+            else if (btn.dataset.action === 'reactivate') changeStatus(u, 'reactivate').then(r => { flash(r.message, r.ok); if (r.ok) loadUsers(currentUrl); });
+        });
+
+        // Add / Edit / Reset password modal
+        const TITLES = {
+            create:   ['Add Account',    'fa-user-plus', 'Create account'],
+            edit:     ['Edit Account',   'fa-user-pen',  'Save changes'],
+            password: ['Reset Password', 'fa-key',       'Reset password']
+        };
+
+        function openForm(m, u) {
+            mode = m; target = u || null;
+            form.reset(); clearErrors(form); formError.classList.add('hidden');
+            form.querySelectorAll('[data-modes]').forEach(g => {
+                const on = g.dataset.modes.split(' ').includes(m);
+                g.classList.toggle('hidden', !on);
+                g.querySelectorAll('input, select').forEach(i => { i.disabled = !on; });
+            });
+            const pw = field('password');
+            pw.type = 'password';
+            pw.parentElement.querySelector('.acct-eye i').className = 'fa-solid fa-eye';
+
+            document.getElementById('userModalTitle').textContent = TITLES[m][0];
+            document.getElementById('userModalIcon').className = 'fa-solid ' + TITLES[m][1] + ' gov-card-header-icon';
+            saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + TITLES[m][2];
+            saveBtn.disabled = false;
+
+            const sub = document.getElementById('userModalSub');
+            sub.classList.toggle('hidden', !u);
+            if (u) sub.textContent = m === 'password'
+                ? 'Set a new password for ' + u.name + '. They will be signed out of any active session.'
+                : 'Editing ' + u.name + '.';
+
+            if (m === 'edit') {
+                field('name').value = u.name; field('hrep_id').value = u.hrep_id || '';
+                field('email').value = u.email; field('role').value = u.role;
+            }
+            // An admin can't change their own role
+            [...field('role').options].forEach(o => { o.disabled = m === 'edit' && u.self && o.value !== u.role; });
+
+            modal.classList.remove('hidden');
+            const first = form.querySelector('[data-modes]:not(.hidden) input');
+            if (first) first.focus();
+        }
+        function closeForm() { modal.classList.add('hidden'); }
+
+        modal.addEventListener('click', e => {
+            if (e.target === modal || e.target.closest('[data-close]')) { closeForm(); return; }
+            if (e.target.closest('[data-generate]')) {
+                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';   // no look-alikes
+                const bytes = crypto.getRandomValues(new Uint32Array(12));
+                const pw = field('password');
+                pw.value = Array.from(bytes, b => chars[b % chars.length]).join('');
+                pw.type = 'text';
+                pw.parentElement.querySelector('.acct-eye i').className = 'fa-solid fa-eye-slash';
+                return;
+            }
+            const eye = e.target.closest('.acct-eye');
+            if (eye) {
+                const input = eye.parentElement.querySelector('input');
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                eye.querySelector('i').className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+            }
+        });
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            clearErrors(form); formError.classList.add('hidden');
+            const url = mode === 'create' ? form.dataset.createUrl : (mode === 'edit' ? target.urls.update : target.urls.password);
+            const fd = new FormData(form);
+            if (mode !== 'create') fd.append('_method', 'PUT');
+            const label = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+            try {
+                const res = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: JSON_HEADERS, body: fd });
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 422) {
+                    if (data.errors) showErrors(form, data.errors);
+                    else { formError.textContent = data.message || 'Please check the form.'; formError.classList.remove('hidden'); }
+                } else if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                } else {
+                    closeForm();
+                    flash(data.message || 'Saved.');
+                    loadUsers(currentUrl);
+                }
+            } catch (err) {
+                formError.textContent = 'Something went wrong. Please try again.';
+                formError.classList.remove('hidden');
+            }
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = label;
+        });
+
+        // Deactivate (confirmed) / reactivate
+        async function changeStatus(u, action) {
+            try {
+                const res = await fetch(u.urls[action], {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { ...JSON_HEADERS, 'X-CSRF-TOKEN': TOKEN }
+                });
+                const data = await res.json().catch(() => ({}));
+                return { ok: res.ok, message: data.message || (res.ok ? 'Done.' : 'Something went wrong. Please try again.') };
+            } catch (err) {
+                return { ok: false, message: 'Something went wrong. Please try again.' };
+            }
+        }
+
+        function openConfirm(u) {
+            confirmUser = u;
+            confirmErr.textContent = '';
+            document.getElementById('userConfirmMsg').textContent =
+                'Deactivate ' + u.name + '? They will be signed out and unable to log in until reactivated.';
+            confirmBox.classList.remove('hidden');
+        }
+        confirmBox.addEventListener('click', e => {
+            if (e.target === confirmBox || e.target.closest('[data-cancel]')) confirmBox.classList.add('hidden');
+        });
+        confirmBtn.addEventListener('click', async () => {
+            const label = confirmBtn.innerHTML;
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Working…';
+            const r = await changeStatus(confirmUser, 'deactivate');
+            if (r.ok) { confirmBox.classList.add('hidden'); flash(r.message); loadUsers(currentUrl); }
+            else { confirmErr.textContent = r.message; }
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = label;
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            confirmBox.classList.add('hidden');
+            closeForm();
         });
     }
 

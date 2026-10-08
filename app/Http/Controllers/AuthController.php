@@ -31,7 +31,13 @@ class AuthController extends Controller
             return back()->withErrors(['hrep_id' => 'Invalid HREP ID or password.'])->onlyInput('hrep_id');
         }
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
+
+        if (! $user->is_active) {
+            Auth::logout();
+            return back()->withErrors(['hrep_id' => 'This account has been deactivated. Please contact an administrator.'])->onlyInput('hrep_id');
+        }
 
         if ($user->role !== $validated['role']) {
             Auth::logout();
