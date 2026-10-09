@@ -28,7 +28,7 @@ class AuthController extends Controller
             'hrep_id' => $validated['hrep_id'],
             'password' => $validated['password'],
         ])) {
-            return back()->withErrors(['hrep_id' => 'Invalid HREP ID or password.'])->onlyInput('hrep_id');
+            return back()->withErrors(['hrep_id' => 'Invalid HREP ID or password.'])->onlyInput('hrep_id', 'role', 'building_id');
         }
 
         /** @var \App\Models\User $user */
@@ -36,12 +36,18 @@ class AuthController extends Controller
 
         if (! $user->is_active) {
             Auth::logout();
-            return back()->withErrors(['hrep_id' => 'This account has been deactivated. Please contact an administrator.'])->onlyInput('hrep_id');
+            return back()->withErrors(['hrep_id' => 'This account has been deactivated. Please contact an administrator.'])->onlyInput('hrep_id', 'role', 'building_id');
         }
 
         if ($user->role !== $validated['role']) {
             Auth::logout();
-            return back()->withErrors(['role' => 'Selected role does not match this account.'])->onlyInput('hrep_id');
+            return back()->withErrors(['role' => 'Selected role does not match this account.'])->onlyInput('hrep_id', 'role', 'building_id');
+        }
+
+        // "Remember me": only after every check above has passed, so a rejected sign-in never gets a long-lived cookie.
+        // Before this the checkbox was posted but never read, so the session always expired after SESSION_LIFETIME.
+        if ($request->boolean('remember')) {
+            Auth::login($user, true);
         }
 
         $request->session()->regenerate();

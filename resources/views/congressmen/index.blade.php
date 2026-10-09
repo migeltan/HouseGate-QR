@@ -228,6 +228,13 @@
     let page = Number(new URLSearchParams(location.search).get('page')) || 1;
     const hay = new WeakMap();                            // member -> normalised searchable fields
 
+    // Phase 9: an offline reload is answered with the cached /directory page, which has no ?q= prefill
+    // from the server, so restore the filters from the URL (online this just re-sets the same values).
+    new URLSearchParams(location.search).forEach((v, k) => {
+        const el = ['q', 'building', 'status'].includes(k) && filters.querySelector('[name="' + k + '"]');
+        if (el) el.value = v;
+    });
+
     // ---------- Local cache (IndexedDB) ----------
     let dbp = null;
     const idb = () => dbp || (dbp = new Promise((resolve, reject) => {
@@ -646,5 +653,16 @@
         });
     }
 })();
+</script>
+
+<script>
+// Phase 9: offline page shell. The worker's scope is /directory only. It needs HTTPS or localhost;
+// over plain http://192.168.x.x `serviceWorker` doesn't exist, so this is skipped and Phase 8 works as before.
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register(@json(route('directory.sw')), { scope: @json(parse_url(route('congressmen.index'), PHP_URL_PATH)) })
+            .catch(() => {});
+    });
+}
 </script>
 @endsection

@@ -43,7 +43,7 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
     <aside class="sidebar" id="sidebar" aria-label="Main navigation">
-        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+<button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" data-label="Expand sidebar">
             <i class="fa-solid fa-chevron-left"></i>
         </button>
 
@@ -263,10 +263,41 @@ document.addEventListener('submit', async (e) => {
             sidebar.classList.toggle('is-open', open);
             backdrop.classList.toggle('is-open', open);
         };
-        document.getElementById('sidebarToggle').addEventListener('click', () => {
-            document.documentElement.classList.add('sb-animate'); // no animation on page load, only after a click
-            const collapsed = document.documentElement.classList.toggle('sb-collapsed');
+        // Collapsed rail: hovering only hints (CSS), a click anywhere on it opens it.
+        const root = document.documentElement;
+        const setCollapsed = (collapsed) => {
+            root.classList.add('sb-animate'); // no animation on page load, only after a click
+            root.classList.toggle('sb-collapsed', collapsed);
             try { localStorage.setItem('hg.sidebar', collapsed ? 'collapsed' : 'expanded'); } catch (_) {}
+        };
+        document.getElementById('sidebarToggle').addEventListener('click', () => setCollapsed(!root.classList.contains('sb-collapsed')));
+        sidebar.addEventListener('click', (e) => {
+            if (innerWidth < 768 || !root.classList.contains('sb-collapsed')) return;
+            if (e.target.closest('a, button, input, select, textarea')) return;   // links, logout and the chevron keep their own job
+            setCollapsed(false);
+        });
+        sidebar.addEventListener('click', (e) => {
+            if (!isDesktop() || !root.classList.contains('sb-collapsed')) return;
+            if (e.target.closest('a, button, input, select, textarea')) return;   // links, logout and the chevron keep their own job
+            setCollapsed(false);
+        });
+        const startPeek = () => {
+            if (peekIn || sidebar.classList.contains('is-peek') || !armed || !moved || !isDesktop() || !root.classList.contains('sb-collapsed')) return;
+            clearTimeout(peekOut);
+            // short delay so the mouse just passing by doesn't fling the sidebar open
+            peekIn = setTimeout(() => { peekIn = null; root.classList.add('sb-animate'); sidebar.classList.add('is-peek'); hideTip(); }, 120);
+        };
+        sidebar.addEventListener('pointerenter', (e) => {
+            clearTimeout(peekOut);
+            if (e.pointerType === 'mouse') { if (e.movementX || e.movementY) moved = true; startPeek(); }
+        });
+        sidebar.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) { moved = true; startPeek(); }
+        });
+        sidebar.addEventListener('pointerleave', () => {
+            armed = true;
+            clearTimeout(peekIn); peekIn = null;
+            peekOut = setTimeout(() => sidebar.classList.remove('is-peek'), 100);
         });
         document.getElementById('sidebarOpen').addEventListener('click', () => setOpen(true));
         backdrop.addEventListener('click', () => setOpen(false));
@@ -281,7 +312,8 @@ document.addEventListener('submit', async (e) => {
             if (!el || !document.documentElement.classList.contains('sb-collapsed') || innerWidth < 768) return;
             const r = el.getBoundingClientRect();
             tip.textContent = el.dataset.label;
-            tip.style.left = (sidebar.getBoundingClientRect().right + 12) + 'px';
+            // the button straddles the sidebar's edge, so its label starts past the button instead of under it
+            tip.style.left = (el.id === 'sidebarToggle' ? r.right + 8 : sidebar.getBoundingClientRect().right + 12) + 'px';
             tip.style.top = (r.top + r.height / 2) + 'px';
             tip.classList.add('is-visible');
         };
@@ -351,6 +383,20 @@ document.addEventListener('submit', async (e) => {
             start();
         };
         document.querySelectorAll(sel).forEach(watch);
+    })();
+    </script>
+
+    <script>
+    // Phase 9: the cached Directory page carries the signed-in user's name and a CSRF token,
+    // so drop it on logout. (No-op over plain HTTP, where the Cache API doesn't exist.)
+    (function () {
+        const form = document.querySelector('form[action="{{ route('logout') }}"]');
+        if (!form || !window.caches) return;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try { await caches.delete('hg-dir-pages'); } catch (_) {}
+            HTMLFormElement.prototype.submit.call(form);   // .submit() skips this handler
+        });
     })();
     </script>
 

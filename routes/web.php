@@ -4,11 +4,16 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BuildingSelectController;
 use App\Http\Controllers\CongressmanController;
+use App\Http\Controllers\DirectoryServiceWorkerController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\PassController;
 use App\Http\Controllers\PassInventoryController;
 use App\Http\Controllers\ScannerController;
 use Illuminate\Support\Facades\Route;
+
+// Directory offline worker. Public on purpose: it only lists static asset URLs, and the browser
+// re-checks it for updates even after the session has expired.
+Route::get('/directory-sw.js', DirectoryServiceWorkerController::class)->name('directory.sw');
 
 // --- Guest ---
 Route::middleware('guest')->group(function () {

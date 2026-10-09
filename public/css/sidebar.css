@@ -39,7 +39,11 @@
     color: #fff;
     font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
     z-index: 40; /* below modals (z-50) */
-    transition: width var(--sb-speed) var(--sb-ease);
+    /* box-shadow + border-color animate too: they carry the hover hint on the collapsed rail */
+    transition:
+        width var(--sb-speed) var(--sb-ease),
+        box-shadow 0.25s ease,
+        border-color 0.25s ease;
 }
 /* Clips everything during the width animation; the toggle lives outside it */
 .sidebar-inner {
@@ -77,6 +81,34 @@
 .sidebar-toggle:hover {
     transform: scale(1.1);
     background: rgba(36, 91, 166, 0.75);
+}
+/* Ring that pulses out of the button while the collapsed rail is hovered (see the hover hint below) */
+.sidebar-toggle::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 194, 0, 0.85);
+    opacity: 0;
+    pointer-events: none;
+}
+@keyframes sbRing {
+    from {
+        transform: scale(1);
+        opacity: 0.85;
+    }
+    to {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+}
+@keyframes sbNudge {
+    from {
+        translate: 0 0;
+    }
+    to {
+        translate: 3px 0;
+    } /* 'translate' is separate from the chevron's rotate(180deg), so the two don't fight */
 }
 .sidebar-toggle i {
     transition: transform var(--sb-speed) var(--sb-ease);
@@ -369,6 +401,41 @@
     .sb-animate.sb-collapsed .sidebar-actions {
         animation-name: sbFadeB;
     }
+
+    /* Collapsed rail: a click anywhere on it opens it (script in layouts/app.blade.php) */
+    .sb-collapsed .sidebar-inner {
+        cursor: pointer;
+    }
+
+    /* Hover HINT only, the rail never opens by itself. Hovering anywhere on it makes the edge glow gold and the
+       button swell, pulse a ring and nudge its chevron; hovering the button itself pushes that further.
+       hover:hover keeps touch screens from getting a stuck hover state after a tap. */
+    @media (hover: hover) {
+        .sb-collapsed .sidebar:hover {
+            border-right-color: #ffd84d;
+            box-shadow:
+                4px 0 15px rgba(0, 0, 0, 0.1),
+                0 0 22px 2px rgba(255, 194, 0, 0.4);
+        }
+        .sb-collapsed .sidebar:hover .sidebar-toggle {
+            transform: scale(1.12);
+            background: rgba(36, 91, 166, 0.9);
+            border-color: rgba(255, 216, 77, 0.9);
+        }
+        .sb-collapsed .sidebar:hover .sidebar-toggle::after {
+            animation: sbRing 1.4s ease-out infinite;
+        }
+        .sb-collapsed .sidebar:hover .sidebar-toggle i {
+            animation: sbNudge 0.7s ease-in-out infinite alternate;
+        }
+        .sb-collapsed .sidebar .sidebar-toggle:hover {
+            transform: scale(1.22);
+            background: #235aa6;
+            box-shadow:
+                0 0 0 4px rgba(255, 194, 0, 0.35),
+                0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+    }
 }
 
 /* Mobile: off-canvas drawer */
@@ -434,6 +501,10 @@
     }
     .sb-animate .sidebar-actions {
         animation: none;
+    }
+    .sidebar-toggle::after,
+    .sidebar-toggle i {
+        animation: none !important; /* the hover hint keeps its glow and swell, just no looping motion */
     }
 }
 

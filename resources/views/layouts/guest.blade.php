@@ -11,6 +11,7 @@
 
     {{-- Adjust to match however your app.css / app.js are actually loaded elsewhere in the project --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('css/login.css') }}?v={{ filemtime(public_path('css/login.css')) }}">
 
     <style>
         .font-heading { font-family: 'Source Serif Pro', Georgia, serif; }

@@ -1,0 +1,83 @@
+/* Login page only (layouts/guest.blade.php). Plain CSS on purpose: the guest layout does not load theme-govt.css,
+   which is why the old .alert-govt-error warning rendered as unstyled text. */
+
+/* Wrong password / role / building: a real alert instead of plain text */
+.login-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #f3c2c2;
+    border-left: 4px solid #ef3b4c;
+    border-radius: 10px;
+    background: #ffebee;
+    color: #b71c1c;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.35;
+    animation: login-alert-in 0.5s ease-out both; /* fades in, then a short shake */
+}
+.login-alert svg {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.05rem;
+}
+@keyframes login-alert-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    30% {
+        opacity: 1;
+        transform: translateX(-5px);
+    }
+    50% {
+        transform: translateX(5px);
+    }
+    70% {
+        transform: translateX(-3px);
+    }
+    100% {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Fields the error points at */
+.login-input.has-error {
+    border-color: #ef3b4c;
+    background-color: #fff8f8;
+}
+.login-input.has-error:focus {
+    --tw-ring-color: #ef3b4c;
+}
+
+/* Assigned Building is always on screen so choosing a role never changes the card's height.
+   It is just dimmed and disabled until "Building Personnel" is picked. */
+.login-building {
+    transition: opacity 0.2s ease;
+}
+.login-building.is-off {
+    opacity: 0.45;
+}
+.login-building.is-off select {
+    cursor: not-allowed;
+}
+.login-hint {
+    font-weight: 400;
+    color: #94a3b8;
+}
+.login-building:not(.is-off) .login-hint {
+    visibility: hidden; /* hidden, not removed: on narrow screens it wraps, and removing it would resize the card */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-alert {
+        animation: none;
+    }
+    .login-building {
+        transition: none;
+    }
+}
