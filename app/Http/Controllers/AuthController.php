@@ -22,6 +22,13 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
             'role' => ['required', 'in:admin,guard'],
             'building_id' => ['required_if:role,guard', 'nullable', 'exists:buildings,id'],
+        ], [
+            // Laravel's defaults read "The building id field is required when role is guard."
+            'hrep_id.required' => 'Enter your HREP ID.',
+            'password.required' => 'Enter your password.',
+            'role.required' => 'Select your workstation.',
+            'building_id.required_if' => 'Select your assigned building.',
+            'building_id.exists' => 'That building is not available. Please choose again.',
         ]);
 
         if (! Auth::attempt([

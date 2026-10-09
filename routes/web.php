@@ -9,6 +9,7 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\PassController;
 use App\Http\Controllers\PassInventoryController;
 use App\Http\Controllers\ScannerController;
+use App\Http\Controllers\WhatsNewController;
 use Illuminate\Support\Facades\Route;
 
 // Directory offline worker. Public on purpose: it only lists static asset URLs, and the browser
@@ -24,6 +25,7 @@ Route::middleware('guest')->group(function () {
 // --- Authenticated ---
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('/whats-new/dismiss', [WhatsNewController::class, 'dismiss'])->name('whatsnew.dismiss');
 
     Route::get('/select-building', [BuildingSelectController::class, 'show'])->name('building.select');
     Route::post('/select-building', [BuildingSelectController::class, 'store'])->name('building.select.store');

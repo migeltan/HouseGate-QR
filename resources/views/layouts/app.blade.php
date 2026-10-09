@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ asset('css/scanner-restyle.css') }}">
     <link rel="stylesheet" href="{{ asset('css/sidebar.css') }}?v={{ filemtime(public_path('css/sidebar.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/glass-status.css') }}?v={{ filemtime(public_path('css/glass-status.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/whats-new.css') }}?v={{ filemtime(public_path('css/whats-new.css')) }}">
     {{-- Pre-built Tailwind v3 (replaces the Play CDN). Kept LAST because the CDN used to inject its <style> at the end of <head>. --}}
     <link rel="stylesheet" href="{{ asset('css/tailwind.css') }}?v={{ filemtime(public_path('css/tailwind.css')) }}">
     <script>try{if(localStorage.getItem('hg.sidebar')==='collapsed')document.documentElement.classList.add('sb-collapsed')}catch(e){}</script>
@@ -369,8 +370,11 @@ document.addEventListener('submit', async (e) => {
     // Skeleton for photos: shimmer sits on the <img> itself until it has loaded.
     // Covers building cards, scanner result photo, pass-info + log-row photos.
     (function () {
-        const sel = '.gov-building-card-photo img, .gov-info-photo, .result-photo img';
+        const sel = '.gov-building-card-photo img, .gov-info-photo, .result-photo img, .dir-photo, #mmPhoto';
+        const watched = new WeakSet();   // scan() can run again on the same <img> without stacking listeners
         const watch = img => {
+            if (watched.has(img)) return;
+            watched.add(img);
             const start = () => {
                 if (img.getAttribute('src') && !(img.complete && img.naturalWidth)) img.classList.add('sk-img');
             };
@@ -382,7 +386,9 @@ document.addEventListener('submit', async (e) => {
             new MutationObserver(start).observe(img, { attributes: true, attributeFilter: ['src'] });
             start();
         };
-        document.querySelectorAll(sel).forEach(watch);
+        const scan = (root = document) => root.querySelectorAll(sel).forEach(watch);
+        scan();
+        window.hgWatchPhotos = scan;   // call after JS renders more photos (the Directory list does)
     })();
     </script>
 
@@ -399,6 +405,14 @@ document.addEventListener('submit', async (e) => {
         });
     })();
     </script>
+
+    {{-- "What's new": once per user per update id (config/whatsnew.php) --}}
+    @auth
+        @php $whatsNew = config('whatsnew'); @endphp
+        @if (! empty($whatsNew['id']) && auth()->user()->last_seen_update !== $whatsNew['id'])
+            @include('partials.whats-new', ['whatsNew' => $whatsNew])
+        @endif
+    @endauth
 
     @yield('scripts')
 

@@ -351,7 +351,7 @@
             <td class="py-2.5 px-4">
                 <div class="flex items-center gap-3">
                     ${m.photo
-                        ? `<img src="${esc(m.photo)}" alt="" loading="lazy" class="h-14 w-11 shrink-0 rounded-md border border-slate-200 object-cover object-top">`
+                        ? `<img src="${esc(m.photo)}" alt="" loading="lazy" class="dir-photo h-14 w-11 shrink-0 rounded-md border border-slate-200 object-cover object-top">`
                         : `<span class="grid h-14 w-11 shrink-0 place-items-center rounded-md border border-slate-200 bg-slate-100 text-slate-300"><i class="fa-solid fa-user"></i></span>`}
                     <div>
                         <p class="font-semibold ${m.active ? 'text-slate-900' : 'text-slate-400'}">${esc(m.name)}</p>
@@ -421,6 +421,7 @@
         const last = Math.max(1, Math.ceil(list.length / PER_PAGE));
         page = Math.min(Math.max(1, page), last);
         results.innerHTML = tableHtml(list.slice((page - 1) * PER_PAGE, page * PER_PAGE), list.length, last, roster.is_admin);
+        if (window.hgWatchPhotos) window.hgWatchPhotos(results);   // shimmer on the new photos until they load
         current = urlForState();
         history.replaceState(null, '', current);
         paintStatus();

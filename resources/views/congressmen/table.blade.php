@@ -41,7 +41,7 @@
                             <div class="flex items-center gap-3">
                                 @if ($m->photo_url)
                                     <img src="{{ $m->photo_url }}" alt="" loading="lazy"
-                                         class="h-14 w-11 shrink-0 rounded-md border border-slate-200 object-cover object-top">
+class="dir-photo h-14 w-11 shrink-0 rounded-md border border-slate-200 object-cover object-top">
                                 @else
                                     <span class="grid h-14 w-11 shrink-0 place-items-center rounded-md border border-slate-200 bg-slate-100 text-slate-300"><i class="fa-solid fa-user"></i></span>
                                 @endif

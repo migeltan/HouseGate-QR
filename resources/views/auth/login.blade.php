@@ -63,26 +63,21 @@
                     <input type="password" name="password" required {{ $errors->has('hrep_id') ? 'autofocus' : '' }}
                         class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('hrep_id') || $errors->has('password') ? 'has-error' : '' }}">
                 </div>
-
                 <div>
                     <label class="block mb-1 font-bold text-slate-700">Workstation</label>
                     <select name="role" required
-                        class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('role') ? 'has-error' : '' }}">ring-2 focus:ring-blue-800"
-                        onchange="document.getElementById('building-field').classList.toggle('hidden', this.value !== 'guard')">
+                        class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('role') ? 'has-error' : '' }}">
                         <option value="" disabled {{ old('role') ? '' : 'selected' }}>Administrator / Personnel</option>
                         <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrator</option>
                         <option value="guard" {{ old('role') === 'guard' ? 'selected' : '' }}>Building Personnel</option>
                     </select>
                 </div>
 
-                <div id="building-field" class="{{ old('role') === 'guard' ? '' : 'hidden' }}">
-                    <label class="block mb-1 font-bold text-slate-700">Assigned Building</label>
-                    <select name="building_id"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-                {{-- Always rendered (dimmed + disabled unless Building Personnel is chosen), so picking a role never resizes the card --}}
+                {{-- Always rendered (dimmed + disabled unless Building Personnel is chosen), so picking a role never resizes the card --}}
                 <div id="building-field" class="login-building {{ old('role') === 'guard' ? '' : 'is-off' }}">
                     <label class="block mb-1 font-bold text-slate-700">Assigned Building <span class="login-hint">· Building Personnel only</span></label>
                     <select name="building_id" {{ old('role') === 'guard' ? '' : 'disabled' }}
-                        class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('building_id') ? 'has-error' : '' }}">2 focus:ring-blue-800">
+                        class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('building_id') ? 'has-error' : '' }}">
                         <option value="">Select building…</option>
                         @foreach ($buildings as $building)
                             @continue($building->code === 'NG')
