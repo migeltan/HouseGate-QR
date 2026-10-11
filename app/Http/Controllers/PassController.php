@@ -250,10 +250,10 @@ class PassController extends Controller
         $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other']);
 
         if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
-            $cap = VisitorPass::addWorkingDays(now(), VisitorPass::MAX_LONG_TERM_WORKING_DAYS);
-            if (\Carbon\Carbon::parse($data['expected_return_date'])->gt($cap)) {
+            $cap = now()->startOfDay()->addDays(VisitorPass::MAX_LONG_TERM_DAYS);
+            if (\Carbon\Carbon::parse($data['expected_return_date'])->startOfDay()->gt($cap)) {
                 throw ValidationException::withMessages(['register' =>
-                    'Expected return date exceeds the 30-working-day cap for long-term passes ('
+                    'Expected return date exceeds the ' . VisitorPass::MAX_LONG_TERM_DAYS . '-day cap for long-term passes ('
                     . $cap->format('M j, Y') . ' latest).'
                 ]);
             }

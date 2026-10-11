@@ -41,8 +41,8 @@
     #logResults, #userResults { position: relative; transition: opacity .15s; }
     #logResults.is-loading, #userResults.is-loading { opacity: .5; pointer-events: none; }
     #logResults.is-loading::before, #userResults.is-loading::before { content: ''; position: absolute; top: 0; left: 0; z-index: 20; height: 2px;
-        width: 40%; background: #235aa6; animation: acct-bar 1s ease-in-out infinite; }
-    @keyframes acct-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+        width: 40%; background: #235aa6; animation: acct-bar .9s ease-in-out infinite alternate; }
+    @keyframes acct-bar { from { left: 0; } to { left: 60%; } }
 </style>
 
 {{-- ============================= INSTRUCTIONS ============================= --}}

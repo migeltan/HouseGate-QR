@@ -1856,7 +1856,7 @@ select.gov-location-badge option {
     max-height: calc(100dvh - 48px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: clip;
 }
 .reg-modal > form {
     display: flex;
@@ -1869,8 +1869,10 @@ select.gov-location-badge option {
     flex: 0 0 auto;
 }
 .reg-modal-body {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     align-content: start;
     gap: 20px;
@@ -2802,4 +2804,26 @@ select.gov-location-badge option {
 }
 a.sidebar-btn {
     text-decoration: none;
+}
+/* Long-term return date: fade in and leave breathing room when scrolled into view */
+@keyframes regReveal {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+#expectedReturnField {
+    scroll-margin-bottom: 24px;
+}
+#expectedReturnField.is-revealed {
+    animation: regReveal 0.25s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+    #expectedReturnField.is-revealed {
+        animation: none;
+    }
 }

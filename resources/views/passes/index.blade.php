@@ -289,16 +289,29 @@
                 btnDay.classList.remove('is-active');
                 btnLongTerm.classList.add('is-active');
 
-                const cap = addWorkingDaysClientSide(new Date(), 30);
-                input.max = cap.toISOString().split('T')[0];
+                const cap = new Date();
+                cap.setDate(cap.getDate() + 7);
+                const pad = n => String(n).padStart(2, '0');
+                input.max = cap.getFullYear() + '-' + pad(cap.getMonth() + 1) + '-' + pad(cap.getDate());
                 document.getElementById('expectedReturnCapHint').textContent =
-                    'Max 30 working days from today — latest allowed: ' +
+                    'Max 7 days from today — latest allowed: ' +
                     cap.toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric'
                     });
+
+                // Bring the new field into view and ready for input.
+                field.classList.remove('is-revealed');
+                void field.offsetWidth; // restart the fade-in animation
+                field.classList.add('is-revealed');
+                requestAnimationFrame(() => {
+                    field.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    input.focus({ preventScroll: true });
+                });
             } else {
+                field.classList.add('is-revealed');
+                field.classList.remove('is-revealed');
                 field.classList.add('hidden');
                 input.removeAttribute('required');
                 input.value = '';

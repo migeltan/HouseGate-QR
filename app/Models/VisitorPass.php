@@ -31,7 +31,7 @@ class VisitorPass extends Model
         'expiry_reminder_sent_on' => 'date',
     ];
 
-    const MAX_LONG_TERM_WORKING_DAYS = 30;
+    const MAX_LONG_TERM_DAYS = 7;          // calendar days from today (was 30 working days)
     const WORKING_WEEKDAYS = [1, 2, 3, 4]; // Mon–Thu, HOR's compressed 4-day week
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
     const DAY_PASS_CUTOFF = '19:00';       // day passes expire at the first 19:00 on/after issue
