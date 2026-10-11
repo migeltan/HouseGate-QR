@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
                 
                 VisitorPass::updateOrCreate(
                     ['building_id' => $building->id, 'pass_number' => $passNumber],
-                    ['qr_token' => $token, 'status' => 'available']
+                    ['qr_token' => $token, 'status' => 'available', 'holder_building_id' => $building->id]
                 );
             }
         }

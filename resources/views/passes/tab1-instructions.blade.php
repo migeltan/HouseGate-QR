@@ -47,7 +47,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
             <i class="fa-solid fa-boxes-stacked header-icon"></i>
             <div>
                 <p class="reg-eyebrow">Inventory</p>
-                <h1 id="inventory-title">Generate &amp; Print Passes</h1>
+                <h1 id="inventory-title">Manage Cards</h1>
             </div>
             <button type="button" class="reg-close-button" aria-label="Close" onclick="closeInventoryModal()">&times;</button>
         </header>
@@ -72,6 +72,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
             <div class="inv-tabs" role="tablist">
                 <button type="button" class="inv-tab is-active" data-inv-tab="generate" onclick="invTab('generate')"><i class="fa-solid fa-plus"></i> Generate</button>
                 <button type="button" class="inv-tab" data-inv-tab="print" onclick="invTab('print')"><i class="fa-solid fa-print"></i> Print / Export</button>
+                <button type="button" class="inv-tab" data-inv-tab="stock" onclick="invTab('stock')"><i class="fa-solid fa-boxes-packing"></i> Desk cards</button>
             </div>
 
             {{-- Generate --}}
@@ -151,6 +152,42 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                     <button type="submit" data-inv-print formaction="{{ route('passes.inventory.csv') }}" formtarget="_self" class="gov-btn-glass-outline"><i class="fa-solid fa-file-csv"></i> Download CSV</button>
                 </div>
             </form>
+            {{-- Desk cards: which blank cards this desk physically holds --}}
+            <form method="POST" action="{{ route('passes.inventory.stock') }}" data-inv-panel="stock" class="inv-panel hidden" onsubmit="return invStockConfirm()">
+                @csrf
+                <input type="hidden" name="building_id" id="invStockBuilding">
+                <input type="hidden" name="mode" id="invStockModeInput" value="desk">
+
+                <p class="inv-intro">Guards can only hand out cards that are at <b>their own desk</b>. Use this to tell the system which card numbers this desk really has.</p>
+
+                <div class="inv-stats">
+                    <span class="inv-stat is-available"><b id="invStockDesk">0</b> at this desk</span>
+                    <span class="inv-stat"><b id="invStockVault">0</b> in storage</span>
+                    <span class="inv-stat is-inactive"><b id="invStockAway">0</b> with another building</span>
+                </div>
+                <p class="inv-warnbox hidden" id="invStockWarn"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></p>
+
+                <div class="inv-choice" role="radiogroup" aria-label="What do you want to do?">
+                    <button type="button" class="inv-choice-btn is-active" data-inv-stockmode="desk" onclick="invStockMode('desk')" role="radio" aria-checked="true">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        <span><b>Give cards to this desk</b><small>Guards here can start handing them out.</small></span>
+                    </button>
+                    <button type="button" class="inv-choice-btn" data-inv-stockmode="vault" onclick="invStockMode('vault')" role="radio" aria-checked="false">
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span><b>Take cards back to storage</b><small>Guards here can no longer hand them out.</small></span>
+                    </button>
+                </div>
+
+                <div class="inv-pair">
+                    <div class="inv-field"><label for="invStockFrom">First card number</label><input id="invStockFrom" type="number" name="from" value="1" min="1" max="9999" required></div>
+                    <div class="inv-field"><label for="invStockTo">Last card number</label><input id="invStockTo" type="number" name="to" value="50" min="1" max="9999" required></div>
+                </div>
+                <p class="inv-count" id="invStockCount"></p>
+                <p class="inv-summary" id="invStockSummary"></p>
+                <div class="inv-actions">
+                    <button type="submit" id="invStockBtn" class="gov-btn-camera"><i class="fa-solid fa-boxes-packing"></i> <span id="invStockBtnLabel">Update cards</span></button>
+                </div>
+            </form>
         </main>
     </section>
 </div>
@@ -162,13 +199,28 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
 // $invData comes from PassController@index: grouped stats + number ranges (no pass rows).
 const INV = @json($invData);
 const expandRanges = r => { const s = new Set(); r.forEach(([a, b]) => { for (let n = a; n <= b; n++) s.add(n); }); return s; };
-Object.values(INV).forEach(e => { e.all = expandRanges(e.all); e.avail = expandRanges(e.avail); });
+Object.values(INV).forEach(e => { e.all = expandRanges(e.all); e.avail = expandRanges(e.avail); e.stock = expandRanges(e.stock); e.vault = expandRanges(e.vault); });
+const INV_MIN_STOCK = {{ \App\Models\VisitorPass::MIN_DESK_STOCK }};
 const $i = id => document.getElementById(id);
 const passWord = n => (n === 1 ? 'pass' : 'passes');
 
 function invTab(tab) {
     document.querySelectorAll('[data-inv-tab]').forEach(b => b.classList.toggle('is-active', b.dataset.invTab === tab));
     document.querySelectorAll('[data-inv-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.invPanel !== tab));
+}
+function invStockMode(mode) {
+    $i('invStockModeInput').value = mode;
+    document.querySelectorAll('[data-inv-stockmode]').forEach(b => {
+        const on = b.dataset.invStockmode === mode;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    invRefresh();
+}
+// Taking cards out of a desk's stock is the risky direction, so ask first.
+function invStockConfirm() {
+    if ($i('invStockModeInput').value === 'desk') return true;
+    return confirm($i('invStockBtnLabel').textContent + '?\n\nGuards at this desk will no longer be able to hand these cards out.');
 }
 function invMode(mode) {
     $i('invModeInput').value = mode;
@@ -229,6 +281,7 @@ function invRefresh() {
     const inv = INV[id];
     $i('invGenBuilding').value = id;
     $i('invPrintBuilding').value = id;
+    $i('invStockBuilding').value = id;
 
     // Stats
     $i('invStatTotal').textContent = inv.total;
@@ -254,7 +307,61 @@ function invRefresh() {
         if (!fresh) gSum.classList.add('is-warn');
         gBtn.disabled = fresh === 0;
     }
+    // Desk cards
+    const cardWord = n => (n === 1 ? 'card' : 'cards');
+    const pad4 = n => String(n).padStart(4, '0');
+    $i('invStockDesk').textContent = inv.stock.size;
+    $i('invStockVault').textContent = inv.vault.size;
+    $i('invStockAway').textContent = inv.away;
+    const sWarn = $i('invStockWarn');
+    sWarn.classList.toggle('hidden', inv.stock.size >= INV_MIN_STOCK);
+    sWarn.querySelector('span').textContent = `Only ${inv.stock.size} ${inv.stock.size === 1 ? 'card is' : 'cards are'} at this desk. Keep at least ${INV_MIN_STOCK} so guards don't run out.`;
 
+    const stA = +$i('invStockFrom').value, stB = +$i('invStockTo').value;
+    const give = $i('invStockModeInput').value === 'desk';
+    const stCount = $i('invStockCount'), stSum = $i('invStockSummary');
+    const stBtn = $i('invStockBtn'), stLabel = $i('invStockBtnLabel');
+    stSum.classList.remove('is-error', 'is-warn');
+    stLabel.textContent = give ? 'Give cards to this desk' : 'Take cards back to storage';
+    if (!stA || !stB || stA < 1 || stB < stA || stB > 9999) {
+        stCount.textContent = '';
+        stSum.textContent = 'Type the first and last card number, for example 200 to 250.';
+        stSum.classList.add('is-error'); stBtn.disabled = true;
+    } else if (stB - stA >= 1000) {
+        stCount.textContent = '';
+        stSum.textContent = 'That is too many at once. Please do 1000 cards or fewer.';
+        stSum.classList.add('is-error'); stBtn.disabled = true;
+    } else {
+        const c = { here: 0, storage: 0, away: 0, busy: 0, none: 0 };
+        for (let n = stA; n <= stB; n++) {
+            if (!inv.all.has(n)) c.none++;
+            else if (inv.stock.has(n)) c.here++;
+            else if (inv.vault.has(n)) c.storage++;
+            else if (inv.avail.has(n)) c.away++;
+            else c.busy++;
+        }
+        const total = stB - stA + 1;
+        stCount.textContent = `${total} ${cardWord(total)} selected: #${pad4(stA)} to #${pad4(stB)}`;
+        const move = give ? c.storage : c.here;
+        const after = give ? inv.stock.size + move : inv.stock.size - move;
+        const notes = [];
+        if (give && c.here) notes.push(`${c.here} already at this desk`);
+        if (!give && c.storage) notes.push(`${c.storage} already in storage`);
+        if (c.busy) notes.push(`${c.busy} with a visitor right now`);
+        if (c.away) notes.push(`${c.away} with another building`);
+        if (c.none) notes.push(`${c.none} not created yet`);
+        const skipped = notes.length ? ` (Not changed: ${notes.join(', ')}.)` : '';
+        if (move) {
+            stSum.textContent = `${move} ${cardWord(move)} will ${give ? 'go to this desk' : 'go back to storage'}. This desk will have ${after}.${skipped}`;
+            stLabel.textContent = give ? `Give ${move} ${cardWord(move)} to this desk` : `Take ${move} ${cardWord(move)} back to storage`;
+            if (after < INV_MIN_STOCK) stSum.classList.add('is-warn');
+        } else {
+            stSum.textContent = `Nothing to change.${skipped}`;
+            stSum.classList.add('is-warn');
+        }
+        stBtn.disabled = move === 0;
+    }
+    
     // Print / export summary
     const sel = invParse();
     const sum = $i('invSummary'), btns = document.querySelectorAll('[data-inv-print]');
@@ -281,7 +388,7 @@ function invRefresh() {
     btns.forEach(b => b.disabled = found === 0);
 }
 
-['invBuilding', 'invGenFrom', 'invGenTo', 'invFrom', 'invTo', 'invStart', 'invCount', 'invList', 'invOnlyAvail']
+['invBuilding', 'invGenFrom', 'invGenTo', 'invFrom', 'invTo', 'invStart', 'invCount', 'invList', 'invOnlyAvail', 'invStockFrom', 'invStockTo']
     .forEach(id => ['input', 'change'].forEach(ev => $i(id).addEventListener(ev, invRefresh)));
 invRefresh();
 // ---- End Inventory modal ----

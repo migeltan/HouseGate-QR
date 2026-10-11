@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminLog;
 use App\Models\Building;
 use App\Models\VisitorPass;
 use App\Services\PassGenerator;
@@ -119,6 +120,53 @@ class PassInventoryController extends Controller
 
         return redirect()->route('passes.index')
             ->with('success', "{$building->name}: {$r['created']} created, {$r['skipped']} already existed.");
+    }
+
+    /**
+     * Which blank cards a desk physically holds. 'desk' puts vault cards (held by no desk) at this
+     * building's desk; 'vault' takes blank cards back out of its stock. Cards with a visitor and
+     * cards held away at another desk are never touched.
+     */
+    public function stock(Request $request)
+    {
+        $data = $request->validate([
+            'building_id' => 'required|exists:buildings,id',
+            'from'        => 'required|integer|min:1|max:9999',
+            'to'          => 'required|integer|gte:from|max:9999',
+            'mode'        => 'required|in:desk,vault',
+        ]);
+        abort_if($data['to'] - $data['from'] >= 1000, 422, 'Range too large (max 1000 at a time).');
+
+        $building = Building::findOrFail($data['building_id']);
+        $padded = array_map(
+            fn ($n) => str_pad((string) $n, 4, '0', STR_PAD_LEFT),
+            range((int) $data['from'], (int) $data['to'])
+        );
+
+        $blank = fn () => VisitorPass::where('building_id', $building->id)
+            ->when($building->code === 'NG', fn ($q) => $q->where('is_multi_building', true))
+            ->whereIn('pass_number', $padded)
+            ->whereNull('visitor_name');
+
+        $moved = $data['mode'] === 'desk'
+            ? $blank()->whereNull('holder_building_id')->update(['holder_building_id' => $building->id])
+            : $blank()->whereColumn('holder_building_id', 'building_id')->update(['holder_building_id' => null]);
+
+        $stock = VisitorPass::where('building_id', $building->id)
+            ->when($building->code === 'NG', fn ($q) => $q->where('is_multi_building', true))
+            ->inStock()
+            ->count();
+
+        $verb = $data['mode'] === 'desk' ? 'given to this desk' : 'taken back to storage';
+        $range = "#{$padded[0]}–#" . end($padded);
+        AdminLog::record('pass.stock_updated', $building->name, "{$moved} card(s) {$verb} ({$range}). Desk stock now {$stock}.");
+
+        $message = "{$building->name}: {$moved} " . ($moved === 1 ? 'card' : 'cards') . " {$verb}. This desk now has {$stock} " . ($stock === 1 ? 'card' : 'cards') . '.';
+        if ($stock < VisitorPass::MIN_DESK_STOCK) {
+            $message .= ' Keep at least ' . VisitorPass::MIN_DESK_STOCK . " so guards don't run out.";
+        }
+
+        return redirect()->route('passes.index')->with('success', $message);
     }
 
     public function print(Request $request)

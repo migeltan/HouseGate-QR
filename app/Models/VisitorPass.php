@@ -19,6 +19,7 @@ class VisitorPass extends Model
     'pass_class', 'expected_return_date', 'visitor_email', 'id_photo_path',
     'registered_by', 'checked_in_at', 'last_egress_at',
     'egress_reminder_sent_on', 'expiry_reminder_sent_on',
+    'holder_building_id',
 ];
 
     protected $casts = [
@@ -34,7 +35,8 @@ class VisitorPass extends Model
     const MAX_LONG_TERM_DAYS = 7;          // calendar days from today (was 30 working days)
     const WORKING_WEEKDAYS = [1, 2, 3, 4]; // Mon–Thu, HOR's compressed 4-day week
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
-    const DAY_PASS_CUTOFF = '19:00';       // day passes expire at the first 19:00 on/after issue
+    const MIN_DESK_STOCK = 50;             // each desk should physically hold at least this many blank cards
+    const DAY_PASS_CUTOFF = '19:00';     // day passes expire at the first 19:00 on/after issue
 
     public function currentBuilding(): BelongsTo
     {
@@ -44,6 +46,19 @@ class VisitorPass extends Model
     public function building(): BelongsTo
     {
         return $this->belongsTo(Building::class);
+    }
+
+    /** Desk (building) that physically holds this card right now. NULL = vault (held by no desk). */
+    public function holder(): BelongsTo
+    {
+        return $this->belongsTo(Building::class, 'holder_building_id');
+    }
+
+    /** Blank card sitting at its own home desk: the only cards a guard may issue. */
+    public function scopeInStock(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereNull('visitor_name')
+            ->whereColumn('holder_building_id', 'building_id');
     }
 
     public function scanLogs(): HasMany

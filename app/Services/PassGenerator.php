@@ -39,6 +39,7 @@ class PassGenerator
                 'qr_token'          => self::token($building, $number),
                 'status'            => 'available',
                 'is_multi_building' => $isMulti,
+                'holder_building_id' => $building->id,
             ]);
             $created++;
         }

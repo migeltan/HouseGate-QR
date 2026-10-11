@@ -70,6 +70,7 @@ class GenerateMultiBuildingPasses extends Command
                 'qr_token' => $qrToken,
                 'status' => 'available',
                 'is_multi_building' => true,
+                'holder_building_id' => $multiBuildingId,
             ]);
 
             $this->info("Created pass #{$passNumber} ({$qrToken}) — available");

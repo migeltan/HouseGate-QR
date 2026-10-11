@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/passes/inventory/generate', [PassInventoryController::class, 'generate'])->name('passes.inventory.generate');
             Route::get('/passes/inventory/print', [PassInventoryController::class, 'print'])->name('passes.inventory.print');
             Route::get('/passes/inventory/csv', [PassInventoryController::class, 'csv'])->name('passes.inventory.csv');
+            Route::post('/passes/inventory/stock', [PassInventoryController::class, 'stock'])->name('passes.inventory.stock');
         });
     });
 });

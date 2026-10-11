@@ -67,7 +67,7 @@ class PassController extends Controller
         // Inventory modal (admin only): stats + compact number ranges, not pass rows.
         $invData = [];
         if ($user->isAdmin()) {
-            $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building', 'status', 'pass_number']);
+$nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building', 'status', 'pass_number', 'visitor_name', 'holder_building_id']);
             $toRanges = function ($list) {
                 $ranges = [];
                 foreach ($list->map(fn ($n) => (int) $n)->unique()->sort()->values() as $n) {
@@ -82,9 +82,18 @@ class PassController extends Controller
             };
             foreach ($displayBuildings as $b) {
                 $own = $nums->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'));
+                // Physical custody of blank cards: at this desk, in the vault (no desk), or held at another desk.
+                $blank   = $own->whereNull('visitor_name');
+                $atDesk  = $blank->filter(fn ($r) => (int) $r->holder_building_id === (int) $b->id);
+                $inVault = $blank->filter(fn ($r) => $r->holder_building_id === null);
+                $away    = $blank->filter(fn ($r) => $r->holder_building_id !== null && (int) $r->holder_building_id !== (int) $b->id);
+
                 $invData[$b->id] = $passStats[$b->id] + [
                     'all'   => $toRanges($own->pluck('pass_number')),
                     'avail' => $toRanges($own->where('status', 'available')->pluck('pass_number')),
+                    'stock' => $toRanges($atDesk->pluck('pass_number')),
+                    'vault' => $toRanges($inVault->pluck('pass_number')),
+                    'away'  => $away->count(),
                 ];
             }
         }
@@ -447,17 +456,35 @@ class PassController extends Controller
     {
         $buildingId = $data['building_ids'][0];
 
-        $pass = VisitorPass::where('building_id', $buildingId)
-            ->where('is_multi_building', false)
-            ->whereNull('visitor_name')
-            ->orderBy('pass_number')
-            ->first();
+        // Pick the card INSIDE the transaction with a row lock. A second guard registering at the
+        // same moment waits here, then re-runs the query and gets the next free card instead of
+        // overwriting this visitor's record.
+        [$pass, $transferred] = DB::transaction(function () use ($buildingId, $data, $request) {
+            // Only cards physically at this building's desk are issuable (holder == home building).
+            $pass = VisitorPass::where('building_id', $buildingId)
+                ->where('is_multi_building', false)
+                ->inStock()
+                ->orderBy('pass_number')
+                ->lockForUpdate()
+                ->first();
 
-        if (! $pass) {
-            throw ValidationException::withMessages(['register' => 'No available passes left for that building. Please choose another building.']);
-        }
+            // Admin override: cards that no desk holds (the vault) can be issued by an admin only.
+            if (! $pass && $request->user()->isAdmin()) {
+                $pass = VisitorPass::where('building_id', $buildingId)
+                    ->where('is_multi_building', false)
+                    ->whereNull('visitor_name')
+                    ->whereNull('holder_building_id')
+                    ->orderBy('pass_number')
+                    ->lockForUpdate()
+                    ->first();
+            }
 
-        $transferred = DB::transaction(fn () => $this->assignVisitorToPass($pass, $data, $request));
+            if (! $pass) {
+                throw ValidationException::withMessages(['register' => 'No cards in stock at this desk for that building. Ask an admin to allocate more cards.']);
+            }
+
+            return [$pass, $this->assignVisitorToPass($pass, $data, $request)];
+        });
 
         return $this->registerResponse($request, $pass, $transferred, $this->registrationMessage($pass, $transferred, $pass->building->name));
     }
@@ -475,33 +502,49 @@ class PassController extends Controller
     {
         $northGateId = Building::where('code', 'NG')->value('id');
 
-        $pass = VisitorPass::where('is_multi_building', true)
-            ->whereNull('visitor_name')
-            ->first();
+        // Same rule as single-building: choose (or mint) the card inside the transaction under a lock,
+        // so two admins can neither take the same free card nor mint the same new number.
+        [$pass, $transferred] = DB::transaction(function () use ($northGateId, $data, $request) {
+            $pass = VisitorPass::where('is_multi_building', true)
+                ->inStock()
+                ->orderBy('pass_number')
+                ->lockForUpdate()
+                ->first();
 
-        if (! $pass) {
-            $nextNumber = (int) (VisitorPass::query()
-                ->where('building_id', $northGateId)
-                ->where('is_multi_building', true)
-                ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')
-                ->first()
-                ?->max_num ?? 0) + 1;
+            // Admin-only flow: fall back to a vault card (held by no desk) before minting a new number.
+            if (! $pass) {
+                $pass = VisitorPass::where('is_multi_building', true)
+                    ->whereNull('visitor_name')
+                    ->whereNull('holder_building_id')
+                    ->orderBy('pass_number')
+                    ->lockForUpdate()
+                    ->first();
+            }
 
-            $passNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            if (! $pass) {
+                $nextNumber = (int) (VisitorPass::query()
+                    ->where('building_id', $northGateId)
+                    ->where('is_multi_building', true)
+                    ->lockForUpdate()
+                    ->selectRaw('MAX(CAST(pass_number AS UNSIGNED)) as max_num')
+                    ->first()
+                    ?->max_num ?? 0) + 1;
 
-            $pass = VisitorPass::create([
-                'building_id' => $northGateId,
-                'pass_number' => $passNumber,
-                'qr_token' => "PASS-MULTI-{$passNumber}",
-                'is_multi_building' => true,
-            ]);
-        }
+                $passNumber = str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
 
-        $transferred = DB::transaction(function () use ($pass, $data, $request) {
+                $pass = VisitorPass::create([
+                    'building_id' => $northGateId,
+                    'pass_number' => $passNumber,
+                    'qr_token' => "PASS-MULTI-{$passNumber}",
+                    'is_multi_building' => true,
+                    'holder_building_id' => $northGateId,
+                ]);
+            }
+
             $transferred = $this->assignVisitorToPass($pass, $data, $request);
             $pass->buildings()->sync($data['building_ids']);
 
-            return $transferred;
+            return [$pass, $transferred];
         });
 
         $buildingCount = count($data['building_ids']);
