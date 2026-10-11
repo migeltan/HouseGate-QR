@@ -4,7 +4,7 @@
 
 **QR-based visitor building access control and monitoring for the House of Representatives of the Philippines**
 
-Legislative Security Bureau (LSB) · Perimeter Security Group · Office of the Sergeant-at-Arms
+Legislative Security Bureau (LSB) · Perimeter Security Group · Office of the Sergeant at Arms
 
 Built by **Migel H. Tan** during the **INSPIRE Internship Program** (formerly SMART Internship Program)
 
@@ -35,6 +35,8 @@ It is designed to **supplement** existing guards and physical passes, not replac
 ---
 
 ## Screenshots
+
+> Add images to `docs/screenshots/` using the file names below, or change the paths.
 
 | Login                                | Scanner (AUTHORIZED result)                         |
 | ------------------------------------ | --------------------------------------------------- |
@@ -182,6 +184,21 @@ Deactivated users are logged out immediately.
 - User management with activation control.
 - "What's New" release notes modal.
 
+**Modals (no page reloads)**
+
+- **Register Visitor**: the three-step registration flow described above.
+- **Building passes**: browse and search every pass of a building from the Passes page.
+- **Pass info**: a pass's visitor, destination and status details.
+- **Pass QR**: view or print a pass's QR code.
+- **Pass inventory** (admin): generate, print and stock passes.
+
+**Offline congressman directory**
+
+- The directory keeps working without a connection, so guards can still look up a member and their office.
+- The member list is stored in the browser and refreshed in the background with a cheap version check, so it only re-downloads when the roster actually changed.
+- A service worker caches the directory page, its styles, fonts, icons and member photos for full offline reloads. This part needs HTTPS or `localhost`. On plain `http://` the page still works online, and the cached member list still helps, but a reload with no connection will not.
+- Editing the directory (admin) only works while online.
+
 **Audit and records**
 
 - `scan_logs` (with verification photos), `pass_registrations` (append-only history) and `admin_logs`.
@@ -264,27 +281,72 @@ php artisan optimize:clear                      # clear cached config, routes an
 
 ## Demo Deployment (multiple devices, different networks)
 
-To demo from other laptops on different networks without hosting, run the app on one machine and expose it through an HTTPS tunnel. **HTTPS is required:** browsers only allow camera access on HTTPS or `localhost`, and both registration and scanning use the camera.
+To demo from other laptops and phones on different networks without hosting anything, run the app on one machine and expose it through an HTTPS tunnel (ngrok). **HTTPS is required:** browsers only allow camera access on HTTPS or `localhost`, and both registration and scanning use the camera.
 
-1. Trust the tunnel's proxy headers in `bootstrap/app.php` so Laravel generates `https://` URLs:
+### One-time setup
+
+1. **Trust the tunnel's proxy headers** in `bootstrap/app.php`, so Laravel generates `https://` URLs:
     ```php
     $middleware->trustProxies(at: '*');
     ```
-2. Set `.env` to match the tunnel URL (photo URLs are built from `APP_URL`):
+2. **Build URLs from `APP_URL`** in `app/Providers/AppServiceProvider.php`. A tunnel that rewrites the Host header would otherwise make Laravel redirect to your local `.test` address:
+
+    ```php
+    use Illuminate\Support\Facades\URL;
+
+    public function boot(): void
+    {
+        if (config('app.url')) {
+            URL::forceRootUrl(config('app.url'));
+        }
+    }
+    ```
+
+3. **Laravel Herd only:** serve the site over plain HTTP with `herd unsecure`. A secured site makes Herd's nginx redirect every request to `https://<site>.test`, which other devices cannot reach.
+4. **Set `.env`** to match your tunnel URL (photo URLs are built from `APP_URL`), then run `php artisan config:clear`:
     ```dotenv
     APP_URL=https://<your-domain>.ngrok-free.dev
     APP_DEBUG=false
     SESSION_SECURE_COOKIE=true
     ```
-    Then run `php artisan config:clear`.
-3. Make sure assets are built (`npm run build`), `public/hot` does not exist (stop `npm run dev`) and the storage link exists.
-4. Start the tunnel (example with Herd serving `housegate-qr.test`):
-    ```bash
-    ngrok http 80 --url=https://<your-domain>.ngrok-free.dev --host-header=housegate-qr.test
-    ```
-5. Keep `schedule:work` and `queue:work` running, keep the host machine plugged in with sleep disabled, and use fake visitor data.
+5. **Assets:** run `npm run build`, make sure `public/hot` does not exist (stop `npm run dev`), and make sure the storage link exists (`php artisan storage:link`).
+6. **ngrok:** install it, add your auth token, and find your free dev domain in the ngrok dashboard under Domains.
 
-On the free ngrok plan, each new browser shows a one-time warning page that must be clicked through.
+### Every demo: run these three terminals
+
+With Herd already serving the site, open three terminals in the project folder:
+
+```bash
+# Terminal 1: the tunnel (replace the domain and the Herd site name)
+ngrok http 80 --url=https://<your-domain>.ngrok-free.dev --host-header=housegate-qr.test
+
+# Terminal 2: scheduler (pass expiry every 5 minutes, daily sweep at 19:00)
+php artisan schedule:work
+
+# Terminal 3: queue worker (reminder emails)
+php artisan queue:work
+```
+
+Without Herd, run `php artisan serve` and tunnel to its port instead (`ngrok http 8000 --url=...`, no `--host-header` needed). Note that `php artisan serve` handles one request at a time on Windows.
+
+Then open `https://<your-domain>.ngrok-free.dev` on any device. On the free ngrok plan, each new browser shows a one-time warning page: click **Visit Site**.
+
+### Before you present
+
+- Only one tunnel can use a domain at a time. Stop any other ngrok session that uses it.
+- Keep the host machine plugged in with sleep disabled, and keep a phone hotspot as backup.
+- Use fake visitor data. Registration stores photos of the visitor and their ID.
+- Log in on each device once before the demo and allow camera access when asked.
+
+### Troubleshooting
+
+| Symptom                                                           | Likely cause and fix                                                                                                                                |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser jumps to `<site>.test` and says the server can't be found | The site is secured in Herd (run `herd unsecure`), or the browser cached the old redirect. Open the URL in a private tab or clear that site's data. |
+| ngrok says the endpoint is already online                         | Another tunnel is using the same domain. Stop it.                                                                                                   |
+| Page loads but images or photos are broken                        | `APP_URL` does not match the tunnel URL, or the storage link is missing.                                                                            |
+| Login page has no styling or is blank                             | `public/hot` exists or assets were not built. Delete `public/hot` and run `npm run build`.                                                          |
+| Camera does not start                                             | The page is not on HTTPS, or camera permission was denied in the browser.                                                                           |
 
 > A laptop with a tunnel is a demo setup, not a deployment. For real use, host it on a proper server, ideally inside the LSB network, with HTTPS (still required for the camera).
 
@@ -335,7 +397,7 @@ This is a prototype. Be aware of the following before any real deployment:
 
 ## Roadmap
 
-- Pass transfer and tracking across buildings: view overlays for pass QR and visitor info from the building passes modal.
+- Pass tracking across buildings: one view of where a visitor has been during their visit.
 - Reduce the weight of the passes page (large inline view, rows for every building).
 - Snapshot the visit destination into `scan_logs` so logs and CSV exports show who was visited.
 - Government ID scanning to pre-fill visitor details at registration (decode MRZ/QR codes where present, otherwise local OCR; on-premise first because of privacy).
