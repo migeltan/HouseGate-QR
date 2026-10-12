@@ -305,7 +305,7 @@ function openPassInfoModal(info) {
         rows.forEach(([label, value]) => {
             const wrap = document.createElement('div');
             const l = document.createElement('span'); l.className = 'gov-meta-label'; l.textContent = label;
-            const v = document.createElement('div'); v.className = 'gov-meta-value'; v.textContent = value;
+            const v = document.createElement('div'); v.className = 'gov-meta-value' + (label === 'Email' ? ' keep-case' : ''); v.textContent = value;
             wrap.append(l, v);
             grid.append(wrap);
         });

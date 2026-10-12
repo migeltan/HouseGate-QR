@@ -7,6 +7,11 @@
     <title>@yield('title', 'Visitor Access Control')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    {{-- Favicon: explicit links so every device finds it (versioned so browsers drop the old cached one) --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}?v={{ filemtime(public_path('favicon-32.png')) }}">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v={{ filemtime(public_path('apple-touch-icon.png')) }}">
+
     {{-- Self-hosted fonts (Source Sans 3 / Source Serif 4) and Font Awesome: no external CDN dependency --}}
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}?v={{ filemtime(public_path('css/registration-modal.css')) }}">
@@ -147,12 +152,9 @@
     `;
     container.appendChild(toast);
 
-    if (action) {
-        toast.querySelector('.gov-toast-action').addEventListener('click', () => {
-            action.onClick();
-            dismiss();
-        });
-    }
+    // With an extra action there are two buttons: [0] = the action (View Pass), last = Continue/Try Again.
+    const actionBtns = toast.querySelectorAll('.gov-toast-action');
+    const closeBtn = actionBtns[actionBtns.length - 1];
 
     const dismiss = () => {
         toast.classList.add('is-leaving');
@@ -161,7 +163,15 @@
 
     const timer = setTimeout(dismiss, 5000);
 
-    toast.querySelector('.gov-toast-action').addEventListener('click', () => {
+    if (action) {
+        actionBtns[0].addEventListener('click', () => {
+            clearTimeout(timer);
+            action.onClick();
+            dismiss();
+        });
+    }
+
+    closeBtn.addEventListener('click', () => {
         clearTimeout(timer);
         dismiss();
     });

@@ -75,8 +75,8 @@
         </div>
 
         <div class="reg-field full">
-            <label>Registered by <span class="reg-required">*</span></label>
-            <input type="text" name="registered_by" required placeholder="Entrance personnel name">
+            <label>Registered by</label>
+            <input type="text" value="{{ auth()->user()->name }}" readonly tabindex="-1" style="background:#f1f5f9; cursor:not-allowed;">
         </div>
 
         <div class="reg-field full">

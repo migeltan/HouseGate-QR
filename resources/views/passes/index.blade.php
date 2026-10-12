@@ -879,6 +879,8 @@
         let dupTimer = null;
         let dupSeq = 0;
         let dupState = null; // null | 'exact' | 'possible'
+        let dupLastKey = null;     // inputs of the last finished check; identical inputs are not asked again
+        let dupHasChecked = false; // the loading skeleton only appears for the first check after the window opens
 
         function scheduleDuplicateCheck() {
             clearTimeout(dupTimer);
@@ -891,6 +893,7 @@
             if (!(v('id_type') && v('id_ref')) && !(v('first_name') && v('last_name')) && !(v('last_name') && v(
                     'contact_no'))) {
                 dupSeq++;
+                dupLastKey = null;
                 renderDuplicate(null);
                 return;
             }
@@ -903,8 +906,12 @@
             });
             const transferToken = document.getElementById('transferQrTokenInput').value.trim();
             if (transferToken) params.set('transfer_qr_token', transferToken);
+            // Same inputs as the last finished check: nothing new to ask the server.
+            const key = params.toString();
+            if (key === dupLastKey) return;
             const seq = ++dupSeq;
-            const skTimer = setTimeout(() => { if (seq === dupSeq) toggleDupSkeleton(true); }, 150);
+            // The skeleton is a one-time loading state; later re-checks refresh the result quietly.
+            const skTimer = setTimeout(() => { if (seq === dupSeq && !dupHasChecked) toggleDupSkeleton(true); }, 150);
             try {
                 const res = await fetch(`${DUP_URL}?${params}`, {
                     headers: {
@@ -914,7 +921,11 @@
                 });
                 if (!res.ok) return;
                 const data = await res.json();
-                if (seq === dupSeq) renderDuplicate(data.match, data.transfer_ready);
+                if (seq === dupSeq) {
+                    renderDuplicate(data.match, data.transfer_ready);
+                    dupLastKey = key;
+                    dupHasChecked = true;
+                }
             } catch (e) {
                 /* the server re-checks on submit */
             } finally {
@@ -934,6 +945,20 @@
                 (dupState === 'possible' && !document.getElementById('dupConfirmCheck').checked);
         }
 
+        // House style: these fields are typed and stored in capitals (the server enforces it too).
+        (function () {
+            const CAPS_FIELDS = ['first_name', 'middle_name', 'last_name', 'id_ref', 'vehicle', 'contact_person', 'office_other'];
+            document.addEventListener('input', function (e) {
+                const el = e.target;
+                if (!el.form || el.form.id !== 'registerForm' || el.type !== 'text' || !CAPS_FIELDS.includes(el.name)) return;
+                const up = el.value.toUpperCase();
+                if (up === el.value) return;
+                const s = el.selectionStart, en = el.selectionEnd;
+                el.value = up;
+                try { el.setSelectionRange(s, en); } catch (_) {}
+            });
+        })();
+
         // Every required piece of Step 3, mirrored from the server rules in register().
         function formReady() {
             const f = document.getElementById('registerForm');
@@ -942,7 +967,6 @@
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) return false;
             if (selectedCong.size === 0 && !v('office_other')) return false;
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) return false;
-            if (!v('registered_by')) return false;
             return true;
         }
 
@@ -955,7 +979,6 @@
             if (selectedCong.size === 0 && !v('office_other')) out.push('congressman or “Other”');
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) out.push('reason');
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) out.push('return date');
-            if (!v('registered_by')) out.push('registered by');
             return out;
         }
 
@@ -1123,6 +1146,7 @@
                             : 'Something went wrong on the server. Your entries are still here. Try again.');
                 }
             } catch (e) {
+                console.error('Register request failed:', e);
                 errorMsg = 'Network error. Your entries are still here. Try again.';
             } finally {
                 delete form.dataset.busy;
@@ -1322,6 +1346,7 @@
                 // Transfer Mode replaces the typed duplicate check for this registration.
                 clearTimeout(dupTimer);
                 dupSeq++;
+                dupLastKey = null;
                 renderDuplicate(null);
                 focusTransferModeHwInput();
             } else {
@@ -1573,6 +1598,8 @@
             document.getElementById('registerForm').reset();
             clearTimeout(dupTimer);
             dupSeq++;
+            dupLastKey = null;
+            dupHasChecked = false;
             renderDuplicate(null);
             document.getElementById('transferModeToggle').checked = false;
             toggleTransferMode(false);

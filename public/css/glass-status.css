@@ -2981,3 +2981,60 @@ a.sidebar-btn {
     color: #166534;
     font-weight: 600;
 }
+/* ===== Records tables (logs): loading state + stacked cells ===== */
+.records-pane > :not(:first-child) {
+    transition: opacity 0.15s ease;
+}
+.records-pane.is-loading > :not(:first-child) {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.reg-cell-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.35;
+}
+.reg-sub {
+    font-size: 11px;
+    color: #64748b;
+}
+.reg-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.reg-pill {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 1px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.reg-pill-day {
+    background: #f1f5f9;
+    color: #475569;
+}
+.reg-pill-long {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+/* ===== Read-only screens: visitor data shown in capitals ===== */
+.gov-meta-value,
+.gov-pass-card-name,
+.gov-pass-card-meta,
+.gov-pass-card-buildings,
+#statusVisiting,
+.records-pane tbody td {
+    text-transform: uppercase;
+}
+.gov-meta-value.keep-case {
+    text-transform: none;
+} /* e-mail addresses stay as typed */

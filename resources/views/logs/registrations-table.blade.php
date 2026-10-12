@@ -27,7 +27,7 @@
         </span>
     @else
         <div class="gov-location-wrap w-full">
-            <select name="reg_building" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+            <select name="reg_building" onchange="applyRecordsFilter()"class="gov-location-badge w-full h-11">
                 <option value="ALL">Building</option>
                 @foreach ($buildings as $b)
                     <option value="{{ $b->id }}" {{ (string) request('reg_building') === (string) $b->id ? 'selected' : '' }}>
@@ -44,7 +44,7 @@
 {{-- ========================= --}}
 <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
     <div class="gov-location-wrap w-full">
-        <select name="reg_status" onchange="this.form.submit()" class="gov-location-badge w-full h-11">
+        <select name="reg_status" onchange="applyRecordsFilter()" class="gov-location-badge w-full h-11">
             <option value="ALL">Status</option>
             <option value="open" {{ request('reg_status') === 'open' ? 'selected' : '' }}>Currently assigned</option>
             <option value="closed" {{ request('reg_status') === 'closed' ? 'selected' : '' }}>Returned / expired</option>
@@ -61,22 +61,19 @@
 {{-- =====>>> TABLE  ===== --}}
 {{-- ======================================================================== --}}
     <div class="px-10 pb-5">
-<div class="overflow-hidden rounded-xl border border-slate-300">
-<div class="max-h-[440px] overflow-auto">
-                <table class="w-full min-w-[1500px] border-collapse text-center text-xs">
-<thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
+        <div class="overflow-hidden rounded-xl border border-slate-300">
+            <div class="max-h-[440px] overflow-auto">
+                <table class="w-full border-collapse text-left text-xs" style="min-width: 1080px;">
+                    <thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
                         <tr>
-                            <th class="py-3 px-4 font-bold">Photos</th>
+                            <th class="py-3 px-4 font-bold text-center">Photos</th>
                             <th class="py-3 px-4 font-bold">Registered at</th>
                             <th class="py-3 px-4 font-bold">Visitor</th>
-                            <th class="py-3 px-4 font-bold">Buildings to visit</th>
+                            <th class="py-3 px-4 font-bold text-center">Buildings</th>
                             <th class="py-3 px-4 font-bold">Congressman / Office</th>
-                            <th class="py-3 px-4 font-bold">Contact person</th>
                             <th class="py-3 px-4 font-bold">ID type / ref</th>
-                            <th class="py-3 px-4 font-bold">Pass class</th>
-                            <th class="py-3 px-4 font-bold">Expected return</th>
-                            <th class="py-3 px-4 font-bold">Registered by</th>
-                            <th class="py-3 px-4 font-bold">Status</th>
+                            <th class="py-3 px-4 font-bold text-center">Expected return</th>
+                            <th class="py-3 px-4 font-bold text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -107,7 +104,7 @@
                                     $regReturnLabel = $regCutoff->format('M j, g:i A');
                                 }
                             @endphp
-<tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60"
+                            <tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60"
                                 data-type="registration"
                                 data-timestamp="{{ $r->registered_at->format('Y-m-d h:i:s A') }}"
                                 data-visitor="{{ $r->visitor_name }}"
@@ -122,42 +119,71 @@
                                 @if ($regPhotoOk) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
                                 @if ($regIdPhotoOk) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
                                 onclick="openRowModal(this)">
+                                {{-- Photos --}}
                                 <td class="py-3 px-4">
-                                    <div class="flex justify-center gap-1.5">
+                                    <div class="flex items-center justify-center gap-1.5">
                                         @if ($regPhotoOk)
                                             <img src="{{ asset('storage/' . $r->photo_path) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
                                         @if ($regIdPhotoOk)
                                             <img src="{{ asset('storage/' . $r->id_photo_path) }}" alt="ID photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
-                                        @if ($regPhotoGone && ! $regPhotoOk && ! $regIdPhotoOk)
-                                            <span class="text-xs text-slate-400" title="Photos are deleted when the card is returned">Removed</span>
+                                        @if (! $regPhotoOk && ! $regIdPhotoOk)
+                                            @if ($regPhotoGone)
+                                                <span class="text-[11px] text-slate-400" title="Photos are deleted when the card is returned">Removed</span>
+                                            @else
+                                                <span class="text-slate-300">—</span>
+                                            @endif
                                         @endif
                                     </div>
                                 </td>
-                                <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</td>
-                                <td class="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $r->visitor_name }}</td>
-                                <td class="py-3 px-4 text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
-                                <td class="py-3 px-4 text-slate-700 max-w-[260px] truncate" title="{{ $r->office_to_visit }}">{{ $r->office_to_visit ?? '—' }}</td>
-                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->contact_person ?? '—' }}</td>
-                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->id_type }} &middot; {{ $r->id_ref }}</td>
-                                <td class="py-3 px-4">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700">{{ $regPassClassLabel }}</span>
+                                {{-- Registered at + who registered --}}
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <div class="reg-cell-stack">
+                                        <span class="font-mono text-slate-700">{{ $r->registered_at->format('Y-m-d h:i:s A') }}</span>
+                                        <span class="reg-sub">by {{ $r->registered_by ?? '—' }}</span>
+                                    </div>
                                 </td>
-                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $regReturnLabel }}</td>
-                                <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $r->registered_by ?? '—' }}</td>
-                                <td class="py-3 px-4">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : ($r->unassign_reason === 'transferred' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700') }}">
+                                {{-- Visitor + pass class --}}
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <div class="reg-cell-stack">
+                                        <span class="font-semibold text-slate-900">{{ $r->visitor_name }}</span>
+                                        <span class="reg-pill {{ $r->pass_class === 'long_term' ? 'reg-pill-long' : 'reg-pill-day' }}">{{ $regPassClassLabel }}</span>
+                                    </div>
+                                </td>
+                                {{-- Buildings --}}
+                                <td class="py-3 px-4 text-center text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
+                                {{-- Office + contact person --}}
+                                <td class="py-3 px-4 text-slate-700" style="max-width: 300px;">
+                                    <div class="reg-cell-stack">
+                                        <span class="reg-clamp" title="{{ $r->office_to_visit }}">{{ $r->office_to_visit ?? '—' }}</span>
+                                        @if ($r->contact_person)
+                                            <span class="reg-sub"><i class="fa-solid fa-user"></i> {{ $r->contact_person }}</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                {{-- ID type + reference --}}
+                                <td class="py-3 px-4 whitespace-nowrap text-slate-700">
+                                    <div class="reg-cell-stack">
+                                        <span>{{ $r->id_type }}</span>
+                                        <span class="reg-sub font-mono">{{ $r->id_ref }}</span>
+                                    </div>
+                                </td>
+                                {{-- Expected return --}}
+                                <td class="py-3 px-4 text-center whitespace-nowrap text-slate-700">{{ $regReturnLabel }}</td>
+                                {{-- Status --}}
+                                <td class="py-3 px-4 text-center whitespace-nowrap">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : ($r->unassign_reason === 'transferred' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-600') }}">
                                         {{ $regStatusLabel }}
                                     </span>
                                 </td>
                             </tr>
                         @empty
-<tr><td colspan="11" class="py-14 text-center">
-    <i class="fa-solid fa-id-card text-2xl text-slate-300"></i>
-    <p class="mt-2 text-sm font-semibold text-slate-600">No registrations found</p>
-    <p class="text-xs text-slate-400">Try adjusting your search or filters.</p>
-</td></tr>
+                            <tr><td colspan="8" class="py-14 text-center">
+                                <i class="fa-solid fa-id-card text-2xl text-slate-300"></i>
+                                <p class="mt-2 text-sm font-semibold text-slate-600">No registrations found</p>
+                                <p class="text-xs text-slate-400">Try adjusting your search or filters.</p>
+                            </td></tr>
                         @endforelse
                     </tbody>
                 </table>

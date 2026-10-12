@@ -170,12 +170,21 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             'purpose_choice' => 'required|in:Official Business,Financial/Medical Assistance,Visit,Others',
             'purpose_other' => 'required_if:purpose_choice,Others|nullable|string|max:255',
             'vehicle' => 'nullable|string|max:255',
-            'registered_by' => 'required|string|max:255',
             'pass_class' => 'required|in:day,long_term',
             'expected_return_date' => 'required_if:pass_class,long_term|nullable|date|after:today',
             'building_ids' => 'required|array|min:1',
             'building_ids.*' => 'exists:buildings,id',
         ]);
+
+        // Registered by is always the signed-in account; whatever the form sent is ignored.
+        $data['registered_by'] = $request->user()->name;
+
+        // House style: these free-text fields are stored in capitals.
+        foreach (['first_name', 'middle_name', 'last_name', 'contact_person', 'id_ref', 'vehicle', 'office_other'] as $capsKey) {
+            if (! empty($data[$capsKey])) {
+                $data[$capsKey] = mb_strtoupper(trim($data[$capsKey]));
+            }
+        }
 
         // Reason is chosen from a fixed list; free text only applies when "Others" is picked.
                 // Workflow 1: refuse a second pass for someone who already holds an active one.
