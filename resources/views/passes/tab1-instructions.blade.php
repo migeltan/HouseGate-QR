@@ -1,4 +1,5 @@
 {{-- TAB 1 - INSTRUCTIONS --}}
+@php($awayData = \App\Services\AwayCards::forCurrentUser())
 {{-- Script for this tab is at the bottom of this file. --}}
 <div class="gov-card">
     <div class="gov-card-header">
@@ -10,6 +11,12 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
+            <button type="button" onclick="openAwayModal()" class="gov-btn-glass-outline flex-shrink-0">
+                <i class="fa-solid fa-right-left"></i> Away cards
+                @if ($awayData['count'] > 0)
+                    <span class="away-badge {{ $awayData['overdue'] > 0 ? '' : 'is-calm' }}">{{ $awayData['count'] }}</span>
+                @endif
+            </button>
             @if (auth()->user()->isAdmin())
                 <button type="button" onclick="openInventoryModal()" class="gov-btn-glass-outline flex-shrink-0">
                     <i class="fa-solid fa-boxes-stacked"></i> Manage Inventory
@@ -30,8 +37,13 @@
     </div>
 </div>
 
+@include('passes.away-modal', ['awayData' => $awayData])
+
 <script>
 // ---- Tab 1: Instructions ----
+function openAwayModal() { document.getElementById('awayModal')?.classList.remove('hidden'); }
+function closeAwayModal() { document.getElementById('awayModal')?.classList.add('hidden'); }
+if (new URLSearchParams(location.search).get('away')) { document.addEventListener('DOMContentLoaded', openAwayModal); }
 function openRegisterModal() {
     document.getElementById('registerModal').classList.remove('hidden');
 }

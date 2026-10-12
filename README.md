@@ -318,7 +318,7 @@ With Herd already serving the site, open three terminals in the project folder:
 
 ```bash
 # Terminal 1: the tunnel (replace the domain and the Herd site name)
-ngrok http 80 --url=https://<your-domain>.ngrok-free.dev --host-header=housegate-qr.test
+ngrok http 80 --url=gainfully-strum-viewpoint.ngrok-free.dev. --host-header=housegate-qr.test
 
 # Terminal 2: scheduler (pass expiry every 5 minutes, daily sweep at 19:00)
 php artisan schedule:work

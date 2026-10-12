@@ -15,12 +15,14 @@ class PassRegistration extends Model
     'registered_by', 'pass_class', 'expected_return_date',
         'registered_at', 'unassigned_at', 'unassign_reason','office_to_visit', 'office_other', 'contact_person', 'buildings_snapshot',
     'transferred_from_registration_id',
+    'id_held_building_id', 'id_returned_at', 'id_returned_by',
 ];
 
     protected $casts = [
         'expected_return_date' => 'date',
         'registered_at' => 'datetime',
         'unassigned_at' => 'datetime',
+        'id_returned_at' => 'datetime',
     ];
 
     public function visitorPass(): BelongsTo
@@ -31,6 +33,12 @@ class PassRegistration extends Model
         public function congressmen(): BelongsToMany
     {
         return $this->belongsToMany(Congressman::class, 'pass_registration_congressman')->withTimestamps();
+    }
+
+    /** Desk (building) that physically holds the visitor's surrendered ID. */
+    public function idHeldAt(): BelongsTo
+    {
+        return $this->belongsTo(Building::class, 'id_held_building_id');
     }
 
     /** The earlier registration this one was transferred from (null for a normal registration). */

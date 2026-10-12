@@ -12,13 +12,13 @@ Kickoff prompt: "Continue HouseGate QR. Clone master, read /CLAUDE.md, verify st
 
 ## 1. How we work
 
-- **Phases:** understand (no code) -> discuss (no code) -> implement only when he explicitly says so. **One feature at a time, in small steps** (a previous conversation died on a big one-shot rewrite). Present exact snippets grouped by file in implementation order: `Replace this:` (existing code, verbatim) then `with this:`. New file or heavy rewrite: exact path, one-line reason, full contents. No unrelated refactors.
-- **The user applies changes himself** (Windows, Laravel Herd, `C:\Users\migel\Herd\HouseGate-QR`). No output files or present_files unless he asks (CLAUDE.md is the exception: send it as a downloadable `.md`). Code goes in chat.
-- Match files by content (indentation is inconsistent, some blocks are oddly spaced). If a snippet cannot match, ask him to paste the file, then return it in full.
-- State manual steps explicitly (commands, env, migrations, asset paths, URLs, imports). Wait for approval before the next step.
-- **Cannot run tests, a browser or the app** (no `vendor/`, `node_modules/`). Verify what you can: `php -l` on PHP; for Blade/JS, apply each snippet to a scratch copy with an exact-match script (each "Replace this" must match once). Say "syntax-checked" vs "not run". He runs the app, `php artisan test`, and sends screenshots. Only scaffold tests exist.
-- **Tokens:** inspect only relevant files (`grep -n`, `sed -n` ranges). Never cat whole big files (see section 5 sizes). Concise replies, at most one question per reply (prefer a stated default).
-- Be direct; flag risks honestly.
+- **Phases:** understand (no code) -> discuss (no code) -> implement only when he explicitly says so ("go", "next"). **One feature at a time, in small steps** (a previous conversation died on a big one-shot rewrite). Present exact snippets grouped by file in implementation order: `Replace this:` (existing code, verbatim) then `with this:`. New file or heavy rewrite: exact path, one-line reason, full contents. No unrelated refactors.
+- **The user applies changes himself** (Windows, Laravel Herd, `C:\Users\migel\Herd\HouseGate-QR`). No output files or present_files unless he asks (CLAUDE.md is the exception: downloadable `.md`). Code goes in chat.
+- Match files by content (indentation is inconsistent). If a snippet cannot match, ask him to paste the file, then return it in full. If a change can alter live behaviour before its supporting screen exists, order the steps so the behaviour change comes last.
+- State manual steps explicitly (commands, env, migrations, asset paths, URLs, imports). The app is **deployed**: remind him to run `php artisan migrate --force` and `view:clear` there after pulling.
+- **Cannot run PHP, tests, a browser or the app** (no `vendor/`, no `php`). Verify by applying each snippet to a scratch copy with an exact-match script (each "Replace this" must match once), brace-count PHP, and `node --check` extracted inline JS. Say "syntax-checked" vs "not run". He runs `php artisan test` and sends screenshots/console output. Static-analysis warnings in his editor (Intelephense) are usually harmless; avoid by-reference closures.
+- **Tokens:** `grep -n`, `sed -n` ranges only; never cat big files (sizes in section 5). Concise replies, at most one question per reply (prefer a stated default).
+- Be direct; flag risks and unverified guesses honestly.
 
 ## 2. Seeing the code
 
@@ -28,90 +28,87 @@ mkdir -p /home/claude/migeltan && cd /home/claude/migeltan
 cd housegate && git fetch --depth 15 origin master && git reset --hard FETCH_HEAD && git log --oneline -5
 ```
 
-- Read-only reference; never push. It shows only what is **pushed to `master`**; his local copy may be ahead (treat unpushed work as intentional, never "fix" it back). If he says he applied something not visible, ask him to push or paste it.
-- Never run `composer install`, `npm install`, `pip install`. Ignore `resources.zip` (repo-root archive) and `README.md` prose beyond what is below.
+- Read-only reference; never push. It shows only what is **pushed to `master`**; his local copy is often ahead (treat unpushed work as intentional). If he says he applied something not visible, ask him to push or paste it.
+- Never run `composer install`, `npm install`, `pip install`. Ignore `resources.zip` and README prose beyond what is below.
 
 ## 3. Project
 
-Visitor pass system for the House of Representatives, Office of the Sergeant at Arms, Legislative Security Bureau (LSB), Perimeter Security Group. Built by Migel H. Tan during the INSPIRE internship. Physical colour-coded cards, each with a QR token, replace manual checking.
+Visitor pass system for the House of Representatives, Office of the Sergeant at Arms, Legislative Security Bureau, Perimeter Security Group. Built by Migel H. Tan (INSPIRE internship). Colour-coded cards with a QR token replace manual checking.
 
-**Business flow (loop):** visitor arrives at the North Screening Facility -> North Gate admin/guard registers them, asks questions, records ID -> assigns the building(s) per agenda (tour, congressman visit, ...) -> a card is assigned -> visitor enters a building; scanning gives AUTHORIZED or a denial depending on the card -> system audits every scan -> visitor returns the card -> admin/guard **unassigns** it (back to `available`) -> repeat.
+**Flow (loop):** visitor registers at the North Screening Facility (or, if they arrived by car, at the building desk, surrendering a valid ID) -> admin/guard assigns building(s) per agenda -> card assigned -> scan = AUTHORIZED or denial -> every scan audited -> visitor returns the card -> **unassign** (back to `available`) -> repeat. Moving to another building = **transfer credentials** (see custody).
 
-- Buildings (`buildings.code`): NW North Wing (red), SW South Wing (orange), RVM (green), MB Main Building (blue), SWA South Wing Annex (yellow), **NG North Gate = the multi-access pass** (pink, never selectable as a destination: `Building::selectable()`).
-- Stack: Laravel (composer says `^12.0`, README says 13: trust composer) / PHP ^8.3, Blade (server-rendered, plain JS inline in views, no SPA), `endroid/qr-code`, Vite 8 + Tailwind 4 for `resources/css|js`, **plus** a Tailwind 3 CLI build for `public/css/tailwind.css` (`npm run build:css`). Page CSS lives in `public/css/*.css`. DB: MySQL via `.env` (SQLite also works). Session, cache, queue drivers = `database`. Mail = `log` by default.
-- Scanner hardware: Honeywell 2D scanner, keyboard-wedge, auto-submits; webcam scanning and manual token entry also exist.
-- Seeds: `UserSeeder` admin `HREP-2020-0012`, guard `HREP-2024-0451`, both password `changeme123`; `DatabaseSeeder` buildings + passes; `CongressmanSeeder` from `database/data/congressmen.csv`.
+- Buildings (`buildings.code`): NW North Wing, SW South Wing, RVM, MB Main Building, SWA South Wing Annex, **NG North Gate = multi-access pass** (never a destination: `Building::selectable()`).
+- Stack: Laravel (composer `^12.0`; README says 13: trust composer) / PHP ^8.3, Blade + inline JS (no SPA), `endroid/qr-code`, Vite 8 + Tailwind 4, plus Tailwind 3 CLI for `public/css/tailwind.css` (`npm run build:css`). Page CSS in `public/css/*.css`. MySQL via `.env`; tests use in-memory SQLite. Session/cache/queue = `database`; mail = `log` by default. Deployed and reachable across networks (README has tunnel/deploy notes; `APP_URL` must match the public URL or photos break).
+- Scanner: Honeywell keyboard-wedge (auto-submit), webcam, or manual token entry.
+- Seeds: admin `HREP-2020-0012`, guard `HREP-2024-0451`, password `changeme123`; `CongressmanSeeder` from `database/data/congressmen.csv`.
 
 ## 4. Decisions / rules already made (do not re-ask)
 
-**Auth/roles:** login by `hrep_id` + password + chosen role (`admin` or `guard`; role must match the account). Guards also pick a building at login (`session assigned_building_id`, enforced server-side by `EnsureBuildingSelected`; admins skip it). Deactivated users (`is_active`) are logged out immediately. Route middleware aliases: `building.selected`, `admin`.
+**Auth/roles:** login by `hrep_id` + password + role (`admin`/`guard`). Guards also pick a building (`session assigned_building_id`, `EnsureBuildingSelected`); panels follow the chosen building, not the account. Guards: own building's single-building passes only (`authorizeGuardScope`). Admin-only: logs purge, users, directory, inventory, North Gate passes. Aliases: `building.selected`, `admin`.
 
-- Guards: only their own building's single-building passes; cannot issue multi-building passes (`authorizeGuardScope`, register forces `building_ids`). Admin-only: logs purge, users, directory edits, pass inventory, North Gate passes and `updateBuildings`.
+**Pass lifecycle:** `available` -> `active` -> `expired` | `revoked`; unassign returns to `available`. Token `HOR-20TH-{CODE}-{NNNN}-{HMAC8}`; 250 cards per building.
 
-**Pass lifecycle** (`visitor_passes.status`): `available` -> `active` -> `expired` | `revoked`; unassign returns to `available`.
+- **Day pass** expires at the first 19:00 (`DAY_PASS_CUTOFF`). **Long-term: max 7 calendar days** from today (`VisitorPass::MAX_LONG_TERM_DAYS`, validated server + client).
+- `expireIfDue()` is idempotent/row-locked: on every scan, `passes:expire` (5 min), `passes:daily-sweep` (19:00). `unassign` wipes visitor data + photo files, closes the registration (`returned`); history stays in `pass_registrations`. `revoke` keeps data.
 
-- Token: `HOR-20TH-{CODE}-{NNNN}-{HMAC8}` (`PassGenerator::token`, key = APP_KEY). 250 passes per building (`PER_BUILDING`).
-- **Day pass** expires at the first 19:00 after issue (`DAY_PASS_CUTOFF`). **Long-term** needs `expected_return_date`, valid through end of that day, max 30 **working days** counted Mon-Thu only (`WORKING_WEEKDAYS`).
-- `expireIfDue()` is idempotent and row-locked; called by the scanner on every scan (authoritative) and by `passes:expire` (every 5 min) and `passes:daily-sweep` (19:00). Expiry closes the open registration with `unassign_reason=auto_expired`; day passes also clear occupancy.
-- `unassign` wipes visitor data + photos from the pass, detaches buildings, closes the open registration (`returned`); history stays in `pass_registrations`. `revoke` only flips status and clears presence (data kept for audit).
+**Scan codes:** `INVALID`, `UNASSIGNED`, `EXPIRED`, `REVOKED`, `UNAUTHORIZED`, `BLOCKED` (must scan OUT first), `AUTHORIZED` in/out. Occupancy >16 h resets.
 
-**Scan result codes** (`ScannerController::scan`, logged to `scan_logs` with snapshots): `INVALID`, `UNASSIGNED` (card `available`), `EXPIRED`, `REVOKED`, `UNAUTHORIZED` (building mismatch), `BLOCKED` (still inside another building: must scan OUT first), `AUTHORIZED` with `direction` in/out (toggles `current_building_id`/`checked_in_at`/`last_egress_at`). Stale occupancy >16 h is reset and treated as a fresh entry.
+**Registration:** 3-step modal. Card is picked **inside the transaction with `lockForUpdate`** (race fixed): `registerSingleBuilding` / `registerMultiBuilding` return `[$pass, $transferred]`. Duplicate ID rules unchanged. Photos: new capture wins; on a transfer with no new capture the visitor keeps the old card's photos (files not deleted). Logs show only photos that still exist ("Removed" otherwise).
 
-**Registration** (`PassController::register`, 3-step modal: camera -> information -> destination): purpose from fixed list (`Official Business`, `Financial/Medical Assistance`, `Visit`, `Others`+text); destination = congressmen (must belong to the chosen building(s)) and/or `office_other`; at least one required. Duplicate rule: exact ID match with an active pass blocks; fuzzy match needs `confirm_different_person`. **Transfer** (visitor swaps cards): `transfer_qr_token` of the old active card, identity must match, old registration closes with `transferred`, new one links via `transferred_from_registration_id`.
+**Card custody (built, phases A-C):**
 
-- Audit: `scan_logs` (+ `scan_verification_photos`), `pass_registrations` (append-only history, `buildings_snapshot`, `unassign_reason`), `admin_logs` via `AdminLog::record(action, subject, details)`.
-- Reminders (need a visitor email): missing-egress daily, long-term expiring within 3 days once per return date; mail is **queued**.
+- `visitor_passes.holder_building_id` = desk physically holding the card (NULL = vault). Scope `inStock()` = blank + holder == home building. Guards only issue in-stock cards at their own desk; empty -> block with message; admins may fall back to vault cards. `VisitorPass::MIN_DESK_STOCK = 50` (warning only). Admin screen: Manage Cards > **Desk cards** (`PassInventoryController::stock`, plain-language UI, confirms before taking cards back).
+- **Transfer** to a different building: old card is blanked but **held away** at the desk that issued the new card (`closeForTransfer(old, oldReg, new)` returns holder name); same-building transfer returns to stock. Surrendered ID stays at the original desk: `pass_registrations.id_held_building_id` (inherited across transfers), `id_returned_at/by`.
+- Panel **Away cards** (`App\Services\AwayCards`, `passes/away-modal.blade.php`): home desk sees "Card received" (`passes.receive`) then "ID handed back" (`passes.id-returned`, only after the card is back); the holding desk sees reminders; overdue after 12 h; unassign shows "Hand back to its own desk: ...". Admin log keys: `pass.transferred_away`, `pass.card_received`, `pass.id_returned`, `pass.stock_updated`.
+- New modals must be added to the `ids` list in the shared script in `layouts/app.blade.php` (lifts to `<body>`, animation, scroll lock, Esc).
 
 ## 5. Where things are and status
 
 ```
-routes/web.php, routes/console.php (schedule), bootstrap/app.php (middleware aliases)
-app/Http/Controllers/  PassController 951 lines | ScannerController | LogController | CongressmanController
-                       AccountController | PassInventoryController | AuthController | BuildingSelectController
-                       DirectoryServiceWorkerController | WhatsNewController
-app/Models/  VisitorPass (expiry/occupancy logic) Building PassRegistration ScanLog ScanVerificationPhoto Congressman AdminLog User
-app/Services/ PassGenerator, PhotoResizer      app/console/commands/ (lowercase dir) ExpirePasses DailyPassSweep GeneratePasses ...
-resources/views/ passes/ (index 1573 lines, tab1-3, step1-3 modal steps, _pass-row, print-*, show)
-  scanner/index 822 | account/edit 680 | congressmen/index 668 | layouts/app 419 | logs/ (index, tables, row-modal)
-public/css/ (page CSS) | database/migrations (2026_08_22 ... 2026_10_09) | tests: scaffold only
+routes/web.php | routes/console.php | bootstrap/app.php
+app/Http/Controllers/  PassController (~1100 lines) ScannerController LogController CongressmanController
+                       AccountController PassInventoryController AuthController BuildingSelectController ...
+app/Models/ VisitorPass Building PassRegistration ScanLog Congressman AdminLog User
+app/Services/ PassGenerator PhotoResizer AwayCards     app/console/commands/ (lowercase dir)
+resources/views/ passes/ (index ~1570, tab1-instructions, tab2-buildings, step1-3, away-modal) logs/ scanner/ layouts/app
+public/css/ glass-status.css (modals, inventory, away), registration-modal.css, sidebar.css | database/migrations (to 2026_10_12)
 ```
 
-- Heavy files: always `grep -n` first, then `sed -n 'a,bp'`; `passes/index.blade.php` holds most inline JS (modals, AJAX register/unassign/transfer).
-- JSON/AJAX responses: `passActionResponse`, `registerResponse`, `passPayload` in PassController (used for no-refresh updates).
-- `app/console/commands` is lowercase: fine on Windows, would break class autoload on Linux (case-sensitive) deployment.
-- What-s New modal: `config/whatsnew.php` (`version_label` October 2026), dismissed via `/whats-new/dismiss`.
+- Heavy files: `grep -n` first. `passes/index.blade.php` holds most inline JS. In-place responses: `passActionResponse`, `registerResponse`, `passPayload`.
+- Tests: `ExampleTest` uses `RefreshDatabase` + `withoutVite()`. On SQLite the `unassign_reason` enum lacks `transferred` (widened only on MySQL): matters for future transfer tests.
+- `app/console/commands` lowercase breaks autoload on Linux hosting.
 
-**Recently done (per his notes, Oct 7-9 2026):** modals system, inventory modal, QR-only/paper print options, skeleton loading, building passes modal restyle plan, Register Visitor modal beautify, congressman picker rework, pass transfer UX + submit lock, admin logs, user (de)activation.
+**Pushed (as of last sync):** through B1/B2 (holder column, Desk cards). **Applied locally, may not be pushed (verify):** race fix, C1 (id custody migration `2026_10_12_000001`), photo carry-over, C2 (Away cards), `awayModal` in the layout ids list, 7-day cap, admin-log loading bar fix, register modal scroll fix.
 
 **Verify (run in the clone):**
 
 ```bash
 cd /home/claude/migeltan/housegate && git log --oneline -3
-php -l app/Http/Controllers/PassController.php
-grep -n "route('passes.unassign')\|passes/{pass}/unassign" -r resources routes | head -3
-grep -c "expireIfDue" app/Http/Controllers/ScannerController.php
-ls database/migrations | tail -3
+grep -c "holder_building_id" app/Http/Controllers/PassController.php      # B1
+grep -c "id_held_building_id" app/Http/Controllers/PassController.php     # C1
+grep -c "heldAwayChain" app/Http/Controllers/PassController.php           # C2
+ls app/Services/AwayCards.php resources/views/passes/away-modal.blade.php
+grep -c "awayModal" resources/views/layouts/app.blade.php
+grep -c "MAX_LONG_TERM_DAYS" app/Models/VisitorPass.php
 ```
 
-Gotchas: fixed `/passes/...` routes must stay above `/passes/{pass}`; scheduler and queue only run with `php artisan schedule:work` / `queue:work` (or cron) locally.
+Gotchas: fixed `/passes/...` routes above `/passes/{pass}`; scheduler/queue need `schedule:work`/`queue:work`; `overflow: hidden` modal containers can be scrolled by focusing a hidden `sr-only` input (fixed with `position: relative` + `overflow: clip`).
 
 ## 6. Next (user's queue, one at a time)
 
-0. **He will add 2 current system problems in the next message(s).** Start there; understand first, no code until he says so.
-1. Unassign without a full page refresh.
-2. Registration submit without reload (errors keep the form data).
-3. Reduce the passes page weight (`passes/index.blade.php`, 1573 lines + rows for every building).
-4. Pass expiry "not working" (no expired passes weeks after registering, no notifications). Hypothesis to check first, not a conclusion: scheduler/queue not running locally (`schedule:work`, `queue:work`), mail driver `log`, and that scanner path already expires on scan.
-5. Later: building passes modal (View QR overlay, View Info modal), pass tracking across buildings.
+0. **Fixing bugs he has seen** (he has a list: ask for it / let him paste it). Understand first, no code until he says so. For each: ask for the screenshot or console error, find the cause, then propose the fix.
+1. Open question: expiry "not working" (no expired passes weeks after registering, no emails). Check first: scheduler/queue not running (`schedule:work`, `queue:work`, cron on the server), mail driver `log`; the scanner already expires on scan.
+2. Unassign without refresh and registration submit without reload appear done (in-place JSON paths exist): confirm with him before touching.
+3. Optional: scanner hint when a held-away card is scanned (it shows "unassigned" today); passes page weight; building passes modal polish.
 
 ## 7. Known risks (state them, do not hide them)
 
-- Seeder default password `changeme123` for both accounts; `DatabaseSeeder` tokens use a static `...-SEC2026` suffix (guessable) unlike `PassGenerator` HMAC tokens.
-- Verification/visitor/ID photos are stored on the public disk; unassign deletes the files but scan photos remain.
-- No real test suite; changes are verified only by manual runs.
-- Composer says Laravel 12, README/other notes say 13: do not assume framework-version-specific APIs.
-- Mail is queued: nothing is sent unless a queue worker runs and mail is configured.
-- Day-pass expiry is time-based (19:00), not tied to a scan-out; a visitor still inside is cleared by the sweep.
+- Seeder password `changeme123`; seeded tokens use a static `...-SEC2026` suffix; North Gate cards minted by `registerMultiBuilding` use a guessable `PASS-MULTI-NNNN` token (unlike HMAC tokens).
+- A card handed over but never scanned back stays "away" with its ID outstanding; the Away cards list and 12 h overdue flag are the only safeguard. Transfers made before C1 have no ID desk recorded and do not appear in the panel.
+- Photos are deleted from disk when a card is returned (README says so) while the registration keeps the path; the log hides missing files. Retain-for-audit would be a policy change: ask first.
+- Holder locks (`lockForUpdate`) serialise registrations briefly in the same building; they are a no-op on SQLite.
+- No real test suite; changes are verified manually. Composer says Laravel 12, notes say 13.
+- Mail is queued: nothing is sent unless a worker runs and mail is configured. Day-pass expiry is time-based (19:00).
 
 ## 8. Updating this file
 

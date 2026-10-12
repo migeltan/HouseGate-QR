@@ -46,6 +46,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/passes/{pass}', [PassController::class, 'show'])->name('passes.show');
         Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');
         Route::post('/passes/{pass}/unassign', [PassController::class, 'unassign'])->name('passes.unassign');
+        Route::post('/passes/{pass}/receive', [PassController::class, 'receiveBack'])->name('passes.receive');
+        Route::post('/pass-registrations/{registration}/id-returned', [PassController::class, 'idReturned'])->name('passes.id-returned');
         Route::post('/passes/{pass}/revoke', [PassController::class, 'revoke'])->name('passes.revoke');
         Route::get('/account', [AccountController::class, 'show'])->name('account.edit');
         Route::get('/account/log', [AccountController::class, 'log'])->middleware('admin')->name('account.log');

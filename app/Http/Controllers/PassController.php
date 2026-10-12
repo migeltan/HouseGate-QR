@@ -300,8 +300,12 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         $holder = $pass->visitor_name;
 
         if ($transferred) {
-            return "Transferred: Pass #{$transferred['pass_number']} ({$transferred['building']}) was returned. "
-                . "New Pass #{$pass->pass_number} issued to {$holder} for {$where}.";
+            $oldCard = ! empty($transferred['held_at'])
+                ? "Pass #{$transferred['pass_number']} ({$transferred['building']}) is now held at {$transferred['held_at']}. "
+                    . "Hand it back to the {$transferred['building']} desk when the visitor leaves. "
+                : "Pass #{$transferred['pass_number']} ({$transferred['building']}) was returned. ";
+
+            return "Transferred: {$oldCard}New Pass #{$pass->pass_number} issued to {$holder} for {$where}.";
         }
 
         return $multi
@@ -616,7 +620,8 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
         $photoPaths = [];
         $holder = null;
-        $already = DB::transaction(function () use ($pass, &$photoPaths, &$holder) {
+        $handBack = [];
+        $already = DB::transaction(function () use ($pass, &$photoPaths, &$holder, &$handBack) {
             $this->lockFresh($pass);
 
             if ($pass->status === 'available') {
@@ -626,7 +631,9 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             $holder = $pass->visitor_name;
             $photoPaths = array_filter([$pass->photo_path, $pass->id_photo_path]);
 
-            $pass->openRegistration()?->update([
+            $openRegistration = $pass->openRegistration();
+            $handBack = $this->heldAwayChain($openRegistration);
+            $openRegistration?->update([
                 'unassigned_at' => now(),
                 'unassign_reason' => 'returned',
             ]);
@@ -658,7 +665,117 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
         AdminLog::record('pass.unassigned', $holder, "Pass #{$pass->pass_number} returned to available stock.");
 
-        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} unassigned and returned to available stock.");
+        $suffix = $handBack ? ' Hand back to its own desk: ' . implode(', ', $handBack) . '.' : '';
+
+        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} unassigned and returned to available stock." . $suffix);
+    }
+
+    /** Earlier cards in this visit's transfer chain that are still held away from their home desk. */
+    private function heldAwayChain(?PassRegistration $registration): array
+    {
+        $notes = [];
+        $r = $registration?->transferredFrom;
+
+        for ($i = 0; $r && $i < 10; $i++, $r = $r->transferredFrom) {
+            $p = $r->visitorPass;
+            if ($p && $p->holder_building_id !== null && (int) $p->holder_building_id !== (int) $p->building_id) {
+                $home = $p->is_multi_building ? 'North Gate Access' : optional($p->building)->name;
+                $notes[] = "{$home} #{$p->pass_number}";
+            }
+        }
+
+        return $notes;
+    }
+
+    /**
+     * A card that was held away at another desk (after a transfer) has been physically handed back
+     * to its home desk. Puts it back into that desk's stock.
+     */
+    public function receiveBack(Request $request, VisitorPass $pass)
+    {
+        $this->authorizeGuardScope($request, $pass);
+
+        $error = null;
+        $from = null;
+        DB::transaction(function () use ($pass, &$error, &$from) {
+            $this->lockFresh($pass);
+
+            $away = $pass->holder_building_id !== null
+                && (int) $pass->holder_building_id !== (int) $pass->building_id;
+
+            if (! $away) {
+                $error = "Pass #{$pass->pass_number} is already at its own desk.";
+                return;
+            }
+            if ($pass->status !== 'available' || $pass->visitor_name !== null) {
+                $error = "Pass #{$pass->pass_number} is in use, so it cannot be received back.";
+                return;
+            }
+
+            $from = optional($pass->holder)->name;
+            $pass->update(['holder_building_id' => $pass->building_id]);
+        });
+
+        if ($error) {
+            return redirect()->route('passes.index', ['away' => 1])->withErrors($error);
+        }
+
+        $visitor = PassRegistration::where('visitor_pass_id', $pass->id)
+            ->where('unassign_reason', 'transferred')
+            ->latest('unassigned_at')
+            ->value('visitor_name');
+        $home = $pass->is_multi_building ? 'North Gate Access' : optional($pass->building)->name;
+        AdminLog::record('pass.card_received', $visitor, "Pass #{$pass->pass_number} ({$home}) received back from {$from}.");
+
+        return redirect()->route('passes.index', ['away' => 1])
+            ->with('success', "Pass #{$pass->pass_number} is back at the {$home} desk. You can now hand the visitor's ID back.");
+    }
+
+    /**
+     * The visitor's surrendered ID was handed back. Only possible once the card is back at its home
+     * desk, and only by the desk that holds the ID (or an admin).
+     */
+    public function idReturned(Request $request, PassRegistration $registration)
+    {
+        if ($request->user()->isGuard()) {
+            abort_unless((int) $registration->id_held_building_id === (int) session('assigned_building_id'), 403);
+        }
+
+        $pass = $registration->visitorPass;
+        abort_unless($pass, 404);
+
+        $error = null;
+        DB::transaction(function () use ($registration, $pass, $request, &$error) {
+            $fresh = PassRegistration::whereKey($registration->id)->lockForUpdate()->firstOrFail();
+
+            if ($fresh->id_returned_at) {
+                $error = 'This ID was already handed back.';
+                return;
+            }
+
+            $pass->refresh();
+            $away = $pass->holder_building_id !== null
+                && (int) $pass->holder_building_id !== (int) $pass->building_id;
+            if ($away) {
+                $error = "Receive pass #{$pass->pass_number} back first, then hand the ID back.";
+                return;
+            }
+
+            $fresh->update(['id_returned_at' => now(), 'id_returned_by' => $request->user()->id]);
+        });
+
+        if ($error) {
+            return redirect()->route('passes.index', ['away' => 1])->withErrors($error);
+        }
+
+        AdminLog::record(
+            'pass.id_returned',
+            $registration->visitor_name,
+            "ID ({$registration->id_type}) handed back to the visitor by {$request->user()->name}."
+        );
+
+        return redirect()->route('passes.index', ['away' => 1])
+            ->with('success', "ID handed back to {$registration->visitor_name}.");
     }
 
     /**
@@ -813,9 +930,19 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
      * registration already points back at it). The card returns straight to
      * available stock in its home building.
      */
-    private function closeForTransfer(VisitorPass $old, PassRegistration $oldRegistration): void
+    private function closeForTransfer(VisitorPass $old, PassRegistration $oldRegistration, VisitorPass $new): ?string
     {
-        $photoPaths = array_filter([$old->photo_path, $old->id_photo_path]);
+        // Photos the new card is now using must stay on disk; only files nobody uses any more are deleted.
+        $photoPaths = array_diff(
+            array_filter([$old->photo_path, $old->id_photo_path]),
+             array_filter([$new->photo_path, $new->id_photo_path])
+        );
+        $visitor = $old->visitor_name;
+
+        // The desk that issued the new card physically keeps the old one. Only when that is a different
+        // desk is the card "held away": it must be handed back to its home desk, which still holds the ID.
+        $heldAway = (int) $new->building_id !== (int) $old->building_id;
+        $holderId = $heldAway ? $new->building_id : $old->building_id;
 
         $oldRegistration->update([
             'unassigned_at' => now(),
@@ -830,6 +957,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             'photo_path' => null, 'id_photo_path' => null, 'pass_class' => 'day',
             'expected_return_date' => null, 'visitor_email' => null, 'registered_by' => null,
             'current_building_id' => null, 'checked_in_at' => null, 'last_egress_at' => null,
+            'holder_building_id' => $holderId,
         ]);
 
         if ($old->is_multi_building) {
@@ -839,6 +967,21 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         foreach ($photoPaths as $path) {
             Storage::disk('public')->delete($path);
         }
+
+        if (! $heldAway) {
+            return null;
+        }
+
+        $homeName = $old->is_multi_building ? 'North Gate Access' : optional($old->building)->name;
+        $holderName = optional(Building::find($holderId))->name;
+        $idName = optional(Building::find($oldRegistration->id_held_building_id ?? $old->building_id))->name;
+        AdminLog::record(
+            'pass.transferred_away',
+            $visitor,
+            "Pass #{$old->pass_number} ({$homeName}) is now held at {$holderName}. The visitor's ID stays at {$idName}."
+        );
+
+        return $holderName;
     }
 
     /**
@@ -885,6 +1028,13 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
             $fullName = 'Unnamed Visitor';
         }
 
+        // A newly captured photo wins. On a transfer with no new capture, the visitor keeps the photos
+        // already on the old card (same person, same ID), so the new card and its scan result show them.
+        $photoPath = $this->storeVisitorPhoto($request) ?? $oldPass?->photo_path ?? $pass->photo_path;
+        $idPhotoPath = $request->filled('id_photo_data')
+            ? $idPhotoPath
+            : ($oldPass?->id_photo_path ?? $idPhotoPath);
+
         $pass->update([
             'visitor_name' => $fullName,
             'first_name' => $data['first_name'] ?? null,
@@ -900,7 +1050,7 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
             'vehicle' => $data['vehicle'] ?? null,
             'status' => 'active',
             'issued_at' => now(),
-            'photo_path' => $this->storeVisitorPhoto($request) ?? $pass->photo_path,
+            'photo_path' => $photoPath,
             'id_photo_path' => $idPhotoPath,
             'pass_class' => $data['pass_class'],
             'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
@@ -933,6 +1083,8 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
             'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
             'registered_at' => now(),
             'transferred_from_registration_id' => $oldRegistration?->id,
+            // The surrendered ID stays at the desk that took it, even across transfers.
+            'id_held_building_id' => $oldRegistration?->id_held_building_id ?? $oldPass?->building_id ?? $pass->building_id,
         ]);
 
         $registration->congressmen()->sync($data['congressman_ids'] ?? []);
@@ -948,7 +1100,8 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
                     ? 'North Gate Access'
                     : optional($oldPass->building)->name,
             ];
-            $this->closeForTransfer($oldPass, $oldRegistration);
+            // Building name where the old card now physically sits, or null if it went back to its own stock.
+            $transferred['held_at'] = $this->closeForTransfer($oldPass, $oldRegistration, $pass);
         }
 
         return $transferred;

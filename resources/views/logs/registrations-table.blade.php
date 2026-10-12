@@ -91,6 +91,11 @@
                                         default => 'Returned',
                                     };
                                 $regPassClassLabel = $r->pass_class === 'long_term' ? 'Long-term' : 'Day';
+                                // Files are deleted when a card is returned; only show photos that still exist.
+                                $regDisk = \Illuminate\Support\Facades\Storage::disk('public');
+                                $regPhotoOk = $r->photo_path && $regDisk->exists($r->photo_path);
+                                $regIdPhotoOk = $r->id_photo_path && $regDisk->exists($r->id_photo_path);
+                                $regPhotoGone = ($r->photo_path && ! $regPhotoOk) || ($r->id_photo_path && ! $regIdPhotoOk);
                                 // Day passes store no return date: they expire at the daily cutoff after issue.
                                 if ($r->expected_return_date) {
                                     $regReturnLabel = $r->expected_return_date->format('M j, Y');
@@ -114,16 +119,19 @@
                                 data-expected-return="{{ $regReturnLabel }}"
                                 data-registered-by="{{ $r->registered_by ?? '—' }}"
                                 data-status="{{ $regStatusLabel }}"
-                                @if ($r->photo_path) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
-                                @if ($r->id_photo_path) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
+                                @if ($regPhotoOk) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
+                                @if ($regIdPhotoOk) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
                                 onclick="openRowModal(this)">
                                 <td class="py-3 px-4">
                                     <div class="flex justify-center gap-1.5">
-                                        @if ($r->photo_path)
+                                        @if ($regPhotoOk)
                                             <img src="{{ asset('storage/' . $r->photo_path) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
-                                        @if ($r->id_photo_path)
+                                        @if ($regIdPhotoOk)
                                             <img src="{{ asset('storage/' . $r->id_photo_path) }}" alt="ID photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                        @endif
+                                        @if ($regPhotoGone && ! $regPhotoOk && ! $regIdPhotoOk)
+                                            <span class="text-xs text-slate-400" title="Photos are deleted when the card is returned">Removed</span>
                                         @endif
                                     </div>
                                 </td>
