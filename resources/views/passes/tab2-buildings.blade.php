@@ -47,7 +47,7 @@
             $inactiveCount = $passStats[$b->id]['inactive'];
         @endphp
         <button type="button" data-building-id="{{ $b->id }}" onclick="openBuildingModal({{ $b->id }}, '{{ $b->name }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
-            class="gov-building-card {{ $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
+            class="gov-building-card {{ $loop->count > 1 && $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
                 <h3>{{ $b->name }}</h3>
 <p class="is-active"><b data-card-count="active">{{ $activeCount }}</b> Active Passes</p>

@@ -22,7 +22,7 @@
 
 <div class="w-full sm:w-[25%] min-w-[160px] h-auto flex items-center">
     @if (auth()->user()->isGuard())
-        <span class="gov-location-badge h-11">
+        <span class="gov-location-badge gov-location-badge--locked h-11" title="Your assigned building">
             <i class="fa-solid fa-building-circle-check"></i> {{ $buildings->first()->name ?? '—' }}
         </span>
     @else

@@ -9,8 +9,8 @@
 
     {{-- Favicon: explicit links so every device finds it (versioned so browsers drop the old cached one) --}}
     <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}?v={{ filemtime(public_path('favicon-32.png')) }}">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v={{ filemtime(public_path('apple-touch-icon.png')) }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v={{ filemtime(public_path('images/favicon-32.png')) }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}?v={{ filemtime(public_path('images/apple-touch-icon.png')) }}">
 
     {{-- Self-hosted fonts (Source Sans 3 / Source Serif 4) and Font Awesome: no external CDN dependency --}}
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">

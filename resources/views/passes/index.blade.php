@@ -1214,7 +1214,7 @@
 
         function focusTransferHwInput() {
             if (!document.getElementById('transferCameraToggle').checked) {
-                setTimeout(() => transferHwInput.focus(), 50);
+                setTimeout(() => transferHwInput.focus({ preventScroll: true }), 50);
             }
         }
 
@@ -1380,7 +1380,7 @@
 
         function focusTransferModeHwInput() {
             if (!document.getElementById('transferModeCameraToggle').checked) {
-                setTimeout(() => transferModeHwInput.focus(), 50);
+                setTimeout(() => transferModeHwInput.focus({ preventScroll: true }), 50);
             }
         }
 

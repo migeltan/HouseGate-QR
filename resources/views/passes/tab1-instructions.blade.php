@@ -45,7 +45,12 @@ function openAwayModal() { document.getElementById('awayModal')?.classList.remov
 function closeAwayModal() { document.getElementById('awayModal')?.classList.add('hidden'); }
 if (new URLSearchParams(location.search).get('away')) { document.addEventListener('DOMContentLoaded', openAwayModal); }
 function openRegisterModal() {
-    document.getElementById('registerModal').classList.remove('hidden');
+    const overlay = document.getElementById('registerModal');
+    overlay.classList.remove('hidden');
+    // Always start at the top: the scroller is .reg-modal and it keeps its old scrollTop between opens.
+    const scroller = overlay.querySelector('.reg-modal');
+    if (scroller) scroller.scrollTop = 0;
+    requestAnimationFrame(() => { if (scroller) scroller.scrollTop = 0; });
 }
 function openInventoryModal() { document.getElementById('inventoryModal')?.classList.remove('hidden'); }
 function closeInventoryModal() { document.getElementById('inventoryModal')?.classList.add('hidden'); }
