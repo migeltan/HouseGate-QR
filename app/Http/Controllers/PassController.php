@@ -726,7 +726,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         });
 
         if ($error) {
-            return redirect()->route('passes.index', ['away' => 1])->withErrors($error);
+            return $this->awayResponse($request, false, $error);
         }
 
         $visitor = PassRegistration::where('visitor_pass_id', $pass->id)
@@ -736,8 +736,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         $home = $pass->is_multi_building ? 'North Gate Access' : optional($pass->building)->name;
         AdminLog::record('pass.card_received', $visitor, "Pass #{$pass->pass_number} ({$home}) received back from {$from}.");
 
-        return redirect()->route('passes.index', ['away' => 1])
-            ->with('success', "Pass #{$pass->pass_number} is back at the {$home} desk. You can now hand the visitor's ID back.");
+        return $this->awayResponse($request, true, "Pass #{$pass->pass_number} is back at the {$home} desk. You can now hand the visitor's ID back.");
     }
 
     /**
@@ -774,7 +773,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         });
 
         if ($error) {
-            return redirect()->route('passes.index', ['away' => 1])->withErrors($error);
+            return $this->awayResponse($request, false, $error);
         }
 
         AdminLog::record(
@@ -783,8 +782,31 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             "ID ({$registration->id_type}) handed back to the visitor by {$request->user()->name}."
         );
 
-        return redirect()->route('passes.index', ['away' => 1])
-            ->with('success', "ID handed back to {$registration->visitor_name}.");
+        return $this->awayResponse($request, true, "ID handed back to {$registration->visitor_name}.");
+    }
+
+    /**
+     * Away cards result. JSON (fresh list + counts) for the in-place modal;
+     * the old redirect + flash toast when JS is unavailable.
+     */
+    private function awayResponse(Request $request, bool $ok, string $message)
+    {
+        if ($request->expectsJson()) {
+            $away = \App\Services\AwayCards::forCurrentUser();
+
+            return response()->json([
+                'ok' => $ok,
+                'message' => $message,
+                'html' => view('passes.away-list', ['awayData' => $away])->render(),
+                'count' => $away['count'],
+                'overdue' => $away['overdue'],
+                'sig' => \App\Services\AwayCards::signature($away),
+            ], $ok ? 200 : 409);
+        }
+
+        $redirect = redirect()->route('passes.index', ['away' => 1]);
+
+        return $ok ? $redirect->with('success', $message) : $redirect->withErrors($message);
     }
 
     /**

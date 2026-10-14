@@ -13,9 +13,7 @@
         <div class="flex items-center gap-3">
             <button type="button" onclick="openAwayModal()" class="gov-btn-glass-outline flex-shrink-0">
                 <i class="fa-solid fa-right-left"></i> Away cards
-                @if ($awayData['count'] > 0)
-                    <span class="away-badge {{ $awayData['overdue'] > 0 ? '' : 'is-calm' }}">{{ $awayData['count'] }}</span>
-                @endif
+                <span id="awayBadge" class="away-badge {{ $awayData['overdue'] > 0 ? '' : 'is-calm' }}" @if ($awayData['count'] < 1) style="display:none" @endif>{{ $awayData['count'] }}</span>
             </button>
             @if (auth()->user()->isAdmin())
                 <button type="button" onclick="openInventoryModal()" class="gov-btn-glass-outline flex-shrink-0">
@@ -41,8 +39,88 @@
 
 <script>
 // ---- Tab 1: Instructions ----
-function openAwayModal() { document.getElementById('awayModal')?.classList.remove('hidden'); }
+function openAwayModal() { document.getElementById('awayModal')?.classList.remove('hidden'); window.hgLive?.refresh(); }
 function closeAwayModal() { document.getElementById('awayModal')?.classList.add('hidden'); }
+
+// ---- Away cards: styled confirm + in-place submit (no page reload) ----
+function setAwayBadge(count, overdue) {
+    const badge = document.getElementById('awayBadge');
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.display = count > 0 ? '' : 'none';
+    badge.classList.toggle('is-calm', !(overdue > 0));
+}
+
+document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-away')) return;
+    e.preventDefault();
+    if (form.dataset.busy) return;
+
+    if (form.hasAttribute('data-away-confirm')) {
+        const ok = await confirmDialog({
+            title: 'Hand the ID back?',
+            subject: form.dataset.awayVisitor,
+            message: 'Confirm the visitor is taking back their ' + form.dataset.awayIdLabel + ' now.',
+            confirmLabel: 'Yes, handed back',
+            tone: 'warning',
+        });
+        if (!ok) return;
+    }
+
+    form.dataset.busy = '1';
+    const btn = form.querySelector('button[type="submit"]');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
+
+    try {
+        const res = await fetch(form.action, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form),
+            credentials: 'same-origin',
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+
+        if (data && data.html) {   // fresh list also on "already done" (409)
+            document.getElementById('awayList')?.replaceWith(
+                Object.assign(document.createElement('div'), { innerHTML: data.html }).firstElementChild
+            );
+            setAwayBadge(data.count, data.overdue);
+            if (data.sig) window.hgLive?.setSig('away', data.sig);
+        }
+        if (res.ok && data && data.ok) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data?.message || (res.status === 419 ? 'Your session expired. Reload the page and try again.'
+                : res.status === 403 ? 'You are not allowed to do that.'
+                : 'Something went wrong. Please try again.'), 'error');
+        }
+    } catch (err) {
+        showToast('Network error. Nothing was changed.', 'error');
+    } finally {
+        delete form.dataset.busy;
+        if (form.isConnected) { btn.disabled = false; btn.innerHTML = original; }
+    }
+});
+
+// ---- Away cards: live updates (see window.hgLive in layouts/app.blade.php) ----
+// Registered on DOMContentLoaded because the layout script that defines hgLive runs after this one.
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.hgLive) return;
+    window.hgLive.register('away', {
+        sig: @json(\App\Services\AwayCards::signature($awayData)),
+        // never swap the list while a confirm dialog is open or a button is mid-request
+        busy: () => !!document.querySelector('#awayList form[data-busy]') || !!document.querySelector('.gov-confirm'),
+        apply(d) {
+            const list = document.getElementById('awayList');
+            if (list) list.replaceWith(Object.assign(document.createElement('div'), { innerHTML: d.html }).firstElementChild);
+            setAwayBadge(d.count, d.overdue);
+        },
+    });
+});
 if (new URLSearchParams(location.search).get('away')) { document.addEventListener('DOMContentLoaded', openAwayModal); }
 function openRegisterModal() {
     const overlay = document.getElementById('registerModal');

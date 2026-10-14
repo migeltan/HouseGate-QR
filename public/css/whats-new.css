@@ -52,3 +52,19 @@
     font-size: 0.75rem;
     color: #94a3b8;
 }
+.wn-skip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: "Source Sans Pro", "Source Sans 3", sans-serif;
+    font-size: 0.85rem;
+    color: var(--ink-muted, #5b6270);
+    cursor: pointer;
+    user-select: none;
+}
+.wn-skip input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--brand-blue, #235aa6);
+    cursor: pointer;
+}

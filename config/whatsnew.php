@@ -1,32 +1,34 @@
 <?php
 
 /*
- * "What's new" overlay shown once to each signed-in user (resources/views/partials/whats-new.blade.php).
+ * "What's new" overlay shown to each signed-in user on every sign-in (resources/views/partials/whats-new.blade.php).
  *
- *  - To announce something new: change `id` and the items. Everybody sees it once more, even those who
- *    dismissed the previous one. Keep the same `id` while only fixing typos.
+ *  - "Got it" / X only closes it for the current sign-in. The "Don't show this again" checkbox records the
+ *    current `id` on the user, so it stays hidden until `id` changes.
+ *  - To announce something new: change `id` and the items. Everybody sees it again, even those who ticked
+ *    "Don't show this again" before. Keep the same `id` while only fixing typos or adding to the same release.
  *  - To turn the popup off: set `id` to null.
  */
 return [
-    'id' => '2026-10-directory-sidebar',
+    'id' => '2026-10-away-cards',
     'eyebrow' => "What's new",
     'title' => 'Updates to HouseGate',
     'version_label' => 'October 2026',
     'items' => [
         [
-            'icon' => 'fa-address-book',
-            'title' => 'Faster Directory on a weak connection',
-            'text' => 'The roster is kept on this device, so search and filters respond instantly and keep working if the connection drops. It refreshes in the background when you are online.',
+            'icon' => 'fa-right-left',
+            'title' => 'Away cards, smoother',
+            'text' => 'Handing a card or ID back now asks for confirmation in the same style as the rest of the app, shows a notification, and updates the list without reloading the page.',
         ],
         [
-            'icon' => 'fa-table-columns',
-            'title' => 'Easier sidebar',
-            'text' => 'Hover the collapsed sidebar for a hint, then click anywhere on it to open it. The arrow button still works.',
+            'icon' => 'fa-id-card',
+            'title' => 'Transfers keep track of cards and IDs',
+            'text' => 'When a visitor moves to another building, the old card is held at that desk and the ID stays at the original one. Away cards shows what still has to be handed back.',
         ],
         [
-            'icon' => 'fa-key',
-            'title' => 'Remember me now works',
-            'text' => 'Tick it when you sign in to stay signed in on this computer. Building personnel are asked for their building again after a long break.',
+            'icon' => 'fa-calendar-days',
+            'title' => 'Long-term passes: up to 7 days',
+            'text' => 'Long-term passes can now be set for a maximum of 7 calendar days from today.',
         ],
     ],
 ];

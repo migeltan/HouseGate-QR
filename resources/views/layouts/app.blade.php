@@ -419,9 +419,140 @@ document.addEventListener('submit', async (e) => {
     {{-- "What's new": once per user per update id (config/whatsnew.php) --}}
     @auth
         @php $whatsNew = config('whatsnew'); @endphp
-        @if (! empty($whatsNew['id']) && auth()->user()->last_seen_update !== $whatsNew['id'])
+        @if (! empty($whatsNew['id']) && auth()->user()->last_seen_update !== $whatsNew['id'] && ! session('whatsnew_closed'))
             @include('partials.whats-new', ['whatsNew' => $whatsNew])
         @endif
+    @endauth
+
+    {{-- Connection status pill: Online / Offline / Can't reach server. Shown on every page for signed-in users. --}}
+    @auth
+        <div id="hgConn" class="hg-conn" data-state="online" data-url="{{ url('/up') }}" role="status" aria-live="polite">
+            <span class="hg-conn-dot" aria-hidden="true"></span>
+            <span class="hg-conn-label">Online</span>
+        </div>
+        <script>
+        (function () {
+            const pill = document.getElementById('hgConn');
+            if (!pill) return;
+            const label = pill.querySelector('.hg-conn-label');
+            const PROBE_MS = 20000, TIMEOUT_MS = 5000;
+            let state = 'online', probing = false;
+
+            function paint(next) {
+                if (next === state) return;
+                state = next;
+                pill.dataset.state = next;
+                label.textContent = next === 'online' ? 'Online'
+                    : next === 'offline' ? 'Offline'
+                    : "Can't reach server";
+            }
+            // Other scripts (the upcoming live updates) can report the outcome of their own requests here.
+            function report(ok) {
+                if (!navigator.onLine) paint('offline');
+                else paint(ok ? 'online' : 'unreachable');
+            }
+            async function probe() {
+                if (probing) return;
+                if (!navigator.onLine) { paint('offline'); return; }
+                probing = true;
+                const ctl = new AbortController();
+                const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+                try {
+                    const res = await fetch(pill.dataset.url, { method: 'HEAD', cache: 'no-store', credentials: 'omit', signal: ctl.signal });
+                    report(res.ok);
+                } catch (_) {
+                    report(false);
+                } finally {
+                    clearTimeout(t);
+                    probing = false;
+                }
+            }
+
+            window.addEventListener('offline', () => paint('offline'));
+            window.addEventListener('online', probe);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) probe(); });
+            setInterval(() => { if (!document.hidden) probe(); }, PROBE_MS);
+            window.hgConn = { report, probe, get state() { return state; } };
+            probe();
+        })();
+        </script>
+    @endauth
+
+    {{-- Live updates: pages register "regions" (window.hgLive.register); one poll covers them all. --}}
+    @auth
+        <script>
+        (function () {
+            const URL_ = @json(route('live.pulse'));
+            const BASE_MS = 5000, MAX_MS = 60000, IDLE_MS = 15 * 60 * 1000, TIMEOUT_MS = 8000;
+            const regions = {};   // name -> { sig, apply(data), busy() }
+            let delay = BASE_MS, timer = null, inflight = false, stopped = false, lastInput = Date.now();
+
+            // Polls only while the tab is visible, the browser is online, and the user was active in the last
+            // 15 minutes. The idle cutoff matters: every poll is a normal request, so without it an open tab
+            // would keep the session alive forever and defeat the idle timeout.
+            function active() { return !document.hidden && navigator.onLine && Date.now() - lastInput < IDLE_MS; }
+            function schedule() { clearTimeout(timer); if (!stopped) timer = setTimeout(poll, delay); }
+            function stop() {
+                stopped = true;
+                clearTimeout(timer);
+                if (typeof showToast === 'function') showToast('Live updates stopped because your session changed. Reload the page to continue.', 'error', 'Live Updates Paused');
+            }
+
+            async function poll() {
+                clearTimeout(timer);
+                const names = Object.keys(regions);
+                if (stopped || !names.length) return;
+                if (!active() || inflight) { schedule(); return; }
+                inflight = true;
+                const qs = new URLSearchParams();
+                names.forEach(n => qs.set(n, regions[n].sig));
+                const ctl = new AbortController();
+                const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+                try {
+                    const res = await fetch(URL_ + '?' + qs, {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin', cache: 'no-store', signal: ctl.signal,
+                    });
+                    if (res.redirected || [401, 403, 419].includes(res.status)) { stop(); return; }
+                    if (!res.ok) throw new Error('http ' + res.status);
+                    const data = await res.json();
+                    delay = BASE_MS;
+                    if (window.hgConn) window.hgConn.report(true);   // feeds the Online / Offline pill
+                    names.forEach(n => {
+                        const d = data[n], r = regions[n];
+                        if (!d || !d.changed) return;
+                        if (r.busy && r.busy()) return;   // user is mid-action: picked up on the next poll
+                        r.sig = d.sig;
+                        r.apply(d);
+                    });
+                } catch (_) {
+                    delay = Math.min(delay * 2, MAX_MS);   // back off while the server is struggling
+                    if (window.hgConn) window.hgConn.report(false);
+                } finally {
+                    clearTimeout(t);
+                    inflight = false;
+                    schedule();
+                }
+            }
+
+            function refresh() { delay = BASE_MS; poll(); }
+            function onInput() {
+                const wasIdle = Date.now() - lastInput >= IDLE_MS;
+                lastInput = Date.now();
+                if (wasIdle) refresh();   // back after a pause: catch up immediately
+            }
+            ['pointerdown', 'keydown', 'mousemove', 'touchstart', 'scroll'].forEach(ev =>
+                window.addEventListener(ev, onInput, { passive: true, capture: true }));
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+            window.addEventListener('online', refresh);
+
+            window.hgLive = {
+                register(name, region) { regions[name] = region; schedule(); },
+                setSig(name, sig) { if (regions[name]) regions[name].sig = sig; },
+                refresh,
+            };
+        })();
+        </script>
     @endauth
 
     @yield('scripts')

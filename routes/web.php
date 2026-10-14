@@ -10,6 +10,7 @@ use App\Http\Controllers\PassController;
 use App\Http\Controllers\PassInventoryController;
 use App\Http\Controllers\ScannerController;
 use App\Http\Controllers\WhatsNewController;
+use App\Http\Controllers\LivePulseController;
 use Illuminate\Support\Facades\Route;
 
 // Directory offline worker. Public on purpose: it only lists static asset URLs, and the browser
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/passes/{pass}/receive', [PassController::class, 'receiveBack'])->name('passes.receive');
         Route::post('/pass-registrations/{registration}/id-returned', [PassController::class, 'idReturned'])->name('passes.id-returned');
         Route::post('/passes/{pass}/revoke', [PassController::class, 'revoke'])->name('passes.revoke');
+        Route::get('/live/pulse', [LivePulseController::class, 'pulse'])->middleware('throttle:120,1')->name('live.pulse');
         Route::get('/account', [AccountController::class, 'show'])->name('account.edit');
         Route::get('/account/log', [AccountController::class, 'log'])->middleware('admin')->name('account.log');
         Route::put('/account/profile', [AccountController::class, 'updateProfile'])->name('account.profile');

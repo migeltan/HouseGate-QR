@@ -71,4 +71,18 @@ class AwayCards
             'overdue' => count(array_filter($all, fn ($i) => $i['overdue'])),
         ];
     }
+
+    /**
+     * Short fingerprint of what the Away cards list shows. The page and the live poll compare it, so the
+     * list is only re-sent when a card or ID actually changed state, desk or overdue flag.
+     */
+    public static function signature(array $away): string
+    {
+        $row = fn ($i) => [$i['registration_id'], $i['pass_id'], $i['state'], $i['holder'], $i['id_held'], $i['overdue']];
+
+        return md5(json_encode([
+            array_map($row, $away['follow']),
+            array_map($row, $away['holding']),
+        ]));
+    }
 }
