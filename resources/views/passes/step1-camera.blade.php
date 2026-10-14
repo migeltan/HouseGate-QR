@@ -69,6 +69,6 @@
     <canvas id="photoCanvas" class="hidden"></canvas>
     <input type="hidden" name="photo_data" id="photoDataInput">
     <canvas id="idPhotoCanvas" class="hidden"></canvas>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
 </section>

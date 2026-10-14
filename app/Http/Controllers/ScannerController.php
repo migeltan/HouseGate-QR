@@ -17,14 +17,12 @@ class ScannerController extends Controller
     public function index()
     {
         $buildings = Building::where('code', '!=', 'NG')->orderBy('name')->get();
-        $passes = VisitorPass::with('building')->orderBy('building_id')->orderBy('pass_number')->get();
-        $recentLogs = ScanLog::with(['visitorPass', 'scannedBuilding'])->latest()->limit(50)->get();
 
         // Admin still picks freely; guard's building comes from their locked session value.
         $lockedBuildingId = request()->user()->isGuard() ? session('assigned_building_id') : null;
         $lockedBuilding = $lockedBuildingId ? Building::find($lockedBuildingId) : null;
 
-        return view('scanner.index', compact('buildings', 'passes', 'recentLogs', 'lockedBuilding'));
+        return view('scanner.index', compact('buildings', 'lockedBuilding'));
     }
 
     private function storeVerificationPhoto(string $base64, ScanLog $log, ?VisitorPass $pass): void

@@ -96,10 +96,7 @@ Gotchas: fixed `/passes/...` routes above `/passes/{pass}`; scheduler/queue need
 
 ## 6. Next (user's queue, one at a time)
 
-0. **Fixing bugs he has seen** (he has a list: ask for it / let him paste it). Understand first, no code until he says so. For each: ask for the screenshot or console error, find the cause, then propose the fix.
-1. Open question: expiry "not working" (no expired passes weeks after registering, no emails). Check first: scheduler/queue not running (`schedule:work`, `queue:work`, cron on the server), mail driver `log`; the scanner already expires on scan.
-2. Unassign without refresh and registration submit without reload appear done (in-place JSON paths exist): confirm with him before touching.
-3. Optional: scanner hint when a held-away card is scanned (it shows "unassigned" today); passes page weight; building passes modal polish.
+1. He will state the problems from here.
 
 ## 7. Known risks (state them, do not hide them)
 

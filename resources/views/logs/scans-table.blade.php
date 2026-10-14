@@ -1,5 +1,5 @@
 {{-- ============================= SCANS PANE ============================= --}}
-    <form id="scansPane" class="records-pane">
+    <form id="scansPane" class="records-pane" data-live-sig="{{ $liveSig ?? '' }}">
 
 
     {{-- ======================================================================== --}}
@@ -90,7 +90,7 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @forelse ($logs as $l)
-<tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60"
+                            <tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60" data-log-id="{{ $l->id }}"
                                     data-type="scan"
                                     data-timestamp="{{ $l->created_at->format('Y-m-d h:i:s A') }}"
                                     data-visitor="{{ $l->visitor_name_snapshot }}"

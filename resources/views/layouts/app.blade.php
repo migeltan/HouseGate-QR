@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/registration-modal.css') }}?v={{ filemtime(public_path('css/registration-modal.css')) }}">
 
-    <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/theme-govt.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/scanner-restyle.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}?v={{ filemtime(public_path('vendor/fontawesome/css/all.min.css')) }}">
+   <link rel="stylesheet" href="{{ asset('css/theme-govt.css') }}?v={{ filemtime(public_path('css/theme-govt.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/scanner-restyle.css') }}?v={{ filemtime(public_path('css/scanner-restyle.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sidebar.css') }}?v={{ filemtime(public_path('css/sidebar.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/glass-status.css') }}?v={{ filemtime(public_path('css/glass-status.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/whats-new.css') }}?v={{ filemtime(public_path('css/whats-new.css')) }}">
@@ -505,7 +505,11 @@ document.addEventListener('submit', async (e) => {
                 if (!active() || inflight) { schedule(); return; }
                 inflight = true;
                 const qs = new URLSearchParams();
-                names.forEach(n => qs.set(n, regions[n].sig));
+                names.forEach(n => {
+                    qs.set(n, regions[n].sig);
+                    // a region may send extra context (e.g. the filters it is showing)
+                    if (regions[n].params) Object.entries(regions[n].params()).forEach(([k, v]) => qs.set(k, v));
+                });
                 const ctl = new AbortController();
                 const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
                 try {

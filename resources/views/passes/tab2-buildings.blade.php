@@ -5,11 +5,11 @@
     // Maps each building code to its image filename in public/images/buildings/.
     // SWA has no photo yet — falls back to RVM's until one is supplied.
     $buildingImages = [
-        'NW'    => 'northwing.png',
-        'SW'    => 'southwing.png',
-        'RVM'   => 'rvm.png',
-        'NG'    => 'northgate.png',
-        'MB'    => 'main.png',
+        'NW'    => 'northwing.jpg',
+        'SW'    => 'southwing.jpg',
+        'RVM'   => 'rvm.jpg',
+        'NG'    => 'northgate.jpg',
+        'MB'    => 'main.jpg',
         'SWA'   => 'swa.jpg',
     ];
 
@@ -55,7 +55,7 @@
                 <p class="is-inactive" title="Expired or revoked"><b data-card-count="inactive">{{ $inactiveCount }}</b> Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
-                <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.png')) }}"
+                <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.jpg')) }}"
                      alt="{{ $b->name }}">
             </div>
         </button>
@@ -573,5 +573,55 @@ function applyPassPayload(p) {
 }
 // ---- End in-place Unassign / Revoke ----
 
+// ---- Live updates (window.hgLive in layouts/app.blade.php) ----
+// Card counts follow the server. An open building window re-fetches its rows in place; closed windows
+// drop their stale rows and reload fresh the next time they open.
+async function refreshOpenBuildingRows(group) {
+    if (group.dataset.refreshing === '1') return;
+    group.dataset.refreshing = '1';
+    try {
+        const id = group.id.replace('buildingPassGroup-', '');
+        const res = await fetch(BUILDING_ROWS_URL.replace('__ID__', id), {
+            headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin', cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const html = (await res.text()).trim();
+        const scroller = group.parentElement;
+        const top = scroller.scrollTop;
+        group.querySelectorAll(':scope > .gov-pass-card, :scope > p:not(.gov-pass-row-empty)').forEach(n => n.remove());
+        group.querySelector('.gov-pass-row-empty').insertAdjacentHTML('beforebegin',
+            html || '<p class="text-sm text-slate-400 text-center py-8">No passes exist for this building yet.</p>');
+        scroller.scrollTop = top;
+        applyModalFilters();
+    } catch (_) { /* the next poll retries */ }
+    finally { delete group.dataset.refreshing; }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.hgLive) return;
+    window.hgLive.register('passes', {
+        sig: @json($passesLiveSig ?? ''),
+        // never swap rows under a pass action that is mid-request or waiting on a confirm dialog
+        busy: () => !!document.querySelector('#buildingPassesModal form[data-busy], .gov-confirm'),
+        apply(d) {
+            Object.entries(d.counts).forEach(([bid, c]) => {
+                const card = document.querySelector(`.gov-building-card[data-building-id="${bid}"]`);
+                if (!card) return;
+                ['active', 'available', 'inactive'].forEach(k => {
+                    const el = card.querySelector(`[data-card-count="${k}"]`);
+                    if (el) el.textContent = c[k];
+                });
+            });
+            const modalOpen = !document.getElementById('buildingPassesModal').classList.contains('hidden');
+            document.querySelectorAll('[id^="buildingPassGroup-"]').forEach(group => {
+                if (group.dataset.loaded !== '1') return;
+                if (modalOpen && !group.classList.contains('hidden')) { refreshOpenBuildingRows(group); return; }
+                group.querySelectorAll(':scope > .gov-pass-card, :scope > p:not(.gov-pass-row-empty)').forEach(n => n.remove());
+                delete group.dataset.loaded;
+            });
+        },
+    });
+});
 // ---- End Tab 2 ----
 </script>

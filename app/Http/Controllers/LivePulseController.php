@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AwayCards;
+use App\Services\PassesLive;
 use Illuminate\Http\Request;
 
 class LivePulseController extends Controller
@@ -30,6 +31,22 @@ class LivePulseController extends Controller
                     'count' => $away['count'],
                     'overdue' => $away['overdue'],
                 ];
+        }
+
+        if ($request->has('logs')) {
+            $sig = app(LogController::class)->liveSignature($request);
+
+            $out['logs'] = $sig === (string) $request->query('logs')
+                ? ['changed' => false]
+                : ['changed' => true, 'sig' => $sig];
+        }
+
+        if ($request->has('passes')) {
+            $snap = PassesLive::snapshot();
+
+            $out['passes'] = $snap['sig'] === (string) $request->query('passes')
+                ? ['changed' => false]
+                : ['changed' => true, 'sig' => $snap['sig'], 'counts' => $snap['counts']];
         }
 
         return response()->json($out)->header('Cache-Control', 'no-store');

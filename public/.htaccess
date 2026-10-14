@@ -23,3 +23,24 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+
+# ---- Performance: compression + browser caching for static assets ----
+# Never covers /storage (visitor photos must not linger in browser caches on shared desk computers).
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+<IfModule mod_headers.c>
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        # Fonts, images and vendor files: one week (long enough to help, short enough that replacements show up).
+        RewriteRule ^(fonts|images|vendor)/ - [E=HG_STATIC:1]
+        # CSS/JS requested with ?v=<file time> never change under the same URL: one year.
+        RewriteCond %{QUERY_STRING} (^|&)v=
+        RewriteRule ^(css|js|vendor)/ - [E=HG_VERSIONED:1]
+    </IfModule>
+    # Order matters: the versioned rule comes last so it wins where both apply.
+    Header set Cache-Control "public, max-age=604800" env=HG_STATIC
+    Header set Cache-Control "public, max-age=31536000, immutable" env=HG_VERSIONED
+</IfModule>

@@ -17,6 +17,9 @@
     /* Async filter loading state */
     .records-pane { position: relative; }
     .records-pane.is-loading table { opacity: .45; transition: opacity .15s ease; }
+    /* Rows that just arrived via live update */
+    @keyframes log-row-flash { from { background-color: #dbeafe; } to { background-color: transparent; } }
+    .log-row-new { animation: log-row-flash 2.5s ease-out; }
     .records-pane.is-loading::before {
         content: ''; position: absolute; top: 0; left: 0; z-index: 20;
         height: 2px; width: 40%; background: #235aa6;
@@ -195,6 +198,7 @@
 
     // ---- Async filtering / pagination (no page reload) ----
     let recordsCtrl = null;
+    let recordsPending = 0;   // requests in flight (live refresh waits for 0)
 
     // Combines both panes' filters so each pane keeps its own state.
     function recordsUrl() {
@@ -212,11 +216,13 @@
         loadRecords(recordsUrl());
     }
 
-    async function loadRecords(url) {
+    async function loadRecords(url, opts) {
+        const silent = !!(opts && opts.silent);   // live refresh: no dimming, no full-page fallback
         if (recordsCtrl) recordsCtrl.abort();
         recordsCtrl = new AbortController();
+        recordsPending++;
         const panes = document.querySelectorAll('.records-pane');
-        panes.forEach(function (p) { p.classList.add('is-loading'); });
+        if (!silent) panes.forEach(function (p) { p.classList.add('is-loading'); });
 
         try {
             const res = await fetch(url, {
@@ -229,22 +235,42 @@
             const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
             if (!doc.getElementById('scansPane')) throw new Error('Unexpected response');
 
+            const seen = new Set(Array.from(document.querySelectorAll('#scansPane tr[data-log-id]'))
+                .map(function (r) { return r.dataset.logId; }));
+
             panes.forEach(function (cur) {
                 const fresh = doc.getElementById(cur.id);
                 if (!fresh) return;
+                const sc = cur.querySelector('.overflow-auto');
+                const top = silent && sc ? sc.scrollTop : 0;   // keep the reader's place on live refresh
                 const oldKids = Array.from(cur.children);
                 const newKids = Array.from(fresh.children);
                 // child 0 = filter bar (kept, so typing focus isn't lost); the rest = table + footer
                 for (let i = 1; i < oldKids.length; i++) {
                     if (newKids[i]) oldKids[i].replaceWith(newKids[i]);
                 }
+                if (top) {
+                    const nsc = cur.querySelector('.overflow-auto');
+                    if (nsc) nsc.scrollTop = top;
+                }
             });
+
+            if (silent) {
+                document.querySelectorAll('#scansPane tr[data-log-id]').forEach(function (r) {
+                    if (!seen.has(r.dataset.logId)) r.classList.add('log-row-new');
+                });
+            }
+
+            const liveSig = doc.getElementById('scansPane').dataset.liveSig;
+            if (liveSig && window.hgLive) window.hgLive.setSig('logs', liveSig);
 
             history.replaceState(null, '', url);
             panes.forEach(function (p) { p.classList.remove('is-loading'); });
         } catch (err) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError' || silent) return;
             window.location.href = url; // fallback: normal full load
+        } finally {
+            recordsPending--;
         }
     }
 
@@ -263,6 +289,30 @@
         e.preventDefault();
         const u = new URL(a.href, window.location.href);
         loadRecords(u.pathname + u.search);
+    });
+
+    // ---- Live updates: new scans / registrations appear without a refresh (window.hgLive, layouts/app) ----
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.hgLive) return;
+        const KEYS = ['search', 'result', 'building', 'reg_search', 'reg_status', 'reg_building'];
+        const onFirstPage = function () {
+            const p = new URLSearchParams(location.search);
+            return (p.get('page') || '1') === '1' && (p.get('reg_page') || '1') === '1';
+        };
+        window.hgLive.register('logs', {
+            sig: @json($liveSig),
+            params: function () {
+                const cur = new URLSearchParams(location.search), out = {};
+                KEYS.forEach(function (k) { const v = cur.get(k); if (v) out[k] = v; });
+                return out;
+            },
+            // not while a request is running, on page 2+, or while a dialog is open: retried on the next poll
+            busy: function () {
+                return recordsPending > 0 || !onFirstPage() ||
+                    !!document.querySelector('#rowDetailsModalOverlay:not(.hidden), #purgeModalOverlay:not(.hidden), #confirmPurgeOverlay:not(.hidden)');
+            },
+            apply: function () { loadRecords(location.pathname + location.search, { silent: true }); },
+        });
     });
 
     function openDeleteModal() {

@@ -19,13 +19,28 @@ class LogController extends Controller
             ? Building::where('id', session('assigned_building_id'))->get()
             : Building::where('code', '!=', 'NG')->orderBy('name')->get();
 
+        // Taken BEFORE the queries: if a scan lands in between, the next poll just refreshes once more.
+        $liveSig = $this->liveSignature($request);
+
         $logs = $this->applyFilters($this->scopedLogsQuery($request), $request)
             ->latest()->paginate(25)->withQueryString();
 
         $registrations = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request)
             ->latest('registered_at')->paginate(25, ['*'], 'reg_page')->withQueryString();
 
-        return view('logs.index', compact('logs', 'buildings', 'registrations'));
+        return view('logs.index', compact('logs', 'buildings', 'registrations', 'liveSig'));
+    }
+
+    /**
+     * Cheap change marker for the live poll: newest scan id + newest registration id/update under the
+     * SAME scope and filters as the page. Two indexed aggregates; no rows are loaded.
+     */
+    public function liveSignature(Request $request): string
+    {
+        $scan = $this->applyFilters($this->scopedLogsQuery($request), $request)->max('id');
+        $reg = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request);
+
+        return (int) $scan . ':' . (int) (clone $reg)->max('id') . ':' . (string) $reg->max('updated_at');
     }
 
     public function export(Request $request): StreamedResponse

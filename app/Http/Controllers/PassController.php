@@ -112,7 +112,9 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             ])
             ->values();
 
-        return view('passes.index', compact('buildings', 'displayBuildings', 'roster', 'passStats', 'invData'));
+        $passesLiveSig = \App\Services\PassesLive::snapshot()['sig'];
+
+        return view('passes.index', compact('buildings', 'displayBuildings', 'roster', 'passStats', 'invData', 'passesLiveSig'));
     }
 
     /**
