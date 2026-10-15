@@ -428,6 +428,34 @@ select.gov-location-badge option {
     box-shadow: 0 2px 8px rgba(16, 24, 40, 0.1);
 }
 
+/* State pill on the scanner Live Feed: Waiting / Live (same look as the registration camera) */
+.cam-state-pill {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    font:
+        700 0.68rem/1.4 "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+}
+.cam-state-pill[data-state="live"] {
+    color: #fff;
+    background: rgba(241, 57, 72, 0.75);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 /* ---------- ID viewer ---------- */
 .gov-idviewer {
     position: fixed;

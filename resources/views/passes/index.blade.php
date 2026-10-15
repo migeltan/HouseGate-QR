@@ -88,6 +88,11 @@
             sel.disabled = true;
             sel.classList.add('hidden');
             document.getElementById('manualCardNote').textContent = '';
+            document.getElementById('manualCardGrid').replaceChildren();
+            document.getElementById('manualCardFilter').value = '';
+            document.getElementById('manualCardPicker').classList.add('hidden');
+            document.getElementById('manualCardOpenBtn').classList.remove('hidden');
+            document.getElementById('manualCardSummary').textContent = 'Auto-assign (lowest available number)';
         }
 
         function refreshManualCard() {
@@ -99,17 +104,24 @@
 
         function toggleManualCard(on) {
             if (!on) { resetManualCard(); refreshSubmitState(); return; }
+            document.getElementById('manualCardToggle').checked = true;
             loadManualCards(checkedBuildingIds()[0]);
         }
 
         async function loadManualCards(buildingId) {
             const seq = ++manualCardSeq;
             const sel = document.getElementById('manualCardSelect');
+            const grid = document.getElementById('manualCardGrid');
             const note = document.getElementById('manualCardNote');
+            document.getElementById('manualCardPicker').classList.remove('hidden');
+            document.getElementById('manualCardOpenBtn').classList.add('hidden');
+            document.getElementById('manualCardSummary').textContent = 'Pick a card below';
+            document.getElementById('manualCardFilter').value = '';
             sel.replaceChildren(new Option('Loading cards…', ''));
             sel.disabled = true;
-            sel.classList.remove('hidden');
-            note.textContent = '';
+            grid.replaceChildren();
+            note.dataset.base = 'Loading cards…';
+            note.textContent = 'Loading cards…';
             refreshSubmitState();
             try {
                 const res = await fetch(`${MANUAL_CARDS_BASE}/${buildingId}/stock`, {
@@ -120,16 +132,53 @@
                 if (seq !== manualCardSeq) return;
                 sel.replaceChildren(new Option('Choose a card…', ''), ...data.cards.map(c => new Option('#' + c.number, c.id)));
                 sel.disabled = data.cards.length === 0;
-                note.textContent = data.cards.length
-                    ? `${data.cards.length} card${data.cards.length === 1 ? '' : 's'} in stock at this desk. Pick the one you are physically handing over.`
+                grid.replaceChildren(...data.cards.map(c => {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'reg-card-chip';
+                    chip.dataset.id = String(c.id);
+                    chip.dataset.number = String(c.number);
+                    chip.textContent = '#' + c.number;
+                    chip.addEventListener('click', () => pickManualCard(c.id));
+                    return chip;
+                }));
+                note.dataset.base = data.cards.length
+                    ? `${data.cards.length} card${data.cards.length === 1 ? '' : 's'} in stock at this desk. Tap the one you are physically handing over.`
                     : 'No cards in stock at this desk. Ask an admin to allocate more cards.';
+                note.textContent = note.dataset.base;
             } catch (e) {
                 if (seq !== manualCardSeq) return;
                 sel.replaceChildren(new Option('Could not load cards', ''));
                 sel.disabled = true;
-                note.textContent = 'Could not load the card list. Untick the option to auto-assign, or try again.';
+                note.dataset.base = 'Could not load the card list. Choose "Use auto-assign instead", or try again.';
+                note.textContent = note.dataset.base;
             }
             refreshSubmitState();
+        }
+
+        // Tapping a card chip stores it in the hidden pass_id select (what the form actually submits).
+        function pickManualCard(id) {
+            const sel = document.getElementById('manualCardSelect');
+            sel.value = String(id);
+            document.querySelectorAll('#manualCardGrid .reg-card-chip').forEach(chip => {
+                chip.classList.toggle('is-selected', chip.dataset.id === String(id));
+            });
+            const label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+            document.getElementById('manualCardSummary').textContent = 'Card ' + label + ' (chosen)';
+            refreshSubmitState();
+        }
+
+        // Digits only: "16" shows #0016, #0116, #0160 ...
+        function filterManualCards() {
+            const q = document.getElementById('manualCardFilter').value.replace(/\D/g, '');
+            const note = document.getElementById('manualCardNote');
+            let shown = 0;
+            document.querySelectorAll('#manualCardGrid .reg-card-chip').forEach(chip => {
+                const hit = !q || chip.dataset.number.includes(q);
+                chip.hidden = !hit;
+                if (hit) shown++;
+            });
+            note.textContent = q && shown === 0 ? `No card matches "${q}".` : (note.dataset.base || '');
         }
         // ---- End manual card pick ----
 

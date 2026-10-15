@@ -34,7 +34,7 @@ class PassController extends Controller
         // Buildings shown as their own clickable tile on the Passes grid —
         // same guard scoping as $buildings, but North Gate IS included so
         // its own dedicated pass pool gets a visible card.
-        $displayBuildingsQuery = Building::orderBy('name');
+        $displayBuildingsQuery = Building::withPool()->orderBy('name');
         if ($user->isGuard()) {
             $displayBuildingsQuery->where('id', session('assigned_building_id'));
         }
@@ -54,7 +54,7 @@ class PassController extends Controller
         $passStats = $displayBuildings->mapWithKeys(function ($b) use ($statRows) {
             $by = $statRows
                 ->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'))
-                ->pluck('n', 'status');
+                ->pluck('n', 'bucket');
 
             return [$b->id => [
                 'available' => (int) ($by['available'] ?? 0),
@@ -187,6 +187,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             'congressman_ids' => 'nullable|array',
             'congressman_ids.*' => 'integer|exists:congressmen,id',
             'office_other' => 'nullable|string|max:255',
+            'others_place' => 'nullable|string|max:255',   // which place under "Others" (LIRMD, Bank...)
             'contact_person' => 'nullable|string|max:255',
             'purpose_choice' => 'required|in:Official Business,Financial/Medical Assistance,Visit,Others',
             'purpose_other' => 'required_if:purpose_choice,Others|nullable|string|max:255',
@@ -202,7 +203,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         $data['registered_by'] = $request->user()->name;
 
         // House style: these free-text fields are stored in capitals.
-        foreach (['first_name', 'middle_name', 'last_name', 'contact_person', 'id_ref', 'vehicle', 'office_other'] as $capsKey) {
+        foreach (['first_name', 'middle_name', 'last_name', 'contact_person', 'id_ref', 'vehicle', 'office_other', 'others_place'] as $capsKey) {
             if (! empty($data[$capsKey])) {
                 $data[$capsKey] = mb_strtoupper(trim($data[$capsKey]));
             }
@@ -264,11 +265,23 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             ? trim($data['purpose_other'])
             : $data['purpose_choice'];
 
-        if (count($data['building_ids']) > 1) {
-            abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a North Gate Access (multi-building) pass.');
+        // Gate 6 (multi-access) = 2+ buildings, or any visit that includes the hidden "Others" category.
+        $othersId = Building::where('code', Building::OTHERS_CODE)->value('id');
+        $hasOthers = $othersId && in_array((int) $othersId, array_map('intval', $data['building_ids']), true);
+        $isMulti = count($data['building_ids']) > 1 || $hasOthers;
+
+        if ($hasOthers && trim((string) ($data['others_place'] ?? '')) === '') {
+            throw ValidationException::withMessages(['register' => 'Choose which place under "Others" the visitor is going to.']);
+        }
+        if (! $hasOthers) {
+            $data['others_place'] = null;
         }
 
-        if (! empty($data['pass_id']) && count($data['building_ids']) !== 1) {
+        if ($isMulti) {
+            abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a Gate 6 (multi-building) pass.');
+        }
+
+        if (! empty($data['pass_id']) && $isMulti) {
             throw ValidationException::withMessages(['register' => 'A specific card can only be chosen for a single-building pass.']);
         }
 
@@ -285,13 +298,13 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             throw ValidationException::withMessages(['register' => 'One or more selected congressmen are not in the selected building(s).']);
         }
 
-        if ($congressmen->isEmpty() && $other === '') {
+        if ($congressmen->isEmpty() && $other === '' && ! $hasOthers) {
             throw ValidationException::withMessages(['register' => 'Choose at least one congressman, or fill in "Other".']);
         }
 
         $data['congressman_ids'] = $congressmen->pluck('id')->all();
         $data['office_other'] = $other !== '' ? $other : null;
-        $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other']);
+        $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other'], $data['others_place'] ?? null);
 
         if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
             $cap = now()->startOfDay()->addDays(VisitorPass::MAX_LONG_TERM_DAYS);
@@ -303,7 +316,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             }
         }
 
-        return count($data['building_ids']) === 1
+        return ! $isMulti
             ? $this->registerSingleBuilding($data, $request)
             : $this->registerMultiBuilding($data, $request);
     }
@@ -344,7 +357,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         }
 
         return $multi
-            ? "North Gate Access pass #{$pass->pass_number} issued to {$holder} for {$where}."
+            ? "Gate 6 pass #{$pass->pass_number} issued to {$holder} for {$where}."
             : "Pass #{$pass->pass_number} assigned to {$holder} ({$where}).";
     }
 
@@ -389,7 +402,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         }
 
         $building = $pass->is_multi_building
-            ? ($pass->buildings->count() ? $pass->buildings->pluck('name')->join(', ') : 'North Gate Access')
+            ? ($pass->buildings->count() ? $pass->buildings->pluck('name')->join(', ') : 'Gate 6')
             : optional($pass->building)->name;
 
         return response()->json([
@@ -606,7 +619,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
         $buildingCount = count($data['building_ids']);
 
-        return $this->registerResponse($request, $pass, $transferred, $this->registrationMessage($pass, $transferred, "{$buildingCount} buildings", true));
+        return $this->registerResponse($request, $pass, $transferred, $this->registrationMessage($pass, $transferred, $buildingCount === 1 ? Building::whereIn('id', $data['building_ids'])->value('name') : "{$buildingCount} buildings", true));
     }
 
     public function updateBuildings(Request $request, VisitorPass $pass)
@@ -732,7 +745,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         for ($i = 0; $r && $i < 10; $i++, $r = $r->transferredFrom) {
             $p = $r->visitorPass;
             if ($p && $p->holder_building_id !== null && (int) $p->holder_building_id !== (int) $p->building_id) {
-                $home = $p->is_multi_building ? 'North Gate Access' : optional($p->building)->name;
+                $home = $p->is_multi_building ? 'Gate 6' : optional($p->building)->name;
                 $notes[] = "{$home} #{$p->pass_number}";
             }
         }
@@ -777,7 +790,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             ->where('unassign_reason', 'transferred')
             ->latest('unassigned_at')
             ->value('visitor_name');
-        $home = $pass->is_multi_building ? 'North Gate Access' : optional($pass->building)->name;
+        $home = $pass->is_multi_building ? 'Gate 6' : optional($pass->building)->name;
         AdminLog::record('pass.card_received', $visitor, "Pass #{$pass->pass_number} ({$home}) received back from {$from}.");
 
         return $this->awayResponse($request, true, "Pass #{$pass->pass_number} is back at the {$home} desk. You can now hand the visitor's ID back.");
@@ -1116,7 +1129,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             return null;
         }
 
-        $homeName = $old->is_multi_building ? 'North Gate Access' : optional($old->building)->name;
+        $homeName = $old->is_multi_building ? 'Gate 6' : optional($old->building)->name;
         $holderName = optional(Building::find($holderId))->name;
         $idName = optional(Building::find($oldRegistration->id_held_building_id ?? $old->building_id))->name;
         AdminLog::record(
@@ -1222,6 +1235,7 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
             'pass_class' => $data['pass_class'],
             'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
             'office_other' => $data['office_other'] ?? null,
+            'others_place' => $data['others_place'] ?? null,
                         'contact_person' => $data['contact_person'] ?? null,
             // Frozen at registration: multi-pass building links are wiped on unassign.
             'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),
@@ -1241,7 +1255,7 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
                 'id' => $oldPass->id,
                 'pass_number' => $oldPass->pass_number,
                 'building' => $oldPass->is_multi_building
-                    ? 'North Gate Access'
+                    ? 'Gate 6'
                     : optional($oldPass->building)->name,
             ];
             // Building name where the old card now physically sits, or null if it went back to its own stock.
@@ -1254,12 +1268,16 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
      * One-line "who they're visiting" text kept in office_to_visit so the info
      * modal and pre-existing passes keep working. The pivot holds the real data.
      */
-    private function officeSummary(\Illuminate\Support\Collection $congressmen, ?string $other): string
+    private function officeSummary(\Illuminate\Support\Collection $congressmen, ?string $other, ?string $place = null): string
     {
         $parts = $congressmen->sortBy('name')
             ->map(fn ($c) => $c->name . ($c->room ? " ({$c->room})" : ''))
             ->values()
             ->all();
+
+        if ($place) {
+            $parts[] = "Others: {$place}";
+        }
 
         if ($other) {
             $parts[] = "Other: {$other}";

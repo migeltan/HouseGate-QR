@@ -17,7 +17,7 @@
 
         <div class="reg-field full">
             <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a
-                    single-building pass, or 2+ for North Gate Access (Multi-Access Pass))</span></label>
+                    single-building pass, or 2+ for a Gate 6 general pass)</span></label>
             <div class="reg-building-grid" id="regBuildingGrid">
                 @foreach ($buildings as $b)
                     <label class="reg-building-option">
@@ -29,19 +29,30 @@
                 @endforeach
             </div>
             <p class="reg-north-gate-hint" id="northGateHint">
-                2 or more buildings selected — this will be issued as a <strong>North Gate Access</strong> pass, valid
+                2 or more buildings selected — this will be issued as a <strong>Gate 6</strong> general pass, valid
                 at all selected buildings.
             </p>
         </div>
 
         {{-- Manual card pick: single building only. Unticked = auto-assign (lowest in-stock number), as before. --}}
         <div class="reg-field full hidden" id="manualCardField">
-            <label class="reg-dup-confirm">
-                <input type="checkbox" id="manualCardToggle" onchange="toggleManualCard(this.checked)">
-                <span>Choose a specific card <span class="optional">(instead of auto-assign)</span></span>
-            </label>
-            <select name="pass_id" id="manualCardSelect" class="hidden" style="margin-top:8px;" disabled></select>
-            <p class="reg-field-note" id="manualCardNote"></p>
+            <div class="reg-card-row">
+                <div class="reg-card-row-text">
+                    <span class="reg-card-row-label">Card</span>
+                    <span class="reg-card-row-value" id="manualCardSummary">Auto-assign (lowest available number)</span>
+                </div>
+                <button type="button" class="reg-card-row-btn" id="manualCardOpenBtn" onclick="toggleManualCard(true)">Choose a specific card</button>
+            </div>
+            <input type="checkbox" id="manualCardToggle" class="hidden" tabindex="-1" aria-hidden="true">
+            <div class="reg-card-picker hidden" id="manualCardPicker">
+                <div class="reg-card-picker-head">
+                    <input type="text" id="manualCardFilter" inputmode="numeric" autocomplete="off" placeholder="Find a number, e.g. 16" oninput="filterManualCards()">
+                    <button type="button" class="reg-card-row-btn is-quiet" onclick="toggleManualCard(false)">Use auto-assign instead</button>
+                </div>
+                <div class="reg-card-grid" id="manualCardGrid" aria-label="Cards in stock"></div>
+                <p class="reg-field-note" id="manualCardNote"></p>
+            </div>
+            <select name="pass_id" id="manualCardSelect" class="hidden" disabled></select>
         </div>
 
         <div class="reg-field full reg-pair-row">

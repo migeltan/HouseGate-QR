@@ -45,18 +45,20 @@
             $activeCount = $passStats[$b->id]['active'];
             $availableCount = $passStats[$b->id]['available'];
             $inactiveCount = $passStats[$b->id]['inactive'];
+            // Registry title only; passes, logs and cards just say "Gate 6".
+            $cardTitle = $b->code === 'NG' ? $b->name . ' (General Pass)' : $b->name;
         @endphp
-        <button type="button" data-building-id="{{ $b->id }}" onclick="openBuildingModal({{ $b->id }}, '{{ $b->name }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
+        <button type="button" data-building-id="{{ $b->id }}" onclick="openBuildingModal({{ $b->id }}, '{{ $cardTitle }}', '{{ $buildingColorNames[$b->code] ?? '' }}')"
             class="gov-building-card {{ $loop->count > 1 && $loop->last && $loop->count % 2 !== 0 ? 'md:col-span-2 md:max-w-[calc(50%-0.5rem)] md:mx-auto' : '' }}">
             <div class="gov-building-card-info">
-                <h3>{{ $b->name }}</h3>
+                <h3>{{ $cardTitle }}</h3>
 <p class="is-active"><b data-card-count="active">{{ $activeCount }}</b> Active Passes</p>
 <p class="is-available"><b data-card-count="available">{{ $availableCount }}</b> Available Passes</p>
                 <p class="is-inactive" title="Expired, revoked or on hold"><b data-card-count="inactive">{{ $inactiveCount }}</b> Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
                 <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.jpg')) }}"
-                     alt="{{ $b->name }}">
+                     alt="{{ $cardTitle }}">
             </div>
         </button>
     @endforeach
@@ -209,7 +211,7 @@
                 @endforeach
             </div>
             <label class="hold-label" for="holdNote">Note (optional)</label>
-            <input type="text" id="holdNote" name="hold_note" maxlength="255" autocomplete="off" class="hold-note" placeholder="e.g. last seen at the North Gate desk">
+            <input type="text" id="holdNote" name="hold_note" maxlength="255" autocomplete="off" class="hold-note" placeholder="e.g. last seen at the Gate 6 desk">
             <p class="hold-hint">A card on hold is never issued, not even automatically. Use "Back in stock" when it is found or fixed.</p>
             <p id="holdError" class="bp-qr-error hidden"></p>
         </div>

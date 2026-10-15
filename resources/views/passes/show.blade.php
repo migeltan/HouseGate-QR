@@ -16,7 +16,7 @@
 @endphp
 
 <div class="flex flex-col items-center gap-4">
-   <p class="gov-eyebrow">House of Representatives &middot; {{ $isMulti ? 'North Gate Access' : 'Visitor pass' }}</p>
+   <p class="gov-eyebrow">House of Representatives &middot; {{ $isMulti ? 'Gate 6' : 'Visitor pass' }}</p>
     <div class="flex justify-center">
         <div class="space-y-4">
             <div id="printablePassArea" class="pass-preview-card relative w-[300px] h-[500px] rounded-xl overflow-hidden"

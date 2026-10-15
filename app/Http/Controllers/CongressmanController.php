@@ -176,7 +176,7 @@ class CongressmanController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('congressmen', 'name')->ignore($ignore?->id)],
             'rep_type' => ['required', Rule::in(['District Representative', 'Party-list Representative'])],
             'rep_detail' => ['nullable', 'string', 'max:255'],
-            'building_id' => ['required', Rule::exists('buildings', 'id')->where(fn ($q) => $q->where('code', '!=', 'NG'))],
+            'building_id' => ['required', Rule::exists('buildings', 'id')->where(fn ($q) => $q->whereNotIn('code', ['NG', 'OTH']))],
             'floor' => ['nullable', 'integer', 'min:0', 'max:30'],
             'room' => ['nullable', 'string', 'max:30'],
             'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],

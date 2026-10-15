@@ -37,6 +37,7 @@ class PassesLive
         $issued = VisitorPass::query()->tap($scope)->max('issued_at');
 
         $buildings = Building::query()
+            ->withPool()
             ->when($guard, fn ($q) => $q->where('id', $desk))
             ->get(['id', 'code']);
 

@@ -15,7 +15,7 @@ class PassRegistration extends Model
     'registered_by', 'pass_class', 'expected_return_date',
         'registered_at', 'unassigned_at', 'unassign_reason','office_to_visit', 'office_other', 'contact_person', 'buildings_snapshot',
     'transferred_from_registration_id',
-    'id_held_building_id', 'id_returned_at', 'id_returned_by',
+    'id_held_building_id', 'id_returned_at', 'id_returned_by', 'others_place',
 ];
 
     protected $casts = [

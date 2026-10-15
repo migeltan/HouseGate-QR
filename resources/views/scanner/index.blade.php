@@ -56,6 +56,7 @@
                 <div id="reader" class="w-full h-full"></div>
                 <video id="securityCamVideo" autoplay playsinline muted class="hidden w-full h-full object-cover"></video>
                 <canvas id="securityCamCanvas" class="hidden"></canvas>
+                <span id="camStatePill" class="cam-state-pill" data-state="waiting" role="status" aria-live="polite">Waiting</span>
 
                 <div id="scanTargetOverlay" class="gov-scan-overlay hidden">
                     <span class="gov-scan-frame"></span>
@@ -692,6 +693,9 @@ function setCameraUI(active) {
         : '<i class="fa-solid fa-play"></i> Start Camera';
     btn.className = active ? 'gov-btn-camera is-recording' : 'gov-btn-camera';
     document.getElementById('camPlaceholder').classList.toggle('hidden', active);
+    const pill = document.getElementById('camStatePill');
+    pill.dataset.state = active ? 'live' : 'waiting';
+    pill.textContent = active ? '● Live' : 'Waiting';
     syncQrTemplate();
 }
 

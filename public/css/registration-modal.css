@@ -531,6 +531,125 @@
     cursor: pointer;
 }
 
+/* Step 3: card row (auto-assign by default, optional specific card) */
+.reg-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid #d7e0ee;
+    border-radius: 12px;
+    background: #fff;
+}
+.reg-card-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+.reg-card-row-label {
+    font:
+        700 0.72rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.reg-card-row-value {
+    font:
+        600 0.95rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #0f172a;
+}
+.reg-card-row-btn {
+    flex: none;
+    padding: 6px 14px;
+    border: 1px solid #245ba6;
+    border-radius: 9999px;
+    background: #fff;
+    color: #245ba6;
+    font:
+        700 0.8rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.reg-card-row-btn:hover {
+    background: #eef4fc;
+}
+.reg-card-row-btn.is-quiet {
+    border-color: transparent;
+    background: transparent;
+    color: #64748b;
+    text-decoration: underline;
+}
+.reg-card-row-btn.hidden {
+    display: none;
+}
+.reg-card-picker {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid #d7e0ee;
+    border-radius: 12px;
+    background: #f8fafd;
+}
+.reg-card-picker.hidden {
+    display: none;
+}
+.reg-card-picker-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.reg-card-picker-head input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.reg-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.6rem, 1fr));
+    gap: 6px;
+    max-height: 9.5rem;
+    overflow-y: auto;
+    padding: 2px;
+}
+.reg-card-chip {
+    padding: 6px 0;
+    border: 1px solid #cfd9e8;
+    border-radius: 8px;
+    background: #fff;
+    color: #1e293b;
+    font:
+        700 0.82rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.reg-card-chip:hover {
+    border-color: #245ba6;
+    background: #eef4fc;
+}
+.reg-card-chip.is-selected {
+    border-color: #245ba6;
+    background: #245ba6;
+    color: #fff;
+}
+.reg-card-chip[hidden] {
+    display: none;
+}
+.reg-card-row-btn:focus-visible,
+.reg-card-chip:focus-visible {
+    outline: 2px solid #245ba6;
+    outline-offset: 2px;
+}
+.reg-card-picker .reg-field-note {
+    margin-top: 8px;
+}
+
 #registerSubmitBtn:disabled {
     cursor: not-allowed;
 }
