@@ -20,6 +20,7 @@ class VisitorPass extends Model
     'registered_by', 'checked_in_at', 'last_egress_at',
     'egress_reminder_sent_on', 'expiry_reminder_sent_on',
     'holder_building_id',
+    'hold_reason', 'hold_note', 'hold_at', 'hold_by',
 ];
 
     protected $casts = [
@@ -30,13 +31,15 @@ class VisitorPass extends Model
         'last_egress_at' => 'datetime',
         'egress_reminder_sent_on' => 'date',
         'expiry_reminder_sent_on' => 'date',
+        'hold_at' => 'datetime',
     ];
 
     const MAX_LONG_TERM_DAYS = 7;          // calendar days from today (was 30 working days)
     const WORKING_WEEKDAYS = [1, 2, 3, 4]; // Mon–Thu, HOR's compressed 4-day week
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
     const MIN_DESK_STOCK = 50;             // each desk should physically hold at least this many blank cards
-    const DAY_PASS_CUTOFF = '19:00';     // day passes expire at the first 19:00 on/after issue
+    const HOLD_REASONS = ['missing' => 'Missing', 'damaged' => 'Damaged', 'other' => 'Other'];   // card on hold: never issued
+    const DAY_PASS_CUTOFF = '19:00';  // day passes expire at the first 19:00 on/after issue
 
     public function currentBuilding(): BelongsTo
     {
@@ -58,6 +61,7 @@ class VisitorPass extends Model
     public function scopeInStock(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->whereNull('visitor_name')
+            ->whereNull('hold_reason')
             ->whereColumn('holder_building_id', 'building_id');
     }
 

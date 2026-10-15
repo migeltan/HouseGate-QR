@@ -67,7 +67,7 @@ class PassController extends Controller
         // Inventory modal (admin only): stats + compact number ranges, not pass rows.
         $invData = [];
         if ($user->isAdmin()) {
-$nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building', 'status', 'pass_number', 'visitor_name', 'holder_building_id']);
+$nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building', 'status', 'pass_number', 'visitor_name', 'holder_building_id', 'hold_reason']);
             $toRanges = function ($list) {
                 $ranges = [];
                 foreach ($list->map(fn ($n) => (int) $n)->unique()->sort()->values() as $n) {
@@ -84,7 +84,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
                 $own = $nums->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'));
                 // Physical custody of blank cards: at this desk, in the vault (no desk), or held at another desk.
                 $blank   = $own->whereNull('visitor_name');
-                $atDesk  = $blank->filter(fn ($r) => (int) $r->holder_building_id === (int) $b->id);
+                $atDesk  = $blank->filter(fn ($r) => (int) $r->holder_building_id === (int) $b->id && $r->hold_reason === null);
                 $inVault = $blank->filter(fn ($r) => $r->holder_building_id === null);
                 $away    = $blank->filter(fn ($r) => $r->holder_building_id !== null && (int) $r->holder_building_id !== (int) $b->id);
 
@@ -488,6 +488,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
                 $pass = VisitorPass::where('building_id', $buildingId)
                     ->where('is_multi_building', false)
                     ->whereNull('visitor_name')
+                    ->whereNull('hold_reason')
                     ->whereNull('holder_building_id')
                     ->orderBy('pass_number')
                     ->lockForUpdate()

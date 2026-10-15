@@ -16,7 +16,7 @@ class PassesLive
      */
     public static function snapshot(): array
     {
-        $guard = auth()->user()->isGuard();
+        $guard = (bool) request()->user()?->isGuard();
         $desk = session('assigned_building_id');
 
         $scope = function ($query) use ($guard, $desk) {

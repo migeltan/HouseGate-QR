@@ -76,20 +76,25 @@
         <div class="px-10 pb-5">
 <div class="overflow-hidden rounded-xl border border-slate-300">
 <div class="max-h-[440px] overflow-auto">
-                    <table class="w-full min-w-[950px] border-collapse text-center text-xs">
+                    <table class="w-full border-collapse text-left text-xs" style="min-width: 960px;">
 <thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
                             <tr>
-                                <th class="py-3 px-4 font-bold">Timestamp</th>
-                                <th class="py-3 px-4 font-bold">Visitor</th>
-                                <th class="py-3 px-4 font-bold">Contact person</th>
-                                <th class="py-3 px-4 font-bold">Pass #</th>
-                                <th class="py-3 px-4 font-bold">Scanned at</th>
-                                <th class="py-3 px-4 font-bold">Result</th>
-                                <th class="py-3 px-4 font-bold">Reason</th>
+                            <th class="py-3 px-4 font-bold text-center">Photo</th>
+                            <th class="py-3 px-4 font-bold">Timestamp</th>
+                            <th class="py-3 px-4 font-bold">Visitor</th>
+                            <th class="py-3 px-4 font-bold">Pass # / Scanned at</th>
+                            <th class="py-3 px-4 font-bold text-center">Result</th>
+                            <th class="py-3 px-4 font-bold">Reason</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @forelse ($logs as $l)
+                            @php
+                                // Photo files can be deleted later; only show the ones that still exist.
+                                $scanPhotoPath = $l->verificationPhoto?->photo_path;
+                                $scanPhotoOk = $scanPhotoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($scanPhotoPath);
+                                $scanPhotoGone = $scanPhotoPath && ! $scanPhotoOk;
+                            @endphp
                             <tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60" data-log-id="{{ $l->id }}"
                                     data-type="scan"
                                     data-timestamp="{{ $l->created_at->format('Y-m-d h:i:s A') }}"
@@ -99,14 +104,51 @@
                                     data-scanned-at="{{ $l->scannedBuilding->name ?? '' }}"
                                     data-result="{{ ucfirst(strtolower($l->result)) }}"
                                     data-reason="{{ $l->reason }}"
-                                    data-photo="{{ $l->verificationPhoto ? \Illuminate\Support\Facades\Storage::disk('public')->url($l->verificationPhoto->photo_path) : '' }}"
+                                    data-photo="{{ $scanPhotoOk ? asset('storage/' . $scanPhotoPath) : '' }}"
                                     onclick="openRowModal(this)">
-                                    <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $l->created_at->format('Y-m-d h:i:s A') }}</td>
-                                    <td class="py-3 px-4 font-semibold text-slate-900 whitespace-nowrap">{{ $l->visitor_name_snapshot }}</td>
-                                    <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->contact_person_snapshot ?? '—' }}</td>
-                                    <td class="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ $l->pass_number_snapshot }}</td>
-                                    <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $l->scannedBuilding->name ?? '' }}</td>
+                                    {{-- Photo --}}
                                     <td class="py-3 px-4">
+                                        <div class="flex items-center justify-center">
+                                            @if ($scanPhotoOk)
+                                                <img src="{{ asset('storage/' . $scanPhotoPath) }}" alt="Verification photo" loading="lazy" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                            @elseif ($scanPhotoGone)
+                                                <span class="text-[11px] text-slate-400" title="Photo no longer on disk">Removed</span>
+                                            @else
+                                                <span class="text-slate-300">—</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    {{-- Timestamp + direction --}}
+                                    <td class="py-3 px-4 whitespace-nowrap">
+                                        <div class="reg-cell-stack">
+                                            <span class="font-mono text-slate-700">{{ $l->created_at->format('Y-m-d h:i:s A') }}</span>
+                                            @if ($l->direction === 'in')
+                                                <span class="reg-sub"><i class="fa-solid fa-right-to-bracket"></i> Entry</span>
+                                            @elseif ($l->direction === 'out')
+                                                <span class="reg-sub"><i class="fa-solid fa-right-from-bracket"></i> Exit</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    {{-- Visitor + contact person --}}
+                                    <td class="py-3 px-4 whitespace-nowrap">
+                                        <div class="reg-cell-stack">
+                                            <span class="font-semibold text-slate-900">{{ $l->visitor_name_snapshot ?: '—' }}</span>
+                                            @if ($l->contact_person_snapshot)
+                                                <span class="reg-sub"><i class="fa-solid fa-user"></i> {{ $l->contact_person_snapshot }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    {{-- Pass # + building scanned at --}}
+                                    <td class="py-3 px-4 whitespace-nowrap">
+                                        <div class="reg-cell-stack">
+                                            <span class="font-mono font-semibold text-slate-800">{{ $l->pass_number_snapshot ?: '—' }}</span>
+                                            @if ($l->scannedBuilding)
+                                                <span class="reg-sub">{{ $l->scannedBuilding->name }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    {{-- Result --}}
+                                    <td class="py-3 px-4 text-center whitespace-nowrap">
                                         <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold
                                             {{ match($l->result) {
                                                 'AUTHORIZED' => 'bg-emerald-100 text-emerald-700',
@@ -118,10 +160,13 @@
                                             {{ ucfirst(strtolower($l->result)) }}
                                         </span>
                                     </td>
-<td class="py-3 px-4 text-left text-slate-600 truncate max-w-[320px]" title="{{ $l->reason }}">{{ $l->reason }}</td>
+                                    {{-- Reason --}}
+                                    <td class="py-3 px-4 text-slate-600" style="max-width: 320px;">
+                                        <span class="reg-clamp" title="{{ $l->reason }}">{{ $l->reason }}</span>
+                                    </td>
                                 </tr>
                             @empty
-<tr><td colspan="7" class="py-14 text-center">
+<tr><td colspan="6" class="py-14 text-center">
     <i class="fa-solid fa-clipboard-list text-2xl text-slate-300"></i>
     <p class="mt-2 text-sm font-semibold text-slate-600">No scan events found</p>
     <p class="text-xs text-slate-400">Try adjusting your search or filters.</p>
@@ -132,7 +177,7 @@
                 </div>
             </div>
         </div>
-
+        
         {{-- Footer: page count + export / purge --}}
         <div class="flex flex-col gap-3 bg-white px-10 pb-5 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm text-slate-500">

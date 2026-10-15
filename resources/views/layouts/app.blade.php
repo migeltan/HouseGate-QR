@@ -559,6 +559,17 @@ document.addEventListener('submit', async (e) => {
         </script>
     @endauth
 
+    {{-- App-wide static-asset cache (css/js/fonts/images only). See public/app-sw.js. --}}
+    @auth
+        <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(@json(parse_url(asset('app-sw.js'), PHP_URL_PATH))).catch(() => {});
+            });
+        }
+        </script>
+    @endauth
+
     @yield('scripts')
 
 </body>

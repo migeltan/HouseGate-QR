@@ -143,7 +143,11 @@ $reason = "Building Mismatch - Pass is only authorized for {$authorizedBuildingN
         // actual movements and would just clutter the timeline.
         $recentActivity = [];
         if ($pass && $pass->status !== 'available') {
+            // The card is reused by many visitors: only count scans since its current (latest) registration began.
+            $activitySince = $pass->registrations()->latest('registered_at')->value('registered_at');
+
             $recentActivity = ScanLog::where('visitor_pass_id', $pass->id)
+                ->when($activitySince, fn ($q) => $q->where('created_at', '>=', $activitySince))
                 ->where('result', 'AUTHORIZED')
                 ->with('scannedBuilding')
                 ->latest()
