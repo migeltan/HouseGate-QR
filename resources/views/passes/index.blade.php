@@ -65,9 +65,74 @@
             hint.classList.toggle('is-active', checked >= 2);
 
             refreshCongPicker(); // also re-evaluates the submit button
+            refreshManualCard();
         }
 
         // ---- Congressman picker (filtered by the ticked building(s)) ----
+        // ---- Manual card pick (single building only). Unticked = auto-assign, exactly as before. ----
+        const MANUAL_CARDS_BASE = @json(url('/passes/building'));
+        let manualCardSeq = 0;
+
+        // Ticked but no card chosen yet: the form must not fall back to auto-assign by accident.
+        function manualCardPending() {
+            if (!document.getElementById('manualCardToggle').checked || checkedBuildingIds().length !== 1) return false;
+            const sel = document.getElementById('manualCardSelect');
+            return sel.disabled || !sel.value;
+        }
+
+        function resetManualCard() {
+            manualCardSeq++;   // drop any request still in flight
+            document.getElementById('manualCardToggle').checked = false;
+            const sel = document.getElementById('manualCardSelect');
+            sel.replaceChildren();
+            sel.disabled = true;
+            sel.classList.add('hidden');
+            document.getElementById('manualCardNote').textContent = '';
+        }
+
+        function refreshManualCard() {
+            const ids = checkedBuildingIds();
+            document.getElementById('manualCardField').classList.toggle('hidden', ids.length !== 1);
+            if (ids.length !== 1) { resetManualCard(); return; }
+            if (document.getElementById('manualCardToggle').checked) loadManualCards(ids[0]);
+        }
+
+        function toggleManualCard(on) {
+            if (!on) { resetManualCard(); refreshSubmitState(); return; }
+            loadManualCards(checkedBuildingIds()[0]);
+        }
+
+        async function loadManualCards(buildingId) {
+            const seq = ++manualCardSeq;
+            const sel = document.getElementById('manualCardSelect');
+            const note = document.getElementById('manualCardNote');
+            sel.replaceChildren(new Option('Loading cards…', ''));
+            sel.disabled = true;
+            sel.classList.remove('hidden');
+            note.textContent = '';
+            refreshSubmitState();
+            try {
+                const res = await fetch(`${MANUAL_CARDS_BASE}/${buildingId}/stock`, {
+                    headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (seq !== manualCardSeq) return;
+                sel.replaceChildren(new Option('Choose a card…', ''), ...data.cards.map(c => new Option('#' + c.number, c.id)));
+                sel.disabled = data.cards.length === 0;
+                note.textContent = data.cards.length
+                    ? `${data.cards.length} card${data.cards.length === 1 ? '' : 's'} in stock at this desk. Pick the one you are physically handing over.`
+                    : 'No cards in stock at this desk. Ask an admin to allocate more cards.';
+            } catch (e) {
+                if (seq !== manualCardSeq) return;
+                sel.replaceChildren(new Option('Could not load cards', ''));
+                sel.disabled = true;
+                note.textContent = 'Could not load the card list. Untick the option to auto-assign, or try again.';
+            }
+            refreshSubmitState();
+        }
+        // ---- End manual card pick ----
+
         const CONGRESSMEN = @json($roster);
         const BUILDING_NAMES = @json($buildings->pluck('name', 'id'));
         const selectedCong = new Map();
@@ -967,6 +1032,7 @@
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) return false;
             if (selectedCong.size === 0 && !v('office_other')) return false;
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) return false;
+            if (manualCardPending()) return false;
             return true;
         }
 
@@ -979,6 +1045,7 @@
             if (selectedCong.size === 0 && !v('office_other')) out.push('congressman or “Other”');
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) out.push('reason');
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) out.push('return date');
+            if (manualCardPending()) out.push('a card');
             return out;
         }
 

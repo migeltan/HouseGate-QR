@@ -3,14 +3,18 @@
      Expects: $p (VisitorPass with building + buildings), $allBuildingsCount --}}
 @php
     $cardColor = $p->is_multi_building ? 'var(--badge-multi)' : $p->building->color_hex;
-    $searchText = strtolower($p->pass_number . ' ' . ($p->visitor_name ?? 'unassigned'));
+    $searchText = strtolower($p->pass_number . ' ' . ($p->visitor_name ?? 'unassigned') . ($p->hold_reason ? ' hold on-hold ' . $p->hold_reason . ' ' . $p->hold_note : ''));
+    $status = $p->displayStatus();   // 'hold' when the card is on hold
     $badgeMap = [
         'active'    => ['is-active', 'Active'],
         'available' => ['is-available', 'Available'],
         'expired'   => ['is-expired', 'Expired'],
         'revoked'   => ['is-revoked', 'Revoked'],
+        'hold'      => ['is-hold', 'On hold'],
     ];
-    [$badgeClass, $badgeLabel] = $badgeMap[$p->status] ?? ['is-available', 'Available'];
+    [$badgeClass, $badgeLabel] = $badgeMap[$status] ?? ['is-available', 'Available'];
+    $holdLabel = $p->hold_reason ? (\App\Models\VisitorPass::HOLD_REASONS[$p->hold_reason] ?? 'Other') : null;
+    if ($holdLabel) { $badgeLabel = 'On hold · ' . $holdLabel; }
     $infoPayload = [
         'pass_number' => $p->pass_number,
         'status' => $p->status,
@@ -34,7 +38,7 @@
         'id_photo_url' => $p->id_photo_path ? asset('storage/' . $p->id_photo_path) : null,
     ];
 @endphp
-<div class="gov-pass-card" data-pass-id="{{ $p->id }}" data-status="{{ $p->status }}" data-search="{{ $searchText }}">
+<div class="gov-pass-card" data-pass-id="{{ $p->id }}" data-status="{{ $status }}" data-search="{{ $searchText }}">
     <div class="gov-pass-card-info">
         <span class="gov-pass-card-number">#{{ $p->pass_number }}</span>
         <div class="gov-pass-card-details">
@@ -57,7 +61,12 @@
                     </div>
                 @endif
             @else
-                <span class="gov-pass-card-unassigned">Unassigned</span>
+                @if ($p->hold_reason)
+                    <span class="gov-pass-card-unassigned">On hold</span>
+                    <div class="gov-pass-card-meta">{{ $p->hold_note ?: 'No note' }} · {{ $p->hold_by ?? '—' }}{{ $p->hold_at ? ', ' . $p->hold_at->format('M j, g:i A') : '' }}</div>
+                @else
+                    <span class="gov-pass-card-unassigned">Unassigned</span>
+                @endif
             @endif
         </div>
     </div>
@@ -91,6 +100,19 @@
                 <button type="button" class="gov-pass-row-btn is-ghost" data-pass-number="{{ $p->pass_number }}" onclick='openPassInfoModal(@json($infoPayload))'><i class="fa-solid fa-circle-info"></i> View Info</button>
             @else
                 <button type="button" class="gov-pass-row-btn is-ghost" data-qr-url="{{ route('passes.show', $p) }}" data-pass-number="{{ $p->pass_number }}" onclick="openPassQrModal(this)"><i class="fa-solid fa-qrcode"></i> View QR</button>
+                @if ($p->hold_reason)
+                <form method="POST" action="{{ route('passes.release-hold', $p) }}" data-inplace
+                    data-confirm data-confirm-tone="warning"
+                    data-confirm-title="Put this card back in stock?"
+                    data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $holdLabel }}"
+                    data-confirm-message="It can be issued again from the next registration."
+                    data-confirm-label="Back in stock">
+                    @csrf
+                    <button type="submit" class="gov-pass-row-btn is-ghost is-warn"><i class="fa-solid fa-rotate-left"></i> Back in stock</button>
+                </form>
+                @elseif ($p->status === 'available')
+                <button type="button" class="gov-pass-row-btn is-ghost is-warn" data-hold-url="{{ route('passes.hold', $p) }}" data-pass-number="{{ $p->pass_number }}" onclick="openHoldModal(this)"><i class="fa-solid fa-flag"></i> Hold</button>
+                @endif
             @endif
         </div>
     </div>

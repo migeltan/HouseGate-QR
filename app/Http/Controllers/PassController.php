@@ -42,11 +42,11 @@ class PassController extends Controller
 
         // Card counts + inventory stats: one grouped query, no pass rows loaded.
         $statRows = VisitorPass::query()
-            ->selectRaw('building_id, is_multi_building, status, COUNT(*) as n')
+            ->selectRaw('building_id, is_multi_building, ' . VisitorPass::BUCKET_SQL . ' as bucket, COUNT(*) as n')
             ->when($user->isGuard(), fn ($q) => $q
                 ->where('building_id', session('assigned_building_id'))
                 ->where('is_multi_building', false))
-            ->groupBy('building_id', 'is_multi_building', 'status')
+            ->groupBy('building_id', 'is_multi_building', 'bucket')
             ->toBase()
             ->get();
 
@@ -59,7 +59,7 @@ class PassController extends Controller
             return [$b->id => [
                 'available' => (int) ($by['available'] ?? 0),
                 'active'    => (int) ($by['active'] ?? 0),
-                'inactive'  => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0)),
+                'inactive'  => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0) + ($by['hold'] ?? 0)),
                 'total'     => (int) $by->sum(),
             ]];
         });
@@ -90,7 +90,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
                 $invData[$b->id] = $passStats[$b->id] + [
                     'all'   => $toRanges($own->pluck('pass_number')),
-                    'avail' => $toRanges($own->where('status', 'available')->pluck('pass_number')),
+                    'avail' => $toRanges($own->where('status', 'available')->filter(fn ($r) => $r->hold_reason === null)->pluck('pass_number')),
                     'stock' => $toRanges($atDesk->pluck('pass_number')),
                     'vault' => $toRanges($inVault->pluck('pass_number')),
                     'away'  => $away->count(),
@@ -147,6 +147,25 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
+    /** In-stock cards at one desk (blank, not on hold, physically there): feeds the registration "choose a card" list. */
+    public function stockCards(Request $request, Building $building)
+    {
+        if ($request->user()->isGuard() && (int) $building->id !== (int) session('assigned_building_id')) {
+            abort(403);
+        }
+        abort_if($building->code === 'NG', 404);
+
+        $cards = VisitorPass::where('building_id', $building->id)
+            ->where('is_multi_building', false)
+            ->inStock()
+            ->orderBy('pass_number')
+            ->get(['id', 'pass_number']);
+
+        return response()->json([
+            'cards' => $cards->map(fn ($c) => ['id' => $c->id, 'number' => $c->pass_number])->values(),
+        ]);
+    }
+
     public function register(Request $request)
     {
         // Guard can never submit a different building or trigger multi —
@@ -176,6 +195,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             'expected_return_date' => 'required_if:pass_class,long_term|nullable|date|after:today',
             'building_ids' => 'required|array|min:1',
             'building_ids.*' => 'exists:buildings,id',
+            'pass_id' => 'nullable|integer',   // optional: a specific in-stock card instead of auto-assign
         ]);
 
         // Registered by is always the signed-in account; whatever the form sent is ignored.
@@ -246,6 +266,10 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
         if (count($data['building_ids']) > 1) {
             abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a North Gate Access (multi-building) pass.');
+        }
+
+        if (! empty($data['pass_id']) && count($data['building_ids']) !== 1) {
+            throw ValidationException::withMessages(['register' => 'A specific card can only be chosen for a single-building pass.']);
         }
 
                 // Building lock: every chosen congressman must sit in one of the submitted
@@ -475,6 +499,23 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         // same moment waits here, then re-runs the query and gets the next free card instead of
         // overwriting this visitor's record.
         [$pass, $transferred] = DB::transaction(function () use ($buildingId, $data, $request) {
+            // Manual pick: the guard chose this exact card. Re-checked under the lock: it must still be a blank,
+            // unflagged card sitting at this desk. It is never silently swapped for a different card.
+            if (! empty($data['pass_id'])) {
+                $chosen = VisitorPass::whereKey($data['pass_id'])
+                    ->where('building_id', $buildingId)
+                    ->where('is_multi_building', false)
+                    ->inStock()
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $chosen) {
+                    throw ValidationException::withMessages(['register' => 'That card is no longer available: it was just issued, is on hold, or is not at this desk. Pick another card, or untick the option to auto-assign.']);
+                }
+
+                return [$chosen, $this->assignVisitorToPass($chosen, $data, $request)];
+            }
+
             // Only cards physically at this building's desk are issuable (holder == home building).
             $pass = VisitorPass::where('building_id', $buildingId)
                 ->where('is_multi_building', false)
@@ -852,6 +893,75 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} revoked.");
     }
 
+    /**
+     * Put a BLANK card on hold (missing / damaged / other) so it is never issued, until it is
+     * released. An issued card is unassigned first; a visitor's lost card is a Revoke, not a hold.
+     */
+    public function hold(Request $request, VisitorPass $pass)
+    {
+        $this->authorizeGuardScope($request, $pass);
+
+        $data = $request->validate([
+            'hold_reason' => 'required|in:' . implode(',', array_keys(VisitorPass::HOLD_REASONS)),
+            'hold_note'   => 'nullable|string|max:255',
+        ]);
+
+        $problem = DB::transaction(function () use ($pass, $data, $request) {
+            $this->lockFresh($pass);
+
+            if ($pass->visitor_name !== null || $pass->status !== 'available') {
+                return "Pass #{$pass->pass_number} is issued to a visitor. Unassign it first, then put it on hold.";
+            }
+            if ($pass->hold_reason !== null) {
+                return "Pass #{$pass->pass_number} is already on hold.";
+            }
+
+            $pass->update([
+                'hold_reason' => $data['hold_reason'],
+                'hold_note'   => filled($data['hold_note'] ?? null) ? trim($data['hold_note']) : null,
+                'hold_at'     => now(),
+                'hold_by'     => $request->user()->name,
+            ]);
+
+            return null;
+        });
+
+        if ($problem) {
+            return $this->passActionResponse($request, $pass, $problem, false, 409);
+        }
+
+        $label = VisitorPass::HOLD_REASONS[$data['hold_reason']];
+        AdminLog::record('pass.flagged', null, "Pass #{$pass->pass_number} put on hold: {$label}." . ($pass->hold_note ? " Note: {$pass->hold_note}" : ''));
+
+        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} is on hold ({$label}) and will not be issued.");
+    }
+
+    /** The card is found / repaired: it goes back into normal stock. */
+    public function releaseHold(Request $request, VisitorPass $pass)
+    {
+        $this->authorizeGuardScope($request, $pass);
+
+        $wasOnHold = DB::transaction(function () use ($pass) {
+            $this->lockFresh($pass);
+
+            if ($pass->hold_reason === null) {
+                return false;
+            }
+
+            $pass->update(['hold_reason' => null, 'hold_note' => null, 'hold_at' => null, 'hold_by' => null]);
+
+            return true;
+        });
+
+        if (! $wasOnHold) {
+            return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} is not on hold.", false, 409);
+        }
+
+        AdminLog::record('pass.flag_cleared', null, "Pass #{$pass->pass_number} is back in stock.");
+
+        return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} is back in stock.");
+    }
+
     /** Re-read the pass under a row lock so two screens can't both act on stale state. */
     private function lockFresh(VisitorPass $pass): void
     {
@@ -866,15 +976,15 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
     {
         $by = VisitorPass::where('building_id', $pass->building_id)
             ->where('is_multi_building', $pass->is_multi_building)
-            ->selectRaw('status, COUNT(*) as n')
-            ->groupBy('status')
-            ->pluck('n', 'status');
+            ->selectRaw(VisitorPass::BUCKET_SQL . ' as bucket, COUNT(*) as n')
+            ->groupBy('bucket')
+            ->pluck('n', 'bucket');
 
         return [
             'building_id' => $pass->building_id,
             'available'   => (int) ($by['available'] ?? 0),
             'active'      => (int) ($by['active'] ?? 0),
-            'inactive'    => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0)),
+            'inactive'    => (int) (($by['expired'] ?? 0) + ($by['revoked'] ?? 0) + ($by['hold'] ?? 0)),
             'total'       => (int) $by->sum(),
         ];
     }
@@ -906,7 +1016,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         return [
             'pass_id'     => $pass->id,
             'pass_number' => (int) $pass->pass_number,
-            'status'      => $pass->status,
+            'status'      => $pass->displayStatus(),
             'row'         => view('passes._pass-row', [
                 'p' => $pass,
                 'allBuildingsCount' => Building::where('code', '!=', 'NG')->count(),

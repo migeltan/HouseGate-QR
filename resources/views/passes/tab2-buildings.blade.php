@@ -52,7 +52,7 @@
                 <h3>{{ $b->name }}</h3>
 <p class="is-active"><b data-card-count="active">{{ $activeCount }}</b> Active Passes</p>
 <p class="is-available"><b data-card-count="available">{{ $availableCount }}</b> Available Passes</p>
-                <p class="is-inactive" title="Expired or revoked"><b data-card-count="inactive">{{ $inactiveCount }}</b> Inactive Passes</p>
+                <p class="is-inactive" title="Expired, revoked or on hold"><b data-card-count="inactive">{{ $inactiveCount }}</b> Inactive Passes</p>
             </div>
             <div class="gov-building-card-photo">
                 <img src="{{ asset('images/buildings/' . ($buildingImages[$b->code] ?? 'main.jpg')) }}"
@@ -86,6 +86,7 @@
                     <button type="button" onclick="filterModalPasses('available')" class="modal-filter-pill" data-filter="available">Available <span class="bp-count" data-count="available">0</span></button>
                     <button type="button" onclick="filterModalPasses('active')" class="modal-filter-pill" data-filter="active">Active <span class="bp-count" data-count="active">0</span></button>
                     <button type="button" onclick="filterModalPasses('inactive')" class="modal-filter-pill" data-filter="inactive">Inactive <span class="bp-count" data-count="inactive">0</span></button>
+                    <button type="button" onclick="filterModalPasses('hold')" class="modal-filter-pill" data-filter="hold">On hold <span class="bp-count" data-count="hold">0</span></button>
                 </div>
                 <div class="flex items-center gap-3">
                     <span id="buildingModalShowing" class="bp-showing"></span>
@@ -183,6 +184,41 @@
             <button type="button" class="gov-btn-glass-outline" onclick="closePassQrModal()">Close</button>
         </div>
     </div>
+</div>
+
+{{-- Put a blank card on hold (missing / damaged / other). Opened by the row's "Hold" button. --}}
+<div id="passHoldModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="passHoldTitle">
+    <form id="passHoldForm" class="bp-modal-panel bp-hold-panel" onsubmit="submitHold(event)">
+        @csrf
+        <div class="bp-modal-head">
+            <div class="flex items-center gap-3 min-w-0">
+                <i class="fa-solid fa-flag bp-header-icon"></i>
+                <div class="min-w-0">
+                    <span class="bp-eyebrow">Put card on hold</span>
+                    <h3 id="passHoldTitle" class="gov-pass-modal-title"></h3>
+                </div>
+            </div>
+            <button type="button" class="reg-close-button" aria-label="Close" onclick="closeHoldModal()">&times;</button>
+        </div>
+
+        <div class="bp-modal-body">
+            <span class="hold-label">Why is it unavailable?</span>
+            <div class="hold-opts">
+                @foreach (\App\Models\VisitorPass::HOLD_REASONS as $key => $label)
+                    <label class="hold-opt"><input type="radio" name="hold_reason" value="{{ $key }}" {{ $loop->first ? 'checked' : '' }}><span>{{ $label }}</span></label>
+                @endforeach
+            </div>
+            <label class="hold-label" for="holdNote">Note (optional)</label>
+            <input type="text" id="holdNote" name="hold_note" maxlength="255" autocomplete="off" class="hold-note" placeholder="e.g. last seen at the North Gate desk">
+            <p class="hold-hint">A card on hold is never issued, not even automatically. Use "Back in stock" when it is found or fixed.</p>
+            <p id="holdError" class="bp-qr-error hidden"></p>
+        </div>
+
+        <div class="bp-modal-foot">
+            <button type="button" class="gov-btn-glass-outline" onclick="closeHoldModal()">Cancel</button>
+            <button type="submit" id="holdSubmit" class="gov-btn-camera"><i class="fa-solid fa-flag"></i> Put on hold</button>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -453,16 +489,17 @@ function applyModalFilters() {
     document.getElementById('buildingModalSearchClear').classList.toggle('hidden', !searchInput.value);
 
     const rows = visibleGroup.querySelectorAll('.gov-pass-card');
-    const counts = { all: rows.length, available: 0, active: 0, inactive: 0 };
+    const counts = { all: rows.length, available: 0, active: 0, inactive: 0, hold: 0 };
     let shown = 0;
 
     rows.forEach(row => {
         const status = row.dataset.status;
         if (status === 'available') counts.available++;
         else if (status === 'active') counts.active++;
-        else if (status === 'expired' || status === 'revoked') counts.inactive++;
+        else if (status === 'expired' || status === 'revoked' || status === 'hold') counts.inactive++;
+        if (status === 'hold') counts.hold++;
 
-        const matchesStatus = currentModalFilter === 'all' || (currentModalFilter === 'inactive' ? ['expired', 'revoked'].includes(status) : status === currentModalFilter);
+        const matchesStatus = currentModalFilter === 'all' || (currentModalFilter === 'inactive' ? ['expired', 'revoked', 'hold'].includes(status) : status === currentModalFilter);
         const matchesSearch = !query || (row.dataset.search || '').includes(query);
         const show = matchesStatus && matchesSearch;
         row.style.display = show ? '' : 'none';
@@ -572,6 +609,65 @@ function applyPassPayload(p) {
     applyModalFilters();   // pill counts, "Showing x of y", keeps active filter + search
 }
 // ---- End in-place Unassign / Revoke ----
+
+// ---- Put a blank card on hold ----
+let holdUrl = null;
+
+function openHoldModal(btn) {
+    holdUrl = btn.dataset.holdUrl;
+    document.getElementById('passHoldTitle').textContent = `Pass #${btn.dataset.passNumber}`;
+    document.getElementById('holdNote').value = '';
+    document.querySelector('#passHoldForm input[name="hold_reason"]').checked = true;   // first option = Missing
+    document.getElementById('holdError').classList.add('hidden');
+    document.getElementById('holdSubmit').disabled = false;
+    document.getElementById('passHoldModal').classList.remove('hidden');
+    document.getElementById('holdNote').focus();
+}
+
+function closeHoldModal() {
+    holdUrl = null;
+    document.getElementById('passHoldModal').classList.add('hidden');
+}
+
+async function submitHold(e) {
+    e.preventDefault();
+    const btn = document.getElementById('holdSubmit');
+    const err = document.getElementById('holdError');
+    if (btn.disabled || !holdUrl) return;
+    btn.disabled = true;
+    err.classList.add('hidden');
+    try {
+        const res = await fetch(holdUrl, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(e.target),                 // includes @csrf token + reason + note
+            credentials: 'same-origin',
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+
+        if (data && data.row) applyPassPayload(data);      // fresh row also on "already done" (409)
+
+        if (res.ok && data && data.ok) {
+            closeHoldModal();
+            showToast(data.message, 'success');
+        } else if (data && data.row) {
+            closeHoldModal();
+            showToast(data.message, 'error', 'Already Updated');
+        } else {
+            err.textContent = data?.message || (res.status === 419 ? 'Your session expired. Reload the page and try again.'
+                : res.status === 403 ? 'You are not allowed to do that.'
+                : 'Something went wrong. Please try again.');
+            err.classList.remove('hidden');
+        }
+    } catch (_) {
+        err.textContent = 'Network error. Nothing was changed.';
+        err.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+    }
+}
+// ---- End put a blank card on hold ----
 
 // ---- Live updates (window.hgLive in layouts/app.blade.php) ----
 // Card counts follow the server. An open building window re-fetches its rows in place; closed windows

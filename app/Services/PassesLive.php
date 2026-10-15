@@ -26,9 +26,9 @@ class PassesLive
         };
 
         $rows = VisitorPass::query()
-            ->selectRaw('building_id, is_multi_building, status, COUNT(*) as n')
+            ->selectRaw('building_id, is_multi_building, ' . VisitorPass::BUCKET_SQL . ' as bucket, COUNT(*) as n')
             ->tap($scope)
-            ->groupBy('building_id', 'is_multi_building', 'status')
+            ->groupBy('building_id', 'is_multi_building', 'bucket')
             ->toBase()
             ->get();
 
@@ -44,7 +44,7 @@ class PassesLive
         foreach ($buildings as $b) {
             $by = $rows
                 ->filter(fn ($r) => (int) $r->building_id === (int) $b->id && (bool) $r->is_multi_building === ($b->code === 'NG'))
-                ->pluck('n', 'status');
+                ->pluck('n', 'bucket');
 
             $counts[$b->id] = [
                 'available' => (int) ($by['available'] ?? 0),

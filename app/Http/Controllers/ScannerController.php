@@ -91,7 +91,9 @@ class ScannerController extends Controller
             if ($pass->status === 'available') {
                 // Card exists but nobody holds it: never approve, never check in/out.
                 $result = 'UNASSIGNED';
-                $reason = 'Card recognized, but no person is currently assigned to it.';
+                $reason = $pass->hold_reason
+                    ? 'Card is marked ' . strtoupper($pass->hold_reason) . ' and was not supposed to be in use. Hand it to a supervisor.'
+                    : 'Card recognized, but no person is currently assigned to it.';
                 $visitorName = 'No person assigned';
             } elseif ($pass->status === 'expired') {
                 $result = 'EXPIRED';

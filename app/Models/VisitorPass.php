@@ -39,6 +39,8 @@ class VisitorPass extends Model
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
     const MIN_DESK_STOCK = 50;             // each desk should physically hold at least this many blank cards
     const HOLD_REASONS = ['missing' => 'Missing', 'damaged' => 'Damaged', 'other' => 'Other'];   // card on hold: never issued
+    // Status bucket for counts: a card on hold counts as 'hold' whatever its stored status (portable SQL).
+    const BUCKET_SQL = "CASE WHEN hold_reason IS NULL THEN status ELSE 'hold' END";
     const DAY_PASS_CUTOFF = '19:00';  // day passes expire at the first 19:00 on/after issue
 
     public function currentBuilding(): BelongsTo
@@ -63,6 +65,12 @@ class VisitorPass extends Model
         return $query->whereNull('visitor_name')
             ->whereNull('hold_reason')
             ->whereColumn('holder_building_id', 'building_id');
+    }
+
+    /** Status as the Passes screen shows it: a card on hold is 'hold', whatever its stored status. */
+    public function displayStatus(): string
+    {
+        return $this->hold_reason ? 'hold' : $this->status;
     }
 
     public function scanLogs(): HasMany

@@ -34,6 +34,16 @@
             </p>
         </div>
 
+        {{-- Manual card pick: single building only. Unticked = auto-assign (lowest in-stock number), as before. --}}
+        <div class="reg-field full hidden" id="manualCardField">
+            <label class="reg-dup-confirm">
+                <input type="checkbox" id="manualCardToggle" onchange="toggleManualCard(this.checked)">
+                <span>Choose a specific card <span class="optional">(instead of auto-assign)</span></span>
+            </label>
+            <select name="pass_id" id="manualCardSelect" class="hidden" style="margin-top:8px;" disabled></select>
+            <p class="reg-field-note" id="manualCardNote"></p>
+        </div>
+
         <div class="reg-field full reg-pair-row">
             <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen
                     from the selected building(s) are listed)</span></label>

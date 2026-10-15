@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/passes/check-duplicate', [PassController::class, 'checkDuplicate'])->name('passes.check-duplicate');
         Route::get('/passes/lookup-transfer-source', [PassController::class, 'lookupTransferSource'])->name('passes.lookup-transfer-source');
         Route::get('/passes/building/{building}/rows', [PassController::class, 'buildingRows'])->name('passes.building.rows');
+        Route::get('/passes/building/{building}/stock', [PassController::class, 'stockCards'])->name('passes.building.stock');
         Route::post('/passes/register', [PassController::class, 'register'])->name('passes.register');
         Route::get('/passes/{pass}', [PassController::class, 'show'])->name('passes.show');
         Route::put('/passes/{pass}/buildings', [PassController::class, 'updateBuildings'])->name('passes.buildings.update');
@@ -50,6 +51,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/passes/{pass}/receive', [PassController::class, 'receiveBack'])->name('passes.receive');
         Route::post('/pass-registrations/{registration}/id-returned', [PassController::class, 'idReturned'])->name('passes.id-returned');
         Route::post('/passes/{pass}/revoke', [PassController::class, 'revoke'])->name('passes.revoke');
+        Route::post('/passes/{pass}/hold', [PassController::class, 'hold'])->name('passes.hold');
+        Route::post('/passes/{pass}/release-hold', [PassController::class, 'releaseHold'])->name('passes.release-hold');
         Route::get('/live/pulse', [LivePulseController::class, 'pulse'])->middleware('throttle:120,1')->name('live.pulse');
         Route::get('/account', [AccountController::class, 'show'])->name('account.edit');
         Route::get('/account/log', [AccountController::class, 'log'])->middleware('admin')->name('account.log');

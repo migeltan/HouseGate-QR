@@ -342,7 +342,7 @@ document.addEventListener('submit', async (e) => {
     // space-y-6 offset), tagged for the open animation, page-scroll lock, Esc/backdrop close.
     (function () {
         // Order matters: later entries stack above earlier ones.
-        const ids = ['registerModal', 'inventoryModal', 'awayModal', 'buildingPassesModal', 'passInfoModal', 'passQrModal',
+        const ids = ['registerModal', 'inventoryModal', 'awayModal', 'buildingPassesModal', 'passInfoModal', 'passQrModal', 'passHoldModal',
                      'rowDetailsModalOverlay', 'purgeModalOverlay', 'confirmPurgeOverlay'];
         const overlays = ids.map(id => document.getElementById(id)).filter(Boolean);
         if (!overlays.length) return;
