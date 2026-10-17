@@ -87,6 +87,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/passes/inventory/print', [PassInventoryController::class, 'print'])->name('passes.inventory.print');
             Route::get('/passes/inventory/csv', [PassInventoryController::class, 'csv'])->name('passes.inventory.csv');
             Route::post('/passes/inventory/stock', [PassInventoryController::class, 'stock'])->name('passes.inventory.stock');
+            Route::get('/passes/inventory/templates', [PassInventoryController::class, 'templates'])->name('passes.inventory.templates');
+            Route::post('/passes/inventory/templates', [PassInventoryController::class, 'storeTemplate'])->name('passes.inventory.templates.store');
+            Route::put('/passes/inventory/templates/{template}', [PassInventoryController::class, 'updateTemplate'])->name('passes.inventory.templates.update');
+            Route::delete('/passes/inventory/templates/{template}', [PassInventoryController::class, 'destroyTemplate'])->name('passes.inventory.templates.destroy');
         });
     });
 });

@@ -249,13 +249,10 @@ document.addEventListener('submit', async (e) => {
 
     @if (session('success'))
         document.addEventListener('DOMContentLoaded', () => {
-            const passNumber = @json(session('success_pass_number'));
-            const action = passNumber ? {
+            const passInfo = @json(session('success_pass_info'));
+            const action = (passInfo && typeof openPassInfoModal === 'function') ? {
                 label: 'View Pass',
-                onClick: () => {
-                    const btn = document.querySelector(`[data-pass-number="${passNumber}"][onclick^="openPassInfoModal"]`);
-                    if (btn) btn.click();
-                }
+                onClick: () => openPassInfoModal(passInfo),
             } : null;
             showToast(@json(session('success')), 'success', null, action);
         });

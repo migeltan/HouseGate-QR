@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminLog;
 use App\Models\Building;
+use App\Models\PrintTemplate;
 use App\Models\VisitorPass;
 use App\Services\PassGenerator;
 use Illuminate\Http\Request;
@@ -31,13 +32,74 @@ class PassInventoryController extends Controller
     private const MARGIN = 8; // mm, every side
 
     /** How many cells of $cw x $ch mm (with a $gap mm gutter) fit on the paper. Mirrored in the modal's JS. */
-    private function grid(string $paper, float $cw, float $ch, float $gap): array
+    private function grid(string $paper, float $cw, float $ch, float $gap, float $margin = self::MARGIN, bool $landscape = false): array
     {
         $p = self::PAPERS[$paper];
-        $cols = max(1, (int) floor(($p['w'] - 2 * self::MARGIN + $gap) / ($cw + $gap)));
-        $rows = max(1, (int) floor(($p['h'] - 2 * self::MARGIN + $gap) / ($ch + $gap)));
+        $p['page_size'] = $p['size'] . ($landscape ? ' landscape' : '');
+        if ($landscape) {
+            [$p['w'], $p['h']] = [$p['h'], $p['w']];
+        }
+        $cols = max(1, (int) floor(($p['w'] - 2 * $margin + $gap) / ($cw + $gap)));
+        $rows = max(1, (int) floor(($p['h'] - 2 * $margin + $gap) / ($ch + $gap)));
 
-        return ['paper' => $p, 'cols' => $cols, 'rows' => $rows, 'per_page' => $cols * $rows];
+        return ['paper' => $p, 'cols' => $cols, 'rows' => $rows, 'per_page' => $cols * $rows, 'margin' => $margin];
+    }
+
+    /**
+     * Full-pass-card template. mm for sizes, % of the card for positions (centre of each element).
+     * Defaults reproduce the original fixed 60 x 100 mm layout; the print URL may override any key
+     * with t[key]=value (e.g. t[card_w]=80&t[qr_size]=60).
+     */
+    private const CARD_DEFAULTS = [
+        'card_w' => 60.0, 'card_h' => 100.0, 'gap' => 4.0, 'margin' => 8.0, 'radius' => 2.0,
+        'landscape' => false, 'guides' => false, 'bg_fit' => 'cover',
+        'qr_size' => 50.67, 'qr_x' => 50.0, 'qr_y' => 60.2, 'qr_pad' => 1.2,
+        'num_show' => true, 'num_size' => 13.33, 'num_x' => 50.0, 'num_y' => 84.7, 'num_color' => '#ffffff',
+    ];
+
+    private function cardSettings(Request $request): array
+    {
+        $request->validate([
+            't'            => 'nullable|array',
+            't.card_w'     => 'nullable|numeric|min:30|max:200',
+            't.card_h'     => 'nullable|numeric|min:30|max:290',
+            't.gap'        => 'nullable|numeric|min:0|max:20',
+            't.margin'     => 'nullable|numeric|min:0|max:30',
+            't.radius'     => 'nullable|numeric|min:0|max:10',
+            't.landscape'  => 'nullable|boolean',
+            't.guides'     => 'nullable|boolean',
+            't.bg_fit'     => 'nullable|in:cover,contain,fill',
+            't.qr_size'    => 'nullable|numeric|min:15|max:90',
+            't.qr_x'       => 'nullable|numeric|min:0|max:100',
+            't.qr_y'       => 'nullable|numeric|min:0|max:100',
+            't.qr_pad'     => 'nullable|numeric|min:0|max:5',
+            't.num_show'   => 'nullable|boolean',
+            't.num_size'   => 'nullable|numeric|min:4|max:30',
+            't.num_x'      => 'nullable|numeric|min:0|max:100',
+            't.num_y'      => 'nullable|numeric|min:0|max:100',
+            't.num_color'  => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'template_id'  => 'nullable|integer|exists:print_templates,id',
+        ]);
+
+        // Saved template first, explicit t[...] overrides on top.
+        $input = array_merge(
+            $request->filled('template_id') ? (array) PrintTemplate::findOrFail($request->input('template_id'))->settings : [],
+            (array) $request->input('t', [])
+        );
+
+        $out = self::CARD_DEFAULTS;
+        foreach ($input as $key => $value) {
+            if (! array_key_exists($key, $out) || $value === null || $value === '') {
+                continue;
+            }
+            $out[$key] = match (true) {
+                is_bool($out[$key])  => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+                is_float($out[$key]) => (float) $value,
+                default              => (string) $value,
+            };
+        }
+
+        return $out;
     }
 
     /** Print / CSV selection: a range, a typed list ("1-10, 25, 40-45"), or start + count. */
@@ -185,11 +247,67 @@ class PassInventoryController extends Controller
             ]);
         }
 
+        $t = $this->cardSettings($request);
+
         return view('passes.print-sheet', [
             'building' => $building,
             'passes'   => $passes,
-            'grid'     => $this->grid($d['paper'], 60, 100, 4),
+            't'        => $t,
+            'grid'     => $this->grid($d['paper'], $t['card_w'], $t['card_h'], $t['gap'], $t['margin'], $t['landscape']),
         ]);
+    }
+
+    private function templateRow(PrintTemplate $t): array
+    {
+        return [
+            'id'       => $t->id,
+            'name'     => $t->name,
+            'settings' => array_merge(self::CARD_DEFAULTS, (array) $t->settings),
+        ];
+    }
+
+    /** Saved card templates (admin only). */
+    public function templates()
+    {
+        return response()->json(PrintTemplate::orderBy('name')->get()->map(fn ($t) => $this->templateRow($t))->values());
+    }
+
+    /** The editor sends the full settings as t[...], exactly like the print URL. */
+    public function storeTemplate(Request $request)
+    {
+        $data = $request->validate(['name' => 'required|string|max:60|unique:print_templates,name']);
+        $template = PrintTemplate::create([
+            'name'       => $data['name'],
+            'settings'   => $this->cardSettings($request),
+            'created_by' => $request->user()->id,
+        ]);
+        AdminLog::record('print_template.created', $template->name);
+
+        return response()->json(['ok' => true, 'template' => $this->templateRow($template)], 201);
+    }
+
+    /** Rename and/or overwrite settings. Send the FULL t[...] set: a partial one resets the rest to defaults. */
+    public function updateTemplate(Request $request, PrintTemplate $template)
+    {
+        $data = $request->validate(['name' => 'sometimes|required|string|max:60|unique:print_templates,name,' . $template->id]);
+        if (isset($data['name'])) {
+            $template->name = $data['name'];
+        }
+        if ($request->has('t')) {
+            $template->settings = $this->cardSettings($request);
+        }
+        $template->save();
+        AdminLog::record('print_template.updated', $template->name);
+
+        return response()->json(['ok' => true, 'template' => $this->templateRow($template)]);
+    }
+
+    public function destroyTemplate(PrintTemplate $template)
+    {
+        AdminLog::record('print_template.deleted', $template->name);
+        $template->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     public function csv(Request $request)

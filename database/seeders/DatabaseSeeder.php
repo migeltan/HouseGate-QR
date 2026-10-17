@@ -18,13 +18,15 @@ class DatabaseSeeder extends Seeder
     ['code' => 'NG',  'name' => 'Gate 6',            'color_name' => 'Pink',   'color_hex' => '#db2777', 'template_image' => 'images/passes/ng.png',  'qr_color_hex' => '#831843'],
     ['code' => 'MB',  'name' => 'Main Building',     'color_name' => 'Blue',   'color_hex' => '#2563eb', 'template_image' => 'images/passes/mb.png',  'qr_color_hex' => '#1e3a8a'],
     ['code' => 'SWA', 'name' => 'South Wing Annex',  'color_name' => 'Yellow', 'color_hex' => '#ca8a04', 'template_image' => 'images/passes/swa.png', 'qr_color_hex' => '#713f12'],
+    // Hidden Gate 6 destination category: no cards, no template, never a card pool (see the 2026_10_16 Others migration)
+    ['code' => 'OTH', 'name' => 'Others',            'color_name' => 'Gray',   'color_hex' => '#64748b', 'template_image' => null,                    'qr_color_hex' => null],
 ];
 
         foreach ($buildings as $b) {
             $building = Building::updateOrCreate(['code' => $b['code']], $b);
 
-            if ($b['code'] === 'NG') {
-                continue; // North Gate only ever holds multi-building passes
+            if (in_array($b['code'], ['NG', Building::OTHERS_CODE], true)) {
+                continue; // Gate 6 only holds multi-building passes; Others has no card pool at all
             }
 
 

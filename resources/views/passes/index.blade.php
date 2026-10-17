@@ -58,30 +58,92 @@
 @section('scripts')
 
     <script>
+        // id of the hidden "Others" row; null until it exists, so every Others check below stays false.
+        const OTHERS_ID = {{ $buildings->firstWhere('code', \App\Models\Building::OTHERS_CODE)?->id ?? 'null' }};
+
+        function othersTicked() {
+            return OTHERS_ID !== null && checkedBuildingIds().includes(OTHERS_ID);
+        }
+
+        // Gate 6 = Others ticked, or 2+ buildings (same rule as register() on the server).
+        function isGate6() {
+            return checkedBuildingIds().length >= 2 || othersTicked();
+        }
+
+        // Show "Which place?" only with Others ticked and keep the submitted others_place in sync.
+        function syncOthersPlace() {
+            const on = othersTicked();
+            const sel = document.getElementById('othersPlaceSelect');
+            const typed = document.getElementById('othersPlaceTyped');
+            const out = document.getElementById('othersPlace');
+            const another = on && sel.value === '__other';
+
+            document.getElementById('othersPlaceField').classList.toggle('hidden', !on);
+            typed.classList.toggle('hidden', !another);
+            out.value = !on ? '' : (another ? typed.value.trim() : sel.value);
+            out.disabled = !on; // not sent at all unless Others is ticked
+            refreshSubmitState();
+        }
+
+        let visitingOpen = false;   // the user expanded the optional congressman / office block
+
+        function openVisiting() {
+            visitingOpen = true;
+            syncVisitingField();
+            const s = document.getElementById('congSearch');
+            (s.disabled ? document.getElementById('officeOther') : s).focus();
+        }
+
+        // With Others ticked the destination is already settled, so congressman / office is optional and is
+        // tucked behind a link instead of showing empty fields. Otherwise it is required and always shown.
+        function syncVisitingField() {
+            const optional = othersTicked();
+            if (!optional) visitingOpen = false;
+            const filled = selectedCong.size > 0 || !!document.getElementById('officeOther').value.trim();
+            const show = !optional || visitingOpen || filled;
+
+            document.getElementById('visitingField').classList.toggle('hidden', !show);
+            document.getElementById('visitingToggleRow').classList.toggle('hidden', show);
+            document.getElementById('visitingStar').classList.toggle('hidden', optional);
+            document.getElementById('visitingNote').textContent = optional
+                ? 'Optional: Gate 6 already counts as the destination.'
+                : 'Select at least one congressman, or fill in “Office / person”.';
+        }
+
         function updateBuildingSelection() {
-            const checked = document.querySelectorAll('input[name="building_ids[]"]:checked').length;
-            const hint = document.getElementById('northGateHint');
+            document.getElementById('northGateHint').classList.toggle('is-active', isGate6());
 
-            hint.classList.toggle('is-active', checked >= 2);
-
+            syncOthersPlace();
             refreshCongPicker(); // also re-evaluates the submit button
             refreshManualCard();
+            syncVisitingField();
         }
 
         // ---- Congressman picker (filtered by the ticked building(s)) ----
         // ---- Manual card pick (single building only). Unticked = auto-assign, exactly as before. ----
         const MANUAL_CARDS_BASE = @json(url('/passes/building'));
         let manualCardSeq = 0;
+        let manualCardPoolLoaded = null;   // which pool the chip list was loaded for (skip reloads when it hasn't changed)
+        // id of Gate 6's own card pool (admins only; null for guards, who never issue Gate 6).
+        const GATE6_ID = {{ $displayBuildings->firstWhere('code', 'NG')?->id ?? 'null' }};
+
+        // The pool a specific card comes from: Gate 6's pool for a Gate 6 pass, else the one ticked building.
+        function cardPoolId() {
+            const ids = checkedBuildingIds();
+            if (!ids.length) return null;
+            return isGate6() ? GATE6_ID : ids[0];
+        }
 
         // Ticked but no card chosen yet: the form must not fall back to auto-assign by accident.
         function manualCardPending() {
-            if (!document.getElementById('manualCardToggle').checked || checkedBuildingIds().length !== 1) return false;
+            if (!document.getElementById('manualCardToggle').checked || cardPoolId() === null) return false;       if (!document.getElementById('manualCardToggle').checked || checkedBuildingIds().length !== 1) return false;
             const sel = document.getElementById('manualCardSelect');
             return sel.disabled || !sel.value;
         }
 
         function resetManualCard() {
             manualCardSeq++;   // drop any request still in flight
+            manualCardPoolLoaded = null;
             document.getElementById('manualCardToggle').checked = false;
             const sel = document.getElementById('manualCardSelect');
             sel.replaceChildren();
@@ -96,20 +158,25 @@
         }
 
         function refreshManualCard() {
-            const ids = checkedBuildingIds();
-            document.getElementById('manualCardField').classList.toggle('hidden', ids.length !== 1);
-            if (ids.length !== 1) { resetManualCard(); return; }
-            if (document.getElementById('manualCardToggle').checked) loadManualCards(ids[0]);
+            const pool = cardPoolId();
+            document.getElementById('manualCardField').classList.toggle('hidden', pool === null);
+            if (pool === null) { resetManualCard(); return; }
+            // Reload only when the pool changed: adding a third building to a Gate 6 pass keeps the chosen card.
+            if (document.getElementById('manualCardToggle').checked && pool !== manualCardPoolLoaded) loadManualCards(pool);
         }
 
         function toggleManualCard(on) {
             if (!on) { resetManualCard(); refreshSubmitState(); return; }
+            const pool = cardPoolId();
+            if (pool === null) return;
             document.getElementById('manualCardToggle').checked = true;
-            loadManualCards(checkedBuildingIds()[0]);
+            loadManualCards(pool);
         }
 
         async function loadManualCards(buildingId) {
             const seq = ++manualCardSeq;
+            manualCardPoolLoaded = buildingId;
+            const gate6 = buildingId === GATE6_ID;
             const sel = document.getElementById('manualCardSelect');
             const grid = document.getElementById('manualCardGrid');
             const note = document.getElementById('manualCardNote');
@@ -142,9 +209,11 @@
                     chip.addEventListener('click', () => pickManualCard(c.id));
                     return chip;
                 }));
+                const where = gate6 ? 'in the Gate 6 pool' : 'at this desk';
                 note.dataset.base = data.cards.length
-                    ? `${data.cards.length} card${data.cards.length === 1 ? '' : 's'} in stock at this desk. Tap the one you are physically handing over.`
-                    : 'No cards in stock at this desk. Ask an admin to allocate more cards.';
+                    ? `${data.cards.length} card${data.cards.length === 1 ? '' : 's'} in stock ${where}. Tap the one you are physically handing over.`
+                    : (gate6 ? 'No Gate 6 cards in stock. Use auto-assign, or generate more cards first.'
+                             : 'No cards in stock at this desk. Ask an admin to allocate more cards.');
                 note.textContent = note.dataset.base;
             } catch (e) {
                 if (seq !== manualCardSeq) return;
@@ -198,10 +267,13 @@
                 if (!ids.includes(c.b)) selectedCong.delete(id);
             }
 
+            // Others has no congressmen of its own: with only Others ticked there is nothing to search.
+            const realIds = ids.filter(id => id !== OTHERS_ID);
             const search = document.getElementById('congSearch');
-            search.disabled = ids.length === 0;
-            search.placeholder = ids.length ? 'Search name, district or room…' : 'Select a building first…';
-            if (!ids.length) search.value = '';
+            search.disabled = realIds.length === 0;
+            search.placeholder = realIds.length ? 'Search name, district or room…'
+                : (ids.length ? 'Gate 6 only — no congressman needed' : 'Select a building first…');
+            if (!realIds.length) search.value = '';
 
             renderCongChips();
             renderCongList();
@@ -232,8 +304,8 @@
                 hidden.appendChild(h);
             });
 
-            // "Other" is only mandatory when no congressman is picked.
-            document.getElementById('officeOther').required = selectedCong.size === 0;
+            // "Office / person" is only mandatory when no congressman is picked and Others isn't ticked.
+            document.getElementById('officeOther').required = selectedCong.size === 0 && !othersTicked();
             if (document.getElementById('congList').classList.contains('is-open')) positionCongList();
             refreshSubmitState();
         }
@@ -1079,7 +1151,7 @@
             const v = (n) => (f.elements[n]?.value || '').trim();
             if (checkedBuildingIds().length === 0) return false;
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) return false;
-            if (selectedCong.size === 0 && !v('office_other')) return false;
+            if (selectedCong.size === 0 && !v('office_other') && !othersTicked()) return false;   // Others alone counts as the destination
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) return false;
             if (manualCardPending()) return false;
             return true;
@@ -1091,7 +1163,7 @@
             const v = (n) => (f.elements[n]?.value || '').trim();
             const out = [];
             if (checkedBuildingIds().length === 0) out.push('building');
-            if (selectedCong.size === 0 && !v('office_other')) out.push('congressman or “Other”');
+            if (selectedCong.size === 0 && !v('office_other') && !othersTicked()) out.push('congressman or office / person');
             if (!v('purpose_choice') || (v('purpose_choice') === 'Others' && !v('purpose_other'))) out.push('reason');
             if (f.elements['pass_class'].value === 'long_term' && !v('expected_return_date')) out.push('return date');
             if (manualCardPending()) out.push('a card');
@@ -1248,7 +1320,7 @@
                     closeRegisterModal();
                     showToast(data.message, 'success', null, {
                         label: 'View Pass',
-                        onClick: () => document.querySelector(`[data-pass-number="${num}"][onclick^="openPassInfoModal"]`)?.click(),
+                        onClick: () => openPassInfoModal(data.info),
                     });
                 } else {
                     if (data && data.duplicate) {   // server caught a duplicate the live check hadn't shown

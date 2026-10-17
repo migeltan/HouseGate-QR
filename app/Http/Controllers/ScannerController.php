@@ -179,6 +179,11 @@ $reason = "Building Mismatch - Pass is only authorized for {$authorizedBuildingN
             if ($registration->office_other) {
                 $visiting[] = ['name' => $registration->office_other, 'room' => null];
             }
+
+            // Others station: show which place the visitor named (LIRMD, Bank...), if any.
+            if ($registration->others_place) {
+                $visiting[] = ['name' => 'Others: ' . $registration->others_place, 'room' => null];
+            }
         }
 
         return response()->json([

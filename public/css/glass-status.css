@@ -3231,3 +3231,239 @@ a.sidebar-btn {
     font-size: 0.78rem;
     color: #64748b;
 }
+/* "Which place?" row (Step 3) */
+/* :not(.hidden) so the shared .hidden utility still wins when the row is off */
+/* ---- Step 3: optional extras as one calm list (label · value · action) ---- */
+.reg-pair-row.hidden {
+    display: none;
+}
+/* nothing to show: take no space */
+.reg-opts:not(:has(.reg-opt-item:not(.hidden))) {
+    display: none;
+}
+.reg-opts:has(.reg-opt-item:not(.hidden)) {
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+}
+.reg-opt-item:not(.hidden) ~ .reg-opt-item:not(.hidden) {
+    border-top: 1px solid #e8eef6;
+}
+.reg-opt-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 46px;
+    padding: 6px 14px;
+}
+.reg-opt-label {
+    flex: 0 0 5.5rem;
+    font:
+        700 0.72rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.reg-opt-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font:
+        600 0.92rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #0f172a;
+}
+.reg-opt-action {
+    flex: none;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: #245ba6;
+    font:
+        700 0.85rem "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.reg-opt-action:hover {
+    text-decoration: underline;
+}
+.reg-opt-action.hidden {
+    display: none;
+}
+.reg-form-grid .reg-opt-row select,
+.reg-form-grid .reg-opt-row input[type="text"] {
+    width: auto;
+    min-width: 12rem;
+    height: 34px;
+    font-size: 13px;
+}
+.reg-opt-item .reg-card-picker {
+    margin: 0 14px 12px;
+}
+
+/* ---- Card designer (inventory > Print / Export) ---- */
+.cd-box {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    background: #f8fafc;
+}
+.cd-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.cd-hint {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+.cd-tpl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.cd-select {
+    flex: 1 1 160px;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #94a3b8;
+    border-radius: 10px;
+    font:
+        600 14px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+}
+.inv-field .cd-select {
+    width: 100%;
+}
+.cd-btn {
+    height: 40px;
+    padding: 0 14px;
+    color: #235aa6;
+    background: #fff;
+    border: 1px solid #b6c5db;
+    border-radius: 10px;
+    font:
+        700 13px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    cursor: pointer;
+}
+.cd-btn:hover:not(:disabled) {
+    background: #eef3fb;
+}
+.cd-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.cd-btn.is-danger {
+    color: #b42318;
+    border-color: #f1b7b1;
+}
+.cd-msg {
+    min-height: 18px;
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #1f7a45;
+}
+.cd-msg.is-error {
+    color: #b42318;
+}
+.cd-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 10px;
+}
+.cd-preview-wrap {
+    position: sticky;
+    top: 8px;
+    align-self: start;
+    display: flex;
+    justify-content: center;
+}
+.cd-prev {
+    position: relative;
+    overflow: hidden;
+    flex: none;
+    background-color: #cbd5e1;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+}
+.cd-prev-qr {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    box-sizing: border-box;
+}
+.cd-prev-qr > div {
+    width: 100%;
+    height: 100%;
+    background: repeating-conic-gradient(#1e293b 0 25%, #fff 0 50%) 0 0 / 20%
+        20%;
+}
+.cd-prev-num {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font:
+        900 12px/1 ui-monospace,
+        monospace;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.cd-fields {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+.cd-group {
+    margin: 0;
+    padding: 10px 12px 12px;
+    border: 1px solid #dbe3ee;
+    border-radius: 12px;
+    background: #fff;
+    min-width: 0;
+}
+.cd-group legend {
+    padding: 0 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.cd-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.cd-color {
+    padding: 3px !important;
+    cursor: pointer;
+}
+@media (max-width: 560px) {
+    .cd-grid {
+        grid-template-columns: 1fr;
+    }
+    .cd-preview-wrap {
+        position: static;
+    }
+}

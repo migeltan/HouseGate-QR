@@ -20,9 +20,12 @@
                     <i class="fa-solid fa-boxes-stacked"></i> Manage Inventory
                 </button>
             @endif
-            <button type="button" onclick="openRegisterModal()" class="gov-btn-camera flex-shrink-0">
-                <i class="fa-solid fa-user-plus"></i> Register Visitor
-            </button>
+            {{-- Guards at the Others station only scan for now: Gate 6 issuing is admin-only (see register()) --}}
+            @unless (auth()->user()->isGuard() && $buildings->contains('code', \App\Models\Building::OTHERS_CODE))
+                <button type="button" onclick="openRegisterModal()" class="gov-btn-camera flex-shrink-0">
+                    <i class="fa-solid fa-user-plus"></i> Register Visitor
+                </button>
+            @endunless
         </div>
     </div>
     <div class="gov-card-body">
@@ -153,7 +156,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                 <label for="invBuilding">Building</label>
                 <select id="invBuilding">
                     @foreach ($displayBuildings as $b)
-                        <option value="{{ $b->id }}">{{ $b->name }}{{ $b->code === 'NG' ? ' (multi-building pool)' : '' }}</option>
+                        <option value="{{ $b->id }}" data-template="{{ $b->template_image ? asset($b->template_image) : '' }}">{{ $b->name }}{{ $b->code === 'NG' ? ' (multi-building pool)' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="inv-stats">
@@ -236,6 +239,73 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                             <button type="button" class="inv-seg-btn" data-inv-size="18" onclick="invOpt('size','18')">18 mm</button>
                             <button type="button" class="inv-seg-btn is-active" data-inv-size="22" onclick="invOpt('size','22')">22 mm</button>
                             <button type="button" class="inv-seg-btn" data-inv-size="26" onclick="invOpt('size','26')">26 mm</button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Card design: every input is named t[...] so the GET form sends it to the print sheet as-is --}}
+                <?php
+                    $cdFields = [
+                        'Card' => [['card_w', 'Width (mm)', 30, 200, 60], ['card_h', 'Height (mm)', 30, 290, 100], ['radius', 'Corner (mm)', 0, 10, 2], ['gap', 'Gap (mm)', 0, 20, 4], ['margin', 'Page margin (mm)', 0, 30, 8]],
+                        'QR code' => [['qr_size', 'Size (% of width)', 15, 90, 50.67], ['qr_x', 'Left (%)', 0, 100, 50], ['qr_y', 'Top (%)', 0, 100, 60.2], ['qr_pad', 'Padding (mm)', 0, 5, 1.2]],
+                        'Pass number' => [['num_size', 'Size (% of width)', 4, 30, 13.33], ['num_x', 'Left (%)', 0, 100, 50], ['num_y', 'Top (%)', 0, 100, 84.7]],
+                    ];
+                ?>
+                <div class="cd-box" data-inv-cardonly>
+                    <div class="cd-head">
+                        <span class="inv-opt-label">Card design</span>
+                        <span class="cd-hint" id="cdPrevSize"></span>
+                    </div>
+                    <div class="cd-tpl">
+                        <select id="cdTemplate" class="cd-select" onchange="cdPick()">
+                            <option value="">Default (60 × 100 mm)</option>
+                        </select>
+                        <button type="button" class="cd-btn" onclick="cdSave()">Save as new</button>
+                        <button type="button" class="cd-btn" id="cdUpdate" onclick="cdUpdate()" disabled>Update</button>
+                        <button type="button" class="cd-btn is-danger" id="cdDelete" onclick="cdDelete()" disabled>Delete</button>
+                    </div>
+                    <p class="cd-msg" id="cdMsg"></p>
+                    <div class="cd-grid">
+                        <div class="cd-preview-wrap">
+                            <div class="cd-prev" id="cdPrev">
+                                <div class="cd-prev-qr" id="cdPrevQr"><div></div></div>
+                                <div class="cd-prev-num" id="cdPrevNum">0001</div>
+                            </div>
+                        </div>
+                        <div class="cd-fields">
+                            @foreach ($cdFields as $group => $fields)
+                                <fieldset class="cd-group">
+                                    <legend>{{ $group }}</legend>
+                                    <div class="cd-row">
+                                        @foreach ($fields as [$k, $label, $min, $max, $val])
+                                            <div class="inv-field">
+                                                <label for="cd_{{ $k }}">{{ $label }}</label>
+                                                <input id="cd_{{ $k }}" class="cd-in" data-cd="{{ $k }}" name="t[{{ $k }}]" type="number" step="any" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+                            @endforeach
+                            <fieldset class="cd-group">
+                                <legend>Options</legend>
+                                <div class="cd-row">
+                                    <div class="inv-field">
+                                        <label for="cd_bg_fit">Background fit</label>
+                                        <select id="cd_bg_fit" class="cd-select cd-in" data-cd="bg_fit" name="t[bg_fit]">
+                                            <option value="cover">Cover (crop to fill)</option>
+                                            <option value="contain">Contain (whole image)</option>
+                                            <option value="fill">Stretch to fit</option>
+                                        </select>
+                                    </div>
+                                    <div class="inv-field">
+                                        <label for="cd_num_color">Number colour</label>
+                                        <input id="cd_num_color" class="cd-in cd-color" data-cd="num_color" name="t[num_color]" type="color" value="#ffffff">
+                                    </div>
+                                </div>
+                                <label class="inv-check"><input type="hidden" name="t[num_show]" value="0"><input class="cd-in" data-cd="num_show" type="checkbox" name="t[num_show]" value="1" checked> Show pass number</label>
+                                <label class="inv-check"><input type="hidden" name="t[landscape]" value="0"><input class="cd-in" data-cd="landscape" type="checkbox" name="t[landscape]" value="1"> Landscape paper</label>
+                                <label class="inv-check"><input type="hidden" name="t[guides]" value="0"><input class="cd-in" data-cd="guides" type="checkbox" name="t[guides]" value="1"> Cut guides</label>
+                            </fieldset>
                         </div>
                     </div>
                 </div>
@@ -327,11 +397,14 @@ function invMode(mode) {
 // Mirrors PassInventoryController::grid() so the modal can show pages per sheet
 const PAPER = { a4: [210, 297], letter: [215.9, 279.4], legal: [215.9, 355.6] };
 function invPerPage() {
-    const [w, h] = PAPER[$i('invPaper').value];
+    let [w, h] = PAPER[$i('invPaper').value];
     const s = +$i('invSize').value;
-    const [cw, ch, gap] = $i('invLayout').value === 'qr' ? [s + 4, s + 9, 2] : [60, 100, 4];
-    const cols = Math.max(1, Math.floor((w - 16 + gap) / (cw + gap)));
-    const rows = Math.max(1, Math.floor((h - 16 + gap) / (ch + gap)));
+    const isQr = $i('invLayout').value === 'qr';
+    const t = cdRead();
+    if (!isQr && t.landscape) [w, h] = [h, w];
+    const [cw, ch, gap, m] = isQr ? [s + 4, s + 9, 2, 8] : [Math.max(1, t.card_w), Math.max(1, t.card_h), t.gap, t.margin];
+    const cols = Math.max(1, Math.floor((w - 2 * m + gap) / (cw + gap)));
+    const rows = Math.max(1, Math.floor((h - 2 * m + gap) / (ch + gap)));
     return cols * rows;
 }
 function invOpt(kind, value) {
@@ -339,6 +412,7 @@ function invOpt(kind, value) {
     const key = 'inv' + kind[0].toUpperCase() + kind.slice(1);
     document.querySelectorAll(`[data-inv-${kind}]`).forEach(b => b.classList.toggle('is-active', b.dataset[key] === value));
     document.querySelectorAll('[data-inv-qronly]').forEach(el => el.classList.toggle('hidden', $i('invLayout').value !== 'qr'));
+    document.querySelectorAll('[data-inv-cardonly]').forEach(el => el.classList.toggle('hidden', $i('invLayout').value !== 'card'));
     invRefresh();
 }
 
@@ -482,6 +556,138 @@ function invRefresh() {
     if (missing || !found) sum.classList.add('is-warn');
     btns.forEach(b => b.disabled = found === 0);
 }
+
+// ---- Card designer (Print / Export > Card design) ----
+// Mirrors PassInventoryController::CARD_DEFAULTS. Inputs are named t[...], so the print form submits them as-is.
+const CD_NUM = ['card_w', 'card_h', 'gap', 'margin', 'radius', 'qr_size', 'qr_x', 'qr_y', 'qr_pad', 'num_size', 'num_x', 'num_y'];
+const CD_TXT = ['bg_fit', 'num_color'];
+const CD_BOOL = ['landscape', 'guides', 'num_show'];
+const CD_DEFAULTS = {
+    card_w: 60, card_h: 100, gap: 4, margin: 8, radius: 2, bg_fit: 'cover', landscape: false, guides: false,
+    qr_size: 50.67, qr_x: 50, qr_y: 60.2, qr_pad: 1.2, num_show: true, num_size: 13.33, num_x: 50, num_y: 84.7, num_color: '#ffffff',
+};
+const CD_URL = @json(route('passes.inventory.templates'));
+let cdTemplates = [];
+const cdEl = k => document.querySelector(`[data-cd="${k}"]`);
+
+function cdRead() {
+    const t = {};
+    CD_NUM.forEach(k => { t[k] = parseFloat(cdEl(k).value) || 0; });
+    CD_TXT.forEach(k => { t[k] = cdEl(k).value; });
+    CD_BOOL.forEach(k => { t[k] = cdEl(k).checked; });
+    return t;
+}
+function cdWrite(s) {
+    [...CD_NUM, ...CD_TXT].forEach(k => { cdEl(k).value = s[k]; });
+    CD_BOOL.forEach(k => { cdEl(k).checked = !!s[k]; });
+    cdPreview();
+    invRefresh();
+}
+function cdPreview() {
+    const t = cdRead(), opt = $i('invBuilding').selectedOptions[0];
+    const cw = Math.max(1, t.card_w), ch = Math.max(1, t.card_h);
+    const k = Math.min(200 / cw, 280 / ch);   // preview pixels per mm
+    Object.assign($i('cdPrev').style, {
+        width: cw * k + 'px', height: ch * k + 'px', borderRadius: t.radius * k + 'px',
+        backgroundImage: opt && opt.dataset.template ? `url("${opt.dataset.template}")` : 'none',
+        backgroundSize: { cover: 'cover', contain: 'contain', fill: '100% 100%' }[t.bg_fit] || 'cover',
+    });
+    const qs = cw * t.qr_size / 100 * k;
+    Object.assign($i('cdPrevQr').style, {
+        left: t.qr_x + '%', top: t.qr_y + '%', width: qs + 'px', height: qs + 'px',
+        padding: t.qr_pad * k + 'px', borderRadius: cw * 0.0267 * k + 'px',
+    });
+    const num = $i('cdPrevNum');
+    num.style.display = t.num_show ? '' : 'none';
+    Object.assign(num.style, { left: t.num_x + '%', top: t.num_y + '%', color: t.num_color, fontSize: cw * t.num_size / 100 * k + 'px' });
+    $i('cdPrevSize').textContent = `${t.card_w} × ${t.card_h} mm`;
+}
+
+function cdMsg(text, bad) {
+    const m = $i('cdMsg');
+    m.textContent = text || '';
+    m.classList.toggle('is-error', !!bad);
+}
+function cdFill(selectId) {
+    const sel = $i('cdTemplate');
+    sel.length = 1;
+    cdTemplates.forEach(t => sel.add(new Option(t.name, t.id)));
+    sel.value = cdTemplates.some(t => String(t.id) === String(selectId)) ? String(selectId) : '';
+    $i('cdUpdate').disabled = $i('cdDelete').disabled = !sel.value;
+}
+async function cdLoad(selectId) {
+    try {
+        const res = await fetch(CD_URL, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        cdTemplates = res.ok ? await res.json() : [];
+    } catch (_) {
+        cdTemplates = [];
+    }
+    cdFill(selectId);
+}
+function cdPick() {
+    const id = $i('cdTemplate').value;
+    const tpl = cdTemplates.find(t => String(t.id) === id);
+    $i('cdUpdate').disabled = $i('cdDelete').disabled = !id;
+    cdMsg('');
+    cdWrite(tpl ? tpl.settings : CD_DEFAULTS);
+}
+async function cdSend(url, extra) {
+    const body = new URLSearchParams(extra);
+    Object.entries(cdRead()).forEach(([k, v]) => body.set(`t[${k}]`, v === true ? 1 : v === false ? 0 : v));
+    const res = await fetch(url, {
+        method: 'POST', credentials: 'same-origin', body,
+        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.errors ? Object.values(data.errors).flat()[0] : (data.message || 'Could not save the template.'));
+    return data;
+}
+async function cdSave() {
+    const name = (prompt('Template name:') || '').trim();
+    if (!name) return;
+    try {
+        const d = await cdSend(CD_URL, { name });
+        await cdLoad(d.template.id);
+        cdMsg(`Saved "${d.template.name}".`);
+    } catch (e) { cdMsg(e.message, true); }
+}
+async function cdUpdate() {
+    const id = $i('cdTemplate').value;
+    if (!id) return;
+    try {
+        const d = await cdSend(`${CD_URL}/${id}`, { _method: 'PUT' });
+        await cdLoad(d.template.id);
+        cdMsg(`Updated "${d.template.name}".`);
+    } catch (e) { cdMsg(e.message, true); }
+}
+async function cdDelete() {
+    const sel = $i('cdTemplate');
+    if (!sel.value) return;
+    const ok = await confirmDialog({
+        title: 'Delete this template?', subject: sel.selectedOptions[0].textContent,
+        message: 'Only the saved layout is removed. Printed cards are not affected.', confirmLabel: 'Delete', tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+        await cdSend(`${CD_URL}/${sel.value}`, { _method: 'DELETE' });
+        await cdLoad('');
+        cdWrite(CD_DEFAULTS);
+        cdMsg('Template deleted.');
+    } catch (e) { cdMsg(e.message, true); }
+}
+
+document.querySelectorAll('.cd-in').forEach(el => ['input', 'change'].forEach(ev => el.addEventListener(ev, () => { cdPreview(); invRefresh(); })));
+document.querySelectorAll('.cd-in[type="number"]').forEach(el => el.addEventListener('change', () => {
+    let v = parseFloat(el.value);
+    if (isNaN(v)) v = CD_DEFAULTS[el.dataset.cd];
+    el.value = Math.min(+el.max, Math.max(+el.min, v));
+    cdPreview();
+    invRefresh();
+}));
+$i('invBuilding').addEventListener('change', cdPreview);
+cdPreview();
+cdLoad('');
+// ---- End card designer ----
 
 ['invBuilding', 'invGenFrom', 'invGenTo', 'invFrom', 'invTo', 'invStart', 'invCount', 'invList', 'invOnlyAvail', 'invStockFrom', 'invStockTo']
     .forEach(id => ['input', 'change'].forEach(ev => $i(id).addEventListener(ev, invRefresh)));

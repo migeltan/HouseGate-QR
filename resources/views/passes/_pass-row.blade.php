@@ -15,28 +15,7 @@
     [$badgeClass, $badgeLabel] = $badgeMap[$status] ?? ['is-available', 'Available'];
     $holdLabel = $p->hold_reason ? (\App\Models\VisitorPass::HOLD_REASONS[$p->hold_reason] ?? 'Other') : null;
     if ($holdLabel) { $badgeLabel = 'On hold · ' . $holdLabel; }
-    $infoPayload = [
-        'pass_number' => $p->pass_number,
-        'status' => $p->status,
-        'building' => $p->building->name,
-        'qr_url' => route('passes.show', $p),
-        'visitor_name' => $p->visitor_name,
-        'gender' => $p->gender,
-        'contact_no' => $p->contact_no,
-        'visitor_email' => $p->visitor_email,
-        'id_type' => $p->id_type,
-        'id_ref' => $p->id_ref,
-        'office_to_visit' => $p->office_to_visit,
-        'contact_person' => $p->contact_person,
-        'purpose' => $p->purpose,
-        'vehicle' => $p->vehicle,
-        'registered_by' => $p->registered_by,
-        'pass_class' => $p->pass_class,
-        'issued_at' => $p->issued_at?->format('M j, Y g:i A'),
-        'expected_return_date' => $p->expected_return_date?->format('M j, Y'),
-        'photo_url' => $p->photo_path ? asset('storage/' . $p->photo_path) : null,
-        'id_photo_url' => $p->id_photo_path ? asset('storage/' . $p->id_photo_path) : null,
-    ];
+    $infoPayload = $p->infoPayload();
 @endphp
 <div class="gov-pass-card" data-pass-id="{{ $p->id }}" data-status="{{ $status }}" data-search="{{ $searchText }}">
     <div class="gov-pass-card-info">

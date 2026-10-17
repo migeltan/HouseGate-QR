@@ -16,49 +16,81 @@
         </div>
 
         <div class="reg-field full">
-            <label>Destination Building(s) <span class="reg-required">*</span> <span class="optional">(select 1 for a
-                    single-building pass, or 2+ for a Gate 6 general pass)</span></label>
+            <label>Destination <span class="reg-required">*</span> <span class="optional">(1 building = single-building pass; Gate 6 or 2+ buildings = general pass)</span></label>
             <div class="reg-building-grid" id="regBuildingGrid">
-                @foreach ($buildings as $b)
-                    <label class="reg-building-option">
+                {{-- Same order as the Registry tiles (alphabetical by the name shown); the hidden Others row is shown as "Gate 6". --}}
+                @foreach ($buildings->sortBy(fn ($b) => $b->code === \App\Models\Building::OTHERS_CODE ? 'Gate 6' : $b->name) as $b)
+                    <label class="reg-building-option"
+                        @if ($b->code === \App\Models\Building::OTHERS_CODE) title="Gate 6 pass for other offices: LIRMD, LSB, People's Center, Bank, Procurement…" @endif>
                         <input type="checkbox" name="building_ids[]" value="{{ $b->id }}"
                             onchange="updateBuildingSelection()">
                         <span class="reg-building-dot" style="background:{{ $b->color_hex }}"></span>
-                        <span class="reg-building-name">{{ $b->name }}</span>
+                        <span class="reg-building-name">{{ $b->code === \App\Models\Building::OTHERS_CODE ? 'Gate 6' : $b->name }}</span>
                     </label>
                 @endforeach
             </div>
             <p class="reg-north-gate-hint" id="northGateHint">
-                2 or more buildings selected — this will be issued as a <strong>Gate 6</strong> general pass, valid
-                at all selected buildings.
+                <strong>Gate 6</strong> general pass — valid at every selected destination.
             </p>
         </div>
 
-        {{-- Manual card pick: single building only. Unticked = auto-assign (lowest in-stock number), as before. --}}
-        <div class="reg-field full hidden" id="manualCardField">
-            <div class="reg-card-row">
-                <div class="reg-card-row-text">
-                    <span class="reg-card-row-label">Card</span>
-                    <span class="reg-card-row-value" id="manualCardSummary">Auto-assign (lowest available number)</span>
+        {{-- Optional extras in one list, one pattern per row: label · value · action. Required fields stay outside it. --}}
+        <div class="reg-field full reg-opts">
+            {{-- Gate 6 only. Optional; saved for the logs, not used for authorization. --}}
+            <div class="reg-opt-item hidden" id="othersPlaceField">
+                <div class="reg-opt-row">
+                    <span class="reg-opt-label">Place</span>
+                    <span class="reg-opt-value">
+                        <select id="othersPlaceSelect" onchange="syncOthersPlace()" aria-label="Which place (optional)">
+                            <option value="">Not specified</option>
+                            <option value="LIRMD">LIRMD</option>
+                            <option value="LSB">LSB</option>
+                            <option value="People's Center">People's Center</option>
+                            <option value="Bank">Bank</option>
+                            <option value="Procurement">Procurement</option>
+                            <option value="__other">Another place…</option>
+                        </select>
+                        <input type="text" id="othersPlaceTyped" class="hidden" maxlength="255" autocomplete="off"
+                            placeholder="Type the place" oninput="syncOthersPlace()">
+                        {{-- The value actually submitted; kept in sync by syncOthersPlace(). --}}
+                        <input type="hidden" name="others_place" id="othersPlace" disabled>
+                    </span>
                 </div>
-                <button type="button" class="reg-card-row-btn" id="manualCardOpenBtn" onclick="toggleManualCard(true)">Choose a specific card</button>
             </div>
-            <input type="checkbox" id="manualCardToggle" class="hidden" tabindex="-1" aria-hidden="true">
-            <div class="reg-card-picker hidden" id="manualCardPicker">
-                <div class="reg-card-picker-head">
-                    <input type="text" id="manualCardFilter" inputmode="numeric" autocomplete="off" placeholder="Find a number, e.g. 16" oninput="filterManualCards()">
-                    <button type="button" class="reg-card-row-btn is-quiet" onclick="toggleManualCard(false)">Use auto-assign instead</button>
+
+            {{-- Card: auto-assign by default; optionally a specific one (one building, or the Gate 6 pool). --}}
+            <div class="reg-opt-item hidden" id="manualCardField">
+                <div class="reg-opt-row">
+                    <span class="reg-opt-label">Card</span>
+                    <span class="reg-opt-value" id="manualCardSummary">Auto-assign (lowest available number)</span>
+                    <button type="button" class="reg-opt-action" id="manualCardOpenBtn" onclick="toggleManualCard(true)">Choose a specific card</button>
                 </div>
-                <div class="reg-card-grid" id="manualCardGrid" aria-label="Cards in stock"></div>
-                <p class="reg-field-note" id="manualCardNote"></p>
+                <input type="checkbox" id="manualCardToggle" class="hidden" tabindex="-1" aria-hidden="true">
+                <div class="reg-card-picker hidden" id="manualCardPicker">
+                    <div class="reg-card-picker-head">
+                        <input type="text" id="manualCardFilter" inputmode="numeric" autocomplete="off" placeholder="Find a number, e.g. 16" oninput="filterManualCards()">
+                        <button type="button" class="reg-card-row-btn is-quiet" onclick="toggleManualCard(false)">Use auto-assign instead</button>
+                    </div>
+                    <div class="reg-card-grid" id="manualCardGrid" aria-label="Cards in stock"></div>
+                    <p class="reg-field-note" id="manualCardNote"></p>
+                </div>
+                <select name="pass_id" id="manualCardSelect" class="hidden" disabled></select>
             </div>
-            <select name="pass_id" id="manualCardSelect" class="hidden" disabled></select>
+
+            {{-- With Gate 6 ticked, congressman / office is optional: one row here instead of empty fields. --}}
+            <div class="reg-opt-item hidden" id="visitingToggleRow">
+                <div class="reg-opt-row">
+                    <span class="reg-opt-label">Visiting</span>
+                    <span class="reg-opt-value">Not added</span>
+                    <button type="button" class="reg-opt-action" onclick="openVisiting()">Add congressman or office / person</button>
+                </div>
+            </div>
         </div>
 
-        <div class="reg-field full reg-pair-row">
-            <label>Congressman(s) to Visit <span class="reg-required">*</span> <span class="optional">(only congressmen
+        <div class="reg-field full reg-pair-row" id="visitingField">
+            <label>Congressman(s) to Visit <span class="reg-required" id="visitingStar">*</span> <span class="optional">(only congressmen
                     from the selected building(s) are listed)</span></label>
-            <label class="optional">Or: Other <span class="optional">(not visiting a congressman)</span></label>
+            <label class="optional">Or: Office / person <span class="optional">(not a congressman)</span></label>
 
             <div id="congressmanField">
                 <div class="cong-picker" id="congPicker">
@@ -73,7 +105,7 @@
             </div>
             <input type="text" name="office_other" id="officeOther" maxlength="255" required
                 placeholder="e.g. HR Office, Secretariat">
-            <p class="reg-field-note">Select at least one congressman, or fill in “Other”.</p>
+            <p class="reg-field-note" id="visitingNote">Select at least one congressman, or fill in “Office / person”.</p>
         </div>
 
         <div class="reg-field half">

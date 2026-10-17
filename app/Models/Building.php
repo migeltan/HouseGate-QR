@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder; // added: lets the scopes below type $query
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,14 +24,15 @@ class Building extends Model
     public const OTHERS_CODE = 'OTH';
 
     /** Real buildings only (they have congressmen): excludes the Gate 6 pool and Others. */
-    public function scopeSelectable($query)
+    public function scopeSelectable(Builder $query): Builder // typed: clears Intelephense P1132
     {
         return $query->whereNotIn('code', ['NG', self::OTHERS_CODE]);
     }
 
     /** Buildings that own a card pool and get a Registry card: everything except Others. */
-    public function scopeWithPool($query)
+    public function scopeWithPool(Builder $query): Builder // typed: clears Intelephense P1132
     {
+        
         return $query->where('code', '!=', self::OTHERS_CODE);
     }
 

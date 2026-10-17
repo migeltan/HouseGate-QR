@@ -24,7 +24,7 @@ class GenerateMultiBuildingPasses extends Command
         // MULTI building was retired in favor of homing multi-passes under
         // North Gate (NG), so there's no longer a placeholder building to
         // exclude here.
-        $buildings = Building::all();
+        $buildings = Building::withPool()->get(); // same set as before: Others is not a building to sample
 
         if ($buildings->count() < 2) {
             $this->error('Need at least 2 buildings in the database before generating multi-building passes.');

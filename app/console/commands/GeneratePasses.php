@@ -27,7 +27,8 @@ class GeneratePasses extends Command
         }
 
         $code = $this->argument('building');
-        $buildings = $code ? Building::where('code', strtoupper($code))->get() : Building::all();
+        // withPool(): the hidden "Others" row never owns cards, so it is never generated
+        $buildings = $code ? Building::withPool()->where('code', strtoupper($code))->get() : Building::withPool()->get();
 
         if ($buildings->isEmpty()) {
             $this->error('No matching building found.');

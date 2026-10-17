@@ -153,10 +153,11 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         if ($request->user()->isGuard() && (int) $building->id !== (int) session('assigned_building_id')) {
             abort(403);
         }
-        abort_if($building->code === 'NG', 404);
+        abort_if($building->code === Building::OTHERS_CODE, 404); // Others has no card pool
+        $multi = $building->code === 'NG'; // Gate 6's pool holds multi-building cards only (guards never reach here: 403 above)
 
         $cards = VisitorPass::where('building_id', $building->id)
-            ->where('is_multi_building', false)
+            ->where('is_multi_building', $multi)
             ->inStock()
             ->orderBy('pass_number')
             ->get(['id', 'pass_number']);
@@ -270,9 +271,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         $hasOthers = $othersId && in_array((int) $othersId, array_map('intval', $data['building_ids']), true);
         $isMulti = count($data['building_ids']) > 1 || $hasOthers;
 
-        if ($hasOthers && trim((string) ($data['others_place'] ?? '')) === '') {
-            throw ValidationException::withMessages(['register' => 'Choose which place under "Others" the visitor is going to.']);
-        }
+        // The place is optional: Others can be chosen as-is. It is only kept when Others is ticked.
         if (! $hasOthers) {
             $data['others_place'] = null;
         }
@@ -281,9 +280,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             abort_unless($request->user()->isAdmin(), 403, 'Only admins can issue a Gate 6 (multi-building) pass.');
         }
 
-        if (! empty($data['pass_id']) && $isMulti) {
-            throw ValidationException::withMessages(['register' => 'A specific card can only be chosen for a single-building pass.']);
-        }
+        // A specific card (pass_id) is allowed for single-building and Gate 6 passes alike; each register path re-checks it under a lock.
 
                 // Building lock: every chosen congressman must sit in one of the submitted
         // buildings (for guards, building_ids was already forced to their own).
@@ -304,7 +301,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
         $data['congressman_ids'] = $congressmen->pluck('id')->all();
         $data['office_other'] = $other !== '' ? $other : null;
-        $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other'], $data['others_place'] ?? null);
+        $data['office_to_visit'] = $this->officeSummary($congressmen, $data['office_other'], $data['others_place'] ?? null, (bool) $hasOthers);
 
         if ($data['pass_class'] === 'long_term' && ! empty($data['expected_return_date'])) {
             $cap = now()->startOfDay()->addDays(VisitorPass::MAX_LONG_TERM_DAYS);
@@ -575,6 +572,25 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         // Same rule as single-building: choose (or mint) the card inside the transaction under a lock,
         // so two admins can neither take the same free card nor mint the same new number.
         [$pass, $transferred] = DB::transaction(function () use ($northGateId, $data, $request) {
+            // Manual pick: the admin chose this exact Gate 6 card. Re-checked under the lock (still blank, not on hold,
+            // in the pool); it is never silently swapped for a different card.
+            if (! empty($data['pass_id'])) {
+                $chosen = VisitorPass::whereKey($data['pass_id'])
+                    ->where('is_multi_building', true)
+                    ->inStock()
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $chosen) {
+                    throw ValidationException::withMessages(['register' => 'That Gate 6 card is no longer available: it was just issued, is on hold, or is not in stock. Pick another card, or use auto-assign.']);
+                }
+
+                $transferred = $this->assignVisitorToPass($chosen, $data, $request);
+                $chosen->buildings()->sync($data['building_ids']);
+
+                return [$chosen, $transferred];
+            }
+
             $pass = VisitorPass::where('is_multi_building', true)
                 ->inStock()
                 ->orderBy('pass_number')
@@ -1029,6 +1045,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         return [
             'pass_id'     => $pass->id,
             'pass_number' => (int) $pass->pass_number,
+            'info'        => $pass->infoPayload(),
             'status'      => $pass->displayStatus(),
             'row'         => view('passes._pass-row', [
                 'p' => $pass,
@@ -1056,13 +1073,14 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
                 'ok'          => true,
                 'message'     => $message,
                 'pass_number' => (int) $pass->pass_number,
+                'info'        => $updates[0]['info'],
                 'updates'     => $updates,
             ]);
         }
 
         return redirect()->route('passes.index')
             ->with('success', $message)
-            ->with('success_pass_number', $pass->pass_number);
+            ->with('success_pass_info', $pass->infoPayload());
     }
 
     /**
@@ -1268,7 +1286,7 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
      * One-line "who they're visiting" text kept in office_to_visit so the info
      * modal and pre-existing passes keep working. The pivot holds the real data.
      */
-    private function officeSummary(\Illuminate\Support\Collection $congressmen, ?string $other, ?string $place = null): string
+    private function officeSummary(\Illuminate\Support\Collection $congressmen, ?string $other, ?string $place = null, bool $hasOthers = false): string
     {
         $parts = $congressmen->sortBy('name')
             ->map(fn ($c) => $c->name . ($c->room ? " ({$c->room})" : ''))
@@ -1277,6 +1295,8 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
 
         if ($place) {
             $parts[] = "Others: {$place}";
+        } elseif ($hasOthers) {
+            $parts[] = 'Others'; // ticked with no place chosen: still say where they are headed
         }
 
         if ($other) {

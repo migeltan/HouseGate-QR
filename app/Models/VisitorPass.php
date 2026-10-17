@@ -240,4 +240,31 @@ class VisitorPass extends Model
     {
         return $this->registrations()->whereNull('unassigned_at')->latest('registered_at')->first();
     }
+
+    /** Data for the View Info modal. Shared by the row markup and the register response. */
+    public function infoPayload(): array
+    {
+        return [
+            'pass_number' => $this->pass_number,
+            'status' => $this->status,
+            'building' => $this->building?->name,
+            'qr_url' => route('passes.show', $this),
+            'visitor_name' => $this->visitor_name,
+            'gender' => $this->gender,
+            'contact_no' => $this->contact_no,
+            'visitor_email' => $this->visitor_email,
+            'id_type' => $this->id_type,
+            'id_ref' => $this->id_ref,
+            'office_to_visit' => $this->office_to_visit,
+            'contact_person' => $this->contact_person,
+            'purpose' => $this->purpose,
+            'vehicle' => $this->vehicle,
+            'registered_by' => $this->registered_by,
+            'pass_class' => $this->pass_class,
+            'issued_at' => $this->issued_at?->format('M j, Y g:i A'),
+            'expected_return_date' => $this->expected_return_date?->format('M j, Y'),
+            'photo_url' => $this->photo_path ? asset('storage/' . $this->photo_path) : null,
+            'id_photo_url' => $this->id_photo_path ? asset('storage/' . $this->id_photo_path) : null,
+        ];
+    }
 }
