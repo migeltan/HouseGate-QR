@@ -3467,3 +3467,245 @@ a.sidebar-btn {
         position: static;
     }
 }
+
+/* ---- QR sheet designer (inventory > Print / Export > QR only) ---- */
+.qd-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.qd-page {
+    position: relative;
+    flex: none;
+    overflow: hidden;
+    background: #fff;
+    cursor: grab;
+    touch-action: none;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+    user-select: none;
+}
+.qd-page:active {
+    cursor: grabbing;
+}
+.qd-grid {
+    position: relative;
+    display: grid;
+    justify-content: center;
+    align-content: start;
+    box-sizing: content-box;
+}
+.qd-cell {
+    width: var(--cw);
+    height: var(--ch);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: var(--cj);
+    padding-top: var(--cpt);
+    outline: 1px solid #c5ccd6;
+    background: #fff;
+}
+.qd-hide-guides .qd-cell {
+    outline: none;
+}
+.qd-q {
+    flex: none;
+    width: var(--qs);
+    height: var(--qs);
+    background: repeating-conic-gradient(var(--qc) 0 25%, #fff 0 50%) 0 0 / 20%
+        20%;
+}
+.qd-l {
+    flex: none;
+    width: var(--lw);
+    height: var(--lh);
+    margin-top: var(--lm);
+    background: var(--qc);
+    opacity: 0.55;
+    border-radius: 1px;
+}
+.qd-tip {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+}
+/* ---- Manage Cards: one stable dialog, flat editors, footer actions ---- */
+.inv-modal {
+    width: min(1080px, 96vw);
+    max-width: none;
+    min-height: min(680px, calc(100dvh - 48px));
+}
+.inv-modal .inv-panel[data-inv-panel="generate"],
+.inv-modal .inv-panel[data-inv-panel="stock"] {
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+}
+
+/* Segmented controls instead of rows of outlined pills */
+.inv-modal .inv-seg {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    width: fit-content;
+    padding: 4px;
+    background: #e6ecf5;
+    border-radius: 12px;
+}
+.inv-modal .inv-seg-btn {
+    padding: 0.45rem 1rem;
+    color: #475569;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+    box-shadow: none;
+}
+.inv-modal .inv-seg-btn:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
+.inv-modal .inv-seg-btn.is-active {
+    color: var(--brand-blue);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+}
+
+/* Print options row + range fields */
+.inv-opts {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    align-items: end;
+}
+.inv-opt .cd-select {
+    width: 100%;
+}
+.inv-modal .inv-pair {
+    max-width: 460px;
+}
+
+/* Editors: preview on the left, one flat grid of fields on the right, no half-empty boxes */
+.inv-modal .cd-box {
+    padding: 20px;
+}
+.inv-modal .cd-head .inv-opt-label {
+    font-size: 15px;
+}
+.inv-modal .cd-grid {
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    gap: 26px;
+}
+.qd-form {
+    display: grid;
+    gap: 14px 16px;
+    align-content: start;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+}
+.qd-form.qd-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.qd-cap {
+    grid-column: 1 / -1;
+    margin: 8px 0 -4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e2e8f0;
+    font:
+        800 12px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.qd-cap:first-child {
+    margin-top: 0;
+}
+.qd-span-2 {
+    grid-column: span 2;
+}
+.qd-span-3 {
+    grid-column: span 3;
+}
+.qd-form .inv-field label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.qd-form .inv-field select,
+.qd-form .inv-field input[type="number"],
+.qd-form .inv-field input[type="color"] {
+    width: 100%;
+    height: 40px;
+    box-sizing: border-box;
+}
+.qd-checks {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding-top: 6px;
+}
+.qd-checks .inv-check {
+    margin: 0;
+}
+
+/* Footer: summary on the left, actions on the right, part of the dialog (never floats over the editors) */
+.inv-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 28px;
+    background: #fff;
+    border-top: 1px solid #dbe3ee;
+}
+.inv-footer.hidden {
+    display: none;
+}
+.inv-footer .inv-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.inv-footer .inv-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+}
+.inv-footer .inv-actions > * {
+    flex: 0 0 auto;
+    min-width: 180px;
+}
+
+@media (max-width: 900px) {
+    .qd-form,
+    .qd-form.qd-cols-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .qd-span-3 {
+        grid-column: 1 / -1;
+    }
+}
+@media (max-width: 640px) {
+    .inv-modal {
+        width: 100%;
+    }
+    .inv-modal .inv-seg {
+        flex-wrap: wrap;
+    }
+    .inv-modal .cd-grid {
+        grid-template-columns: 1fr;
+    }
+    .inv-footer {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 18px;
+    }
+    .inv-footer .inv-actions {
+        flex-wrap: wrap;
+    }
+    .inv-footer .inv-actions > * {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}

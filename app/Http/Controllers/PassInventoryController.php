@@ -231,6 +231,92 @@ class PassInventoryController extends Controller
         return redirect()->route('passes.index')->with('success', $message);
     }
 
+    /**
+     * QR-only label sheet settings (mm unless noted). Defaults reproduce the original fixed layout:
+     * cells sized from the `size` param on an 8 mm margin with a 2 mm gap.
+     * mode=fill ignores size: it splits the printable area into cols x rows cells and scales the QR to fit.
+     * Override any key from the print URL with q[key]=value (e.g. q[mode]=fill&q[cols]=6&q[rows]=9).
+     */
+    private const QR_DEFAULTS = [
+        'mode' => 'fixed', 'size' => 0.0, 'cols' => 6.0, 'rows' => 9.0,
+        'margin' => 8.0, 'gap' => 2.0, 'pad' => 2.0,
+        'label' => true, 'label_size' => 7.0,
+        'landscape' => false, 'guides' => true, 'color' => 'building',
+        'offset_x' => 0.0, 'offset_y' => 0.0,
+    ];
+
+    private function qrSettings(Request $request, int $selectionSize): array
+    {
+        $request->validate([
+            'q'            => 'nullable|array',
+            'q.mode'       => 'nullable|in:fixed,fill',
+            'q.size'       => 'nullable|numeric|min:8|max:80',
+            'q.cols'       => 'nullable|integer|min:1|max:30',
+            'q.rows'       => 'nullable|integer|min:1|max:40',
+            'q.margin'     => 'nullable|numeric|min:0|max:30',
+            'q.gap'        => 'nullable|numeric|min:0|max:20',
+            'q.pad'        => 'nullable|numeric|min:0|max:10',
+            'q.label'      => 'nullable|boolean',
+            'q.label_size' => 'nullable|numeric|min:4|max:14',
+            'q.landscape'  => 'nullable|boolean',
+            'q.guides'     => 'nullable|boolean',
+            'q.color'      => 'nullable|in:building,black',
+            'q.offset_x'   => 'nullable|numeric|min:-50|max:50',
+            'q.offset_y'   => 'nullable|numeric|min:-50|max:50',
+        ]);
+
+        $out = self::QR_DEFAULTS;
+        foreach ((array) $request->input('q', []) as $key => $value) {
+            if (! array_key_exists($key, $out) || $value === null || $value === '') {
+                continue;
+            }
+            $out[$key] = match (true) {
+                is_bool($out[$key])  => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+                is_float($out[$key]) => (float) $value,
+                default              => (string) $value,
+            };
+        }
+        if ($out['size'] <= 0) {
+            $out['size'] = (float) $selectionSize;
+        }
+
+        return $out;
+    }
+
+    /** Page layout for the QR sheet: grid size, cell size and QR size, all in mm. */
+    private function qrLayout(string $paper, array $q): array
+    {
+        $g = $this->grid($paper, 10, 10, 0, $q['margin'], $q['landscape']);   // paper dims (swapped when landscape) + page_size
+        $p = $g['paper'];
+        $pad = $q['pad'];
+        $labelBlock = $q['label'] ? 5 + ($q['label_size'] - 7) * 0.3528 * 1.2 : 0;
+
+        if ($q['mode'] === 'fill') {
+            $cols = (int) $q['cols'];
+            $rows = (int) $q['rows'];
+            $cw = ($p['w'] - 2 * $q['margin'] - ($cols - 1) * $q['gap']) / $cols;
+            $ch = ($p['h'] - 2 * $q['margin'] - ($rows - 1) * $q['gap']) / $rows;
+            $size = min($cw - 2 * $pad, $ch - 2 * $pad - $labelBlock);
+        } else {
+            $size = $q['size'];
+            $cw = $size + 2 * $pad;
+            $ch = $size + 2 * $pad + $labelBlock;
+            $cols = max(1, (int) floor(($p['w'] - 2 * $q['margin'] + $q['gap']) / ($cw + $q['gap'])));
+            $rows = max(1, (int) floor(($p['h'] - 2 * $q['margin'] + $q['gap']) / ($ch + $q['gap'])));
+        }
+
+        return [
+            'paper'    => $p,
+            'margin'   => $q['margin'],
+            'cols'     => $cols,
+            'rows'     => $rows,
+            'per_page' => $cols * $rows,
+            'cw'       => round($cw, 3),
+            'ch'       => round($ch, 3),
+            'size'     => max(4.0, floor($size * 10) / 10),
+        ];
+    }
+
     public function print(Request $request)
     {
         $d = $this->selection($request);
@@ -238,12 +324,13 @@ class PassInventoryController extends Controller
         $passes = $this->passesFor($building, $d);
 
         if ($d['layout'] === 'qr') {
-            $s = $d['size'];
+            $q = $this->qrSettings($request, $d['size']);
+
             return view('passes.print-qr', [
                 'building' => $building,
                 'passes'   => $passes,
-                'size'     => $s,
-                'grid'     => $this->grid($d['paper'], $s + 4, $s + 9, 2),
+                'q'        => $q,
+                'grid'     => $this->qrLayout($d['paper'], $q),
             ]);
         }
 

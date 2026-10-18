@@ -140,7 +140,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
 
 @if (auth()->user()->isAdmin())
 <div id="inventoryModal" class="reg-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
-    <section class="reg-modal" style="max-width: 34rem;">
+    <section class="reg-modal inv-modal" id="inventoryDialog">
         <header class="reg-modal-header">
             <i class="fa-solid fa-boxes-stacked header-icon"></i>
             <div>
@@ -156,7 +156,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                 <label for="invBuilding">Building</label>
                 <select id="invBuilding">
                     @foreach ($displayBuildings as $b)
-                        <option value="{{ $b->id }}" data-template="{{ $b->template_image ? asset($b->template_image) : '' }}">{{ $b->name }}{{ $b->code === 'NG' ? ' (multi-building pool)' : '' }}</option>
+                        <option value="{{ $b->id }}" data-template="{{ $b->template_image ? asset($b->template_image) : '' }}" data-qr="{{ $b->qr_color_hex ?: ($b->color_hex ?: '#000000') }}">{{ $b->name }}{{ $b->code === 'NG' ? ' (multi-building pool)' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="inv-stats">
@@ -189,7 +189,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
             </form>
 
             {{-- Print / export --}}
-            <form method="GET" action="{{ route('passes.inventory.print') }}" target="_blank" data-inv-panel="print" class="inv-panel hidden">
+            <form method="GET" action="{{ route('passes.inventory.print') }}" target="_blank" id="invPrintForm" data-inv-panel="print" class="inv-panel hidden">
                 <input type="hidden" name="building_id" id="invPrintBuilding">
                 <input type="hidden" name="mode" id="invModeInput" value="range">
 
@@ -226,30 +226,20 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                         </div>
                     </div>
                     <div class="inv-opt">
-                        <span class="inv-opt-label">Paper</span>
-                        <div class="inv-seg">
-                            <button type="button" class="inv-seg-btn is-active" data-inv-paper="a4" onclick="invOpt('paper','a4')">A4</button>
-                            <button type="button" class="inv-seg-btn" data-inv-paper="letter" onclick="invOpt('paper','letter')">Letter</button>
-                            <button type="button" class="inv-seg-btn" data-inv-paper="legal" onclick="invOpt('paper','legal')">Legal</button>
-                        </div>
-                    </div>
-                    <div class="inv-opt hidden" data-inv-qronly>
-                        <span class="inv-opt-label">QR size</span>
-                        <div class="inv-seg">
-                            <button type="button" class="inv-seg-btn" data-inv-size="18" onclick="invOpt('size','18')">18 mm</button>
-                            <button type="button" class="inv-seg-btn is-active" data-inv-size="22" onclick="invOpt('size','22')">22 mm</button>
-                            <button type="button" class="inv-seg-btn" data-inv-size="26" onclick="invOpt('size','26')">26 mm</button>
-                        </div>
+                        <label class="inv-opt-label" for="invPaperSelect">Paper</label>
+                        <select id="invPaperSelect" class="cd-select" onchange="invOpt('paper', this.value)">
+                            <option value="a4">A4 (210 × 297 mm)</option>
+                            <option value="letter">Letter (8.5 × 11 in)</option>
+                            <option value="legal">Legal (8.5 × 14 in)</option>
+                        </select>
                     </div>
                 </div>
 
                 {{-- Card design: every input is named t[...] so the GET form sends it to the print sheet as-is --}}
                 <?php
-                    $cdFields = [
-                        'Card' => [['card_w', 'Width (mm)', 30, 200, 60], ['card_h', 'Height (mm)', 30, 290, 100], ['radius', 'Corner (mm)', 0, 10, 2], ['gap', 'Gap (mm)', 0, 20, 4], ['margin', 'Page margin (mm)', 0, 30, 8]],
-                        'QR code' => [['qr_size', 'Size (% of width)', 15, 90, 50.67], ['qr_x', 'Left (%)', 0, 100, 50], ['qr_y', 'Top (%)', 0, 100, 60.2], ['qr_pad', 'Padding (mm)', 0, 5, 1.2]],
-                        'Pass number' => [['num_size', 'Size (% of width)', 4, 30, 13.33], ['num_x', 'Left (%)', 0, 100, 50], ['num_y', 'Top (%)', 0, 100, 84.7]],
-                    ];
+                    $cdCard = [['card_w', 'Width (mm)', 30, 200, 60], ['card_h', 'Height (mm)', 30, 290, 100], ['radius', 'Corner (mm)', 0, 10, 2], ['gap', 'Gap (mm)', 0, 20, 4]];
+                    $cdQr   = [['qr_size', 'Size (% of width)', 15, 90, 50.67], ['qr_x', 'Left (%)', 0, 100, 50], ['qr_y', 'Top (%)', 0, 100, 60.2], ['qr_pad', 'Padding (mm)', 0, 5, 1.2]];
+                    $cdNum  = [['num_size', 'Size (% of width)', 4, 30, 13.33], ['num_x', 'Left (%)', 0, 100, 50], ['num_y', 'Top (%)', 0, 100, 84.7]];
                 ?>
                 <div class="cd-box" data-inv-cardonly>
                     <div class="cd-head">
@@ -272,49 +262,108 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                                 <div class="cd-prev-num" id="cdPrevNum">0001</div>
                             </div>
                         </div>
-                        <div class="cd-fields">
-                            @foreach ($cdFields as $group => $fields)
-                                <fieldset class="cd-group">
-                                    <legend>{{ $group }}</legend>
-                                    <div class="cd-row">
-                                        @foreach ($fields as [$k, $label, $min, $max, $val])
-                                            <div class="inv-field">
-                                                <label for="cd_{{ $k }}">{{ $label }}</label>
-                                                <input id="cd_{{ $k }}" class="cd-in" data-cd="{{ $k }}" name="t[{{ $k }}]" type="number" step="any" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </fieldset>
-                            @endforeach
-                            <fieldset class="cd-group">
-                                <legend>Options</legend>
-                                <div class="cd-row">
-                                    <div class="inv-field">
-                                        <label for="cd_bg_fit">Background fit</label>
-                                        <select id="cd_bg_fit" class="cd-select cd-in" data-cd="bg_fit" name="t[bg_fit]">
-                                            <option value="cover">Cover (crop to fill)</option>
-                                            <option value="contain">Contain (whole image)</option>
-                                            <option value="fill">Stretch to fit</option>
-                                        </select>
-                                    </div>
-                                    <div class="inv-field">
-                                        <label for="cd_num_color">Number colour</label>
-                                        <input id="cd_num_color" class="cd-in cd-color" data-cd="num_color" name="t[num_color]" type="color" value="#ffffff">
-                                    </div>
+                        <div class="qd-form qd-cols-4">
+                            <h4 class="qd-cap">Card</h4>
+                            @foreach ($cdCard as [$k, $label, $min, $max, $val])
+                                <div class="inv-field">
+                                    <label for="cd_{{ $k }}">{{ $label }}</label>
+                                    <input id="cd_{{ $k }}" class="cd-in" data-cd="{{ $k }}" name="t[{{ $k }}]" type="number" step="any" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
                                 </div>
+                            @endforeach
+                            <h4 class="qd-cap">Page &amp; background</h4>
+                            <div class="inv-field">
+                                <label for="cd_margin">Page margin (mm)</label>
+                                <input id="cd_margin" class="cd-in" data-cd="margin" name="t[margin]" type="number" step="any" min="0" max="30" value="8">
+                            </div>
+                            <div class="inv-field qd-span-3">
+                                <label for="cd_bg_fit">Background fit</label>
+                                <select id="cd_bg_fit" class="cd-select cd-in" data-cd="bg_fit" name="t[bg_fit]">
+                                    <option value="cover">Cover (crop to fill)</option>
+                                    <option value="contain">Contain (whole image)</option>
+                                    <option value="fill">Stretch to fit</option>
+                                </select>
+                            </div>
+                            <h4 class="qd-cap">QR code</h4>
+                            @foreach ($cdQr as [$k, $label, $min, $max, $val])
+                                <div class="inv-field">
+                                    <label for="cd_{{ $k }}">{{ $label }}</label>
+                                    <input id="cd_{{ $k }}" class="cd-in" data-cd="{{ $k }}" name="t[{{ $k }}]" type="number" step="any" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
+                                </div>
+                            @endforeach
+                            <h4 class="qd-cap">Pass number</h4>
+                            @foreach ($cdNum as [$k, $label, $min, $max, $val])
+                                <div class="inv-field">
+                                    <label for="cd_{{ $k }}">{{ $label }}</label>
+                                    <input id="cd_{{ $k }}" class="cd-in" data-cd="{{ $k }}" name="t[{{ $k }}]" type="number" step="any" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
+                                </div>
+                            @endforeach
+                            <div class="inv-field">
+                                <label for="cd_num_color">Colour</label>
+                                <input id="cd_num_color" class="cd-in cd-color" data-cd="num_color" name="t[num_color]" type="color" value="#ffffff">
+                            </div>
+                            <div class="qd-checks">
                                 <label class="inv-check"><input type="hidden" name="t[num_show]" value="0"><input class="cd-in" data-cd="num_show" type="checkbox" name="t[num_show]" value="1" checked> Show pass number</label>
                                 <label class="inv-check"><input type="hidden" name="t[landscape]" value="0"><input class="cd-in" data-cd="landscape" type="checkbox" name="t[landscape]" value="1"> Landscape paper</label>
                                 <label class="inv-check"><input type="hidden" name="t[guides]" value="0"><input class="cd-in" data-cd="guides" type="checkbox" name="t[guides]" value="1"> Cut guides</label>
-                            </fieldset>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <p class="inv-summary" id="invSummary"></p>
-
-                <div class="inv-actions">
-                    <button type="submit" data-inv-print class="gov-btn-camera"><i class="fa-solid fa-print"></i> Open print sheet</button>
-                    <button type="submit" data-inv-print formaction="{{ route('passes.inventory.csv') }}" formtarget="_self" class="gov-btn-glass-outline"><i class="fa-solid fa-file-csv"></i> Download CSV</button>
+                {{-- QR sheet layout: every input is named q[...] so the GET form sends it to the print sheet as-is --}}
+                <?php
+                    $qrRows = [
+                        'Size & grid' => [['size', 'QR size (mm)', 8, 80, 22, 'any'], ['cols', 'Columns', 1, 30, 6, 1], ['rows', 'Rows', 1, 40, 9, 1]],
+                        'Spacing' => [['margin', 'Page margin (mm)', 0, 30, 8, 'any'], ['gap', 'Gap (mm)', 0, 20, 2, 'any'], ['pad', 'Cell padding (mm)', 0, 10, 2, 'any']],
+                        'Position & label' => [['offset_x', 'Shift right (mm)', -50, 50, 0, 'any'], ['offset_y', 'Shift down (mm)', -50, 50, 0, 'any'], ['label_size', 'Label size (pt)', 4, 14, 7, 'any']],
+                    ];
+                ?>
+                <div class="cd-box hidden" data-inv-qronly>
+                    <div class="cd-head">
+                        <span class="inv-opt-label">Sheet layout</span>
+                        <span class="cd-hint" id="qrHint"></span>
+                    </div>
+                    <p class="cd-msg is-error" id="qrMsg"></p>
+                    <div class="cd-grid">
+                        <div class="cd-preview-wrap">
+                            <div class="qd-side">
+                                <div class="qd-page" id="qrPage"><div class="qd-grid" id="qrGrid"></div></div>
+                                <p class="qd-tip">Drag the page to shift the grid</p>
+                                <button type="button" class="cd-btn" onclick="qrCentre()">Centre grid</button>
+                            </div>
+                        </div>
+                        <div class="qd-form qd-cols-3">
+                            <h4 class="qd-cap">Arrangement</h4>
+                            <div class="inv-field qd-span-2">
+                                <label for="qd_mode">How to place the QRs</label>
+                                <select id="qd_mode" class="cd-select qd-in" data-qd="mode" name="q[mode]">
+                                    <option value="fixed">Fixed size, as many as fit</option>
+                                    <option value="fill">Fill the page (columns × rows)</option>
+                                </select>
+                            </div>
+                            <div class="inv-field">
+                                <label for="qd_color">QR colour</label>
+                                <select id="qd_color" class="cd-select qd-in" data-qd="color" name="q[color]">
+                                    <option value="building">Building colour</option>
+                                    <option value="black">Black</option>
+                                </select>
+                            </div>
+                            @foreach ($qrRows as $group => $fields)
+                                <h4 class="qd-cap">{{ $group }}</h4>
+                                @foreach ($fields as [$k, $label, $min, $max, $val, $step])
+                                    <div class="inv-field">
+                                        <label for="qd_{{ $k }}">{{ $label }}</label>
+                                        <input id="qd_{{ $k }}" class="qd-in" data-qd="{{ $k }}" name="q[{{ $k }}]" type="number" step="{{ $step }}" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
+                                    </div>
+                                @endforeach
+                            @endforeach
+                            <div class="qd-checks">
+                                <label class="inv-check"><input type="hidden" name="q[label]" value="0"><input class="qd-in" data-qd="label" type="checkbox" name="q[label]" value="1" checked> Show label under each QR</label>
+                                <label class="inv-check"><input type="hidden" name="q[landscape]" value="0"><input class="qd-in" data-qd="landscape" type="checkbox" name="q[landscape]" value="1"> Landscape paper</label>
+                                <label class="inv-check"><input type="hidden" name="q[guides]" value="0"><input class="qd-in" data-qd="guides" type="checkbox" name="q[guides]" value="1" checked> Cut guides</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
             {{-- Desk cards: which blank cards this desk physically holds --}}
@@ -354,6 +403,14 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                 </div>
             </form>
         </main>
+
+        <footer class="reg-modal-footer inv-footer hidden" id="invPrintFooter">
+            <p class="inv-summary" id="invSummary"></p>
+            <div class="inv-actions">
+                <button type="submit" form="invPrintForm" data-inv-print class="gov-btn-camera"><i class="fa-solid fa-print"></i> Open print sheet</button>
+                <button type="submit" form="invPrintForm" data-inv-print formaction="{{ route('passes.inventory.csv') }}" formtarget="_self" class="gov-btn-glass-outline"><i class="fa-solid fa-file-csv"></i> Download CSV</button>
+            </div>
+        </footer>
     </section>
 </div>
 @endif
@@ -372,6 +429,8 @@ const passWord = n => (n === 1 ? 'pass' : 'passes');
 function invTab(tab) {
     document.querySelectorAll('[data-inv-tab]').forEach(b => b.classList.toggle('is-active', b.dataset.invTab === tab));
     document.querySelectorAll('[data-inv-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.invPanel !== tab));
+    // The print actions live in the dialog footer, so it only shows on this tab
+    document.getElementById('invPrintFooter')?.classList.toggle('hidden', tab !== 'print');
 }
 function invStockMode(mode) {
     $i('invStockModeInput').value = mode;
@@ -397,14 +456,14 @@ function invMode(mode) {
 // Mirrors PassInventoryController::grid() so the modal can show pages per sheet
 const PAPER = { a4: [210, 297], letter: [215.9, 279.4], legal: [215.9, 355.6] };
 function invPerPage() {
-    let [w, h] = PAPER[$i('invPaper').value];
-    const s = +$i('invSize').value;
-    const isQr = $i('invLayout').value === 'qr';
+    const paper = $i('invPaper').value;
+    if ($i('invLayout').value === 'qr') return qrLayoutJs(paper, qrRead(), +$i('invSize').value).perPage;
+    let [w, h] = PAPER[paper];
     const t = cdRead();
-    if (!isQr && t.landscape) [w, h] = [h, w];
-    const [cw, ch, gap, m] = isQr ? [s + 4, s + 9, 2, 8] : [Math.max(1, t.card_w), Math.max(1, t.card_h), t.gap, t.margin];
-    const cols = Math.max(1, Math.floor((w - 2 * m + gap) / (cw + gap)));
-    const rows = Math.max(1, Math.floor((h - 2 * m + gap) / (ch + gap)));
+    if (t.landscape) [w, h] = [h, w];
+    const cw = Math.max(1, t.card_w), ch = Math.max(1, t.card_h);
+    const cols = Math.max(1, Math.floor((w - 2 * t.margin + t.gap) / (cw + t.gap)));
+    const rows = Math.max(1, Math.floor((h - 2 * t.margin + t.gap) / (ch + t.gap)));
     return cols * rows;
 }
 function invOpt(kind, value) {
@@ -413,6 +472,8 @@ function invOpt(kind, value) {
     document.querySelectorAll(`[data-inv-${kind}]`).forEach(b => b.classList.toggle('is-active', b.dataset[key] === value));
     document.querySelectorAll('[data-inv-qronly]').forEach(el => el.classList.toggle('hidden', $i('invLayout').value !== 'qr'));
     document.querySelectorAll('[data-inv-cardonly]').forEach(el => el.classList.toggle('hidden', $i('invLayout').value !== 'card'));
+    if (kind === 'size') qrEl('size').value = value;
+    qrUi();
     invRefresh();
 }
 
@@ -586,7 +647,7 @@ function cdWrite(s) {
 function cdPreview() {
     const t = cdRead(), opt = $i('invBuilding').selectedOptions[0];
     const cw = Math.max(1, t.card_w), ch = Math.max(1, t.card_h);
-    const k = Math.min(200 / cw, 280 / ch);   // preview pixels per mm
+    const k = Math.min(240 / cw, 360 / ch);   // preview pixels per mm
     Object.assign($i('cdPrev').style, {
         width: cw * k + 'px', height: ch * k + 'px', borderRadius: t.radius * k + 'px',
         backgroundImage: opt && opt.dataset.template ? `url("${opt.dataset.template}")` : 'none',
@@ -688,6 +749,110 @@ $i('invBuilding').addEventListener('change', cdPreview);
 cdPreview();
 cdLoad('');
 // ---- End card designer ----
+
+// ---- QR sheet designer (Print / Export > QR only) ----
+// Mirrors PassInventoryController::QR_DEFAULTS / qrLayout(). Inputs are named q[...], so the print form submits them as-is.
+const QD_NUM = ['size', 'cols', 'rows', 'margin', 'gap', 'pad', 'label_size', 'offset_x', 'offset_y'];
+const QD_BOOL = ['label', 'landscape', 'guides'];
+const QD_DEFAULTS = { mode: 'fixed', size: 22, cols: 6, rows: 9, margin: 8, gap: 2, pad: 2, label: true, label_size: 7, landscape: false, guides: true, color: 'building', offset_x: 0, offset_y: 0 };
+
+function qrEl(k) { return document.querySelector(`[data-qd="${k}"]`); }
+function qrRead() {
+    const q = { mode: qrEl('mode').value, color: qrEl('color').value };
+    QD_NUM.forEach(key => { q[key] = parseFloat(qrEl(key).value) || 0; });
+    QD_BOOL.forEach(key => { q[key] = qrEl(key).checked; });
+    return q;
+}
+function qrLayoutJs(paper, q, sizeFallback) {
+    let [w, h] = PAPER[paper];
+    if (q.landscape) [w, h] = [h, w];
+    const lb = q.label ? 5 + (q.label_size - 7) * 0.3528 * 1.2 : 0;
+    let cols, rows, cw, ch, size;
+    if (q.mode === 'fill') {
+        cols = Math.max(1, Math.trunc(q.cols));
+        rows = Math.max(1, Math.trunc(q.rows));
+        cw = (w - 2 * q.margin - (cols - 1) * q.gap) / cols;
+        ch = (h - 2 * q.margin - (rows - 1) * q.gap) / rows;
+        size = Math.min(cw - 2 * q.pad, ch - 2 * q.pad - lb);
+    } else {
+        size = q.size > 0 ? q.size : sizeFallback;
+        cw = size + 2 * q.pad;
+        ch = size + 2 * q.pad + lb;
+        cols = Math.max(1, Math.floor((w - 2 * q.margin + q.gap) / (cw + q.gap)));
+        rows = Math.max(1, Math.floor((h - 2 * q.margin + q.gap) / (ch + q.gap)));
+    }
+    size = Math.max(4, Math.floor(size * 10) / 10);
+    return { w, h, cols, rows, cw, ch, size, perPage: cols * rows };
+}
+function qrPreview() {
+    const q = qrRead(), fill = q.mode === 'fill';
+    const L = qrLayoutJs($i('invPaper').value, q, +$i('invSize').value);
+    const k = Math.min(280 / L.w, 420 / L.h);   // preview pixels per mm
+    const opt = $i('invBuilding').selectedOptions[0];
+    const color = q.color === 'black' ? '#000000' : ((opt && opt.dataset.qr) || '#000000');
+    const page = $i('qrPage'), g = $i('qrGrid');
+    page.style.width = L.w * k + 'px';
+    page.style.height = L.h * k + 'px';
+    page.dataset.k = k;
+    g.style.cssText = `left:${q.offset_x * k}px;top:${q.offset_y * k}px;padding-top:${q.margin * k}px;` +
+        `grid-template-columns:repeat(${L.cols},${L.cw * k}px);gap:${q.gap * k}px;` +
+        `--cw:${L.cw * k}px;--ch:${L.ch * k}px;--qs:${L.size * k}px;--qc:${color};` +
+        `--cj:${fill ? 'center' : 'flex-start'};--cpt:${fill ? 0 : q.pad * k}px;--lm:${1.2 * k}px;` +
+        `--lw:${L.size * k * 0.6}px;--lh:${Math.max(1, q.label_size * 0.3528 * k * 0.8)}px`;
+    g.classList.toggle('qd-hide-guides', !q.guides);
+    const cell = '<div class="qd-cell"><i class="qd-q"></i>' + (q.label ? '<b class="qd-l"></b>' : '') + '</div>';
+    g.innerHTML = cell.repeat(Math.min(L.perPage, 600));
+    $i('qrHint').textContent = `${L.cols} × ${L.rows} per page · QR ${L.size} mm`;
+    $i('qrMsg').textContent = L.size < 14 ? 'Small QR: test-scan a printed sample before printing a full batch.' : '';
+}
+// Enable only the inputs that matter for the chosen arrangement, then redraw
+function qrUi() {
+    const fill = qrEl('mode').value === 'fill';
+    qrEl('size').disabled = fill;
+    qrEl('cols').disabled = qrEl('rows').disabled = !fill;
+    qrEl('label_size').disabled = !qrEl('label').checked;
+    document.querySelectorAll('[data-inv-size]').forEach(b => b.classList.toggle('is-active', !fill && b.dataset.invSize === String(+qrEl('size').value)));
+    qrPreview();
+}
+function qrSync() { qrUi(); invRefresh(); }
+function qrCentre() {
+    qrEl('offset_x').value = 0;
+    qrEl('offset_y').value = 0;
+    qrPreview();
+}
+
+document.querySelectorAll('.qd-in').forEach(el => ['input', 'change'].forEach(ev => el.addEventListener(ev, qrSync)));
+document.querySelectorAll('.qd-in[type="number"]').forEach(el => el.addEventListener('change', () => {
+    let v = parseFloat(el.value);
+    if (isNaN(v)) v = QD_DEFAULTS[el.dataset.qd];
+    v = Math.min(+el.max, Math.max(+el.min, v));
+    if (el.step === '1') v = Math.round(v);
+    el.value = v;
+    qrSync();
+}));
+$i('invBuilding').addEventListener('change', qrPreview);
+
+// Drag the page preview to shift the whole grid (0.5 mm steps, +/- 50 mm)
+(function () {
+    const page = $i('qrPage');
+    let st = null;
+    page.addEventListener('pointerdown', e => {
+        st = { x: e.clientX, y: e.clientY, ox: parseFloat(qrEl('offset_x').value) || 0, oy: parseFloat(qrEl('offset_y').value) || 0, k: +page.dataset.k || 1 };
+        page.setPointerCapture(e.pointerId);
+    });
+    page.addEventListener('pointermove', e => {
+        if (!st) return;
+        const cl = v => Math.max(-50, Math.min(50, Math.round(v * 2) / 2));
+        const nx = cl(st.ox + (e.clientX - st.x) / st.k), ny = cl(st.oy + (e.clientY - st.y) / st.k);
+        qrEl('offset_x').value = nx;
+        qrEl('offset_y').value = ny;
+        $i('qrGrid').style.left = nx * st.k + 'px';
+        $i('qrGrid').style.top = ny * st.k + 'px';
+    });
+    ['pointerup', 'pointercancel'].forEach(ev => page.addEventListener(ev, () => { st = null; }));
+})();
+qrUi();
+// ---- End QR sheet designer ----
 
 ['invBuilding', 'invGenFrom', 'invGenTo', 'invFrom', 'invTo', 'invStart', 'invCount', 'invList', 'invOnlyAvail', 'invStockFrom', 'invStockTo']
     .forEach(id => ['input', 'change'].forEach(ev => $i(id).addEventListener(ev, invRefresh)));
