@@ -96,10 +96,13 @@ Gotchas: fixed `/passes/...` routes above `/passes/{pass}`; scheduler/queue need
 
 ## 6. Next (user's queue, one at a time; say "go" before each)
 
-1. ~~Rename NG to Gate 6~~ done. 2. ~~Gate 6 stock to 500~~ dropped (existing feature covers it).
-2. **"Others" in registration:** ~~3a backend~~ done. **3b (next): Destination UI** in `step3-destination.blade.php` + inline JS in `passes/index.blade.php` (`updateBuildingSelection`, `formReady`, `missingFields`, submit payload): "Others" tile with subtitle, "Which place?" list (LIRMD, LSB, People's Center, Bank, Procurement, "Another place..." typed) required when Others is ticked and sent as `others_place`; Others counts as Gate 6 for the hint and hides the specific-card picker; relabel "Or: Other" to "Or: Office / person (not a congressman)"; congressman requirement satisfied by the place; tile only renders if `OTH` is in `$buildings`. **3c: create the `OTH` row** (migration + seeder; skip pass generation for it, name "Others", neutral colour; `template_image`/`qr_color_hex` NOT NULL? check) = switches everything on. Behaviour change last.
-3. **"Others" scanner/guard-login station** (after 3c these lists already pick up `OTH` automatically via `code != 'NG'`: AuthController, BuildingSelectController, ScannerController, login view; verify guard desk behaviour) + log labels for Gate 6 / Others.
-4. **Only if the office approves:** guard issues Gate 6 for Others-only (server rule in `register()`: guards may submit multi only when `OTH` is the sole building).
+make the vistor pass registry grid (1-3 steps) actually useful and explains the features u can do in this tab since theres a lot. maybe like make these info clickable?
+
+1. register normally (lowest pass number in the building you are assigned is automatically registered to the visitor, or choose a specific pass to assign)
+2. transfer passes: transfers the information of a visitor from one pass to another (and multiple) when a sudden change of destination is prompted.
+3. Away cards: indicates which passes are in which location (building, handler, etc.)
+4. Status per card: unassign, revoke, hold cards when necessary.
+5. manage inventory: generate more passes (Above 250), print qr passes, or assign passes to be held by building personnels.
 
 - Dropped: speed work (he expects the office to optimise at deployment). If revived: self-host `html5-qrcode` (currently from unpkg), hover prefetch, drop `database` session driver.
 
