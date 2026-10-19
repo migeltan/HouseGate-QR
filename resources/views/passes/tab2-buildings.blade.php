@@ -25,7 +25,7 @@
 
 
 
-<div class="gov-legend">
+<div class="gov-legend" id="buildingGrid">
     <span class="gov-legend-item"><span class="gov-legend-dot is-active"></span> Active Passes</span>
     <span class="gov-legend-item"><span class="gov-legend-dot is-available"></span> Available Passes</span>
     <span class="gov-legend-item"><span class="gov-legend-dot is-inactive"></span> Inactive Passes</span>

@@ -1,5 +1,8 @@
 {{-- TAB 1 - INSTRUCTIONS --}}
-@php($awayData = \App\Services\AwayCards::forCurrentUser())
+@php
+    $awayData = \App\Services\AwayCards::forCurrentUser();
+    $canRegister = ! (auth()->user()->isGuard() && $buildings->contains('code', \App\Models\Building::OTHERS_CODE));
+@endphp
 {{-- Script for this tab is at the bottom of this file. --}}
 <div class="gov-card">
     <div class="gov-card-header">
@@ -21,20 +24,162 @@
                 </button>
             @endif
             {{-- Guards at the Others station only scan for now: Gate 6 issuing is admin-only (see register()) --}}
-            @unless (auth()->user()->isGuard() && $buildings->contains('code', \App\Models\Building::OTHERS_CODE))
+            @if ($canRegister)
                 <button type="button" onclick="openRegisterModal()" class="gov-btn-camera flex-shrink-0">
                     <i class="fa-solid fa-user-plus"></i> Register Visitor
                 </button>
-            @endunless
+            @endif
         </div>
     </div>
     <div class="gov-card-body">
-        <p class="gov-instr-lead">Register a visitor with their agenda and detail for access to a certain building. The personnel must:</p>
-        <ol class="gov-instr-steps">
-            <li><span class="gov-instr-num">1</span><span>Register the visitor</span></li>
-            <li><span class="gov-instr-num">2</span><span>Assign the specific building/s they need</span></li>
-            <li><span class="gov-instr-num">3</span><span>Unassign after return of visitor pass</span></li>
+        <p class="gov-instr-lead">Everything you can do on this page, in the order you will usually need it. Click a step to see how it works.</p>
+
+        {{-- Guide: one numbered list + one detail pane. Replaces the old 1-2-3 tiles. --}}
+        @php
+            $isAdmin = auth()->user()->isAdmin();
+            $helpTopics = [
+                [
+                    'key' => 'register',
+                    'icon' => 'fa-user-plus',
+                    'title' => 'Register a visitor',
+                    'tag' => 'Issue a card',
+                    'show' => $canRegister,
+                    'what' => 'Records the visitor and their agenda, then gives them a card that works at the building they are visiting.',
+                    'points' => [
+                        'Take the photo, fill in the details and pick the destination.',
+                        'Auto-assign gives the lowest-numbered free card in stock at your desk. To choose a particular card, open the “Card” row and pick one from the list.',
+                        'A day pass expires at 19:00. A long-term pass lasts up to 7 days.',
+                    ],
+                    'note' => $isAdmin
+                        ? 'Tick two or more buildings, or Others, to issue a Gate 6 pass. Gate 6 cards are always auto-assigned.'
+                        : 'Cards are issued for your own building. Gate 6 passes are issued by an admin.',
+                    'where' => 'Use the Register Visitor button at the top right.',
+                    'action' => null,
+                ],
+                [
+                    'key' => 'transfer',
+                    'icon' => 'fa-shuffle',
+                    'title' => 'Transfer a card',
+                    'tag' => 'Destination changed',
+                    'show' => $canRegister,
+                    'what' => 'Moves a visitor’s details to a new card when their destination suddenly changes, so nothing is typed twice.',
+                    'points' => [
+                        'In the visitor form, switch on “Transferring an existing pass?” and scan the visitor’s old card.',
+                        'Their details and photos carry over. Choose the new destination and the new card as usual.',
+                        'If the new destination is a different building, the old card stays at the desk that issued it and the visitor’s ID stays at the desk where it was handed in. Both appear under Away cards.',
+                    ],
+                    'note' => 'If they now need several buildings, the new card is a Gate 6 pass, which an admin issues.',
+                    'where' => null,
+                    'action' => ['Start a transfer', 'startTransferFromHelp()', 'fa-shuffle'],
+                ],
+                [
+                    'key' => 'away',
+                    'icon' => 'fa-location-dot',
+                    'title' => 'Away cards',
+                    'tag' => 'Where cards are',
+                    'show' => true,
+                    'what' => 'Lists the cards and IDs that still need following up after a transfer, so nothing goes missing between desks.',
+                    'points' => [
+                        'Each row shows the visitor, the card, which desk is holding it and since when.',
+                        'When a card is back at its own desk, press Card received. Once the visitor takes their ID back, press ID handed back.',
+                        'Anything still waiting after 12 hours is flagged overdue. The number on the Away cards button counts what is still open.',
+                    ],
+                    'note' => $isAdmin
+                        ? 'As an admin you see every desk’s cards and IDs.'
+                        : 'You see what is waiting for your desk and the cards your desk is holding for other desks.',
+                    'where' => 'Use the Away cards button at the top right.',
+                    'action' => null,
+                ],
+                [
+                    'key' => 'status',
+                    'icon' => 'fa-id-card',
+                    'title' => 'Card status',
+                    'tag' => 'Unassign, revoke, hold',
+                    'show' => true,
+                    'what' => 'Click a building below to see all of its cards and manage each one.',
+                    'points' => [
+                        'Unassign: the visitor returned the card. It becomes available again and the visitor’s details and photos are erased.',
+                        'Revoke: switches a card off straight away (lost, misused). The visitor’s details are kept for the record.',
+                        'Hold: sets a blank card aside when it is missing or damaged, so it is not handed out.',
+                        'Cards also expire on their own: day passes at 19:00, long-term passes at their end date.',
+                    ],
+                    'note' => $isAdmin
+                        ? 'You can manage every building, including Gate 6 passes.'
+                        : 'You manage your own building’s cards. Gate 6 passes are handled by an admin.',
+                    'where' => null,
+                    'action' => ['Go to buildings', 'showCardStatusArea()', 'fa-arrow-down'],
+                ],
+                [
+                    'key' => 'inventory',
+                    'icon' => 'fa-boxes-stacked',
+                    'title' => 'Manage inventory',
+                    'tag' => 'Admin only',
+                    'show' => $isAdmin,
+                    'what' => 'Controls the supply of cards: how many exist, how they are printed and which desk holds them.',
+                    'points' => [
+                        'Generate: add more cards to a building when its first 250 run low, or build up the Gate 6 stock.',
+                        'Print: make QR sheets of the cards you want to hand out.',
+                        'Stock: assign cards to be held by a building’s desk. A desk with fewer than 50 cards in stock gets a low-stock warning.',
+                    ],
+                    'note' => null,
+                    'where' => 'Use the Manage Inventory button at the top right.',
+                    'action' => null,
+                ],
+            ];
+            $helpTopics = array_values(array_filter($helpTopics, fn ($t) => $t['show']));
+            // "Unassign: text" becomes a bold lead word plus the text
+            $helpTopics = array_map(function ($t) {
+                $t['points'] = array_map(function ($p) {
+                    return preg_match('/^(\w+): (.+)$/', $p, $m)
+                        ? ['lead' => $m[1], 'text' => $m[2]]
+                        : ['lead' => null, 'text' => $p];
+                }, $t['points']);
+                return $t;
+            }, $helpTopics);
+        @endphp
+                <ol class="gov-instr-steps is-clickable">
+            @foreach ($helpTopics as $t)
+                <li id="helpItem-{{ $t['key'] }}">
+                    <button type="button" class="gov-instr-btn" id="helpTab-{{ $t['key'] }}" aria-expanded="false"
+                            aria-controls="helpPane-{{ $t['key'] }}" onclick="toggleHelpTopic('{{ $t['key'] }}')">
+                        <span class="gov-instr-num">{{ $loop->iteration }}</span>
+                        <span>{{ $t['title'] }}</span>
+                    </button>
+                </li>
+            @endforeach
         </ol>
+        @foreach ($helpTopics as $t)
+            <div id="helpPane-{{ $t['key'] }}" class="gov-instr-panel" role="region"
+                 aria-labelledby="helpTab-{{ $t['key'] }}" inert>
+            <div class="gov-instr-panel-clip">
+            <section class="gov-instr-detail">
+                <header class="gov-instr-detail-head">
+                    <span class="gov-instr-detail-icon"><i class="fa-solid {{ $t['icon'] }}"></i></span>
+                    <div>
+                        <span class="gov-instr-detail-step">Step {{ $loop->iteration }} of {{ $loop->count }}</span>
+                        <h3>{{ $t['title'] }}</h3>
+                    </div>
+                </header>
+                <p class="gov-instr-detail-what">{{ $t['what'] }}</p>
+                <ul class="gov-instr-detail-points">
+                    @foreach ($t['points'] as $point)
+                        <li>@if ($point['lead'])<b>{{ $point['lead'] }}</b> @endif{{ $point['text'] }}</li>
+                    @endforeach
+                </ul>
+                @if ($t['note'])
+                    <p class="gov-instr-detail-note"><i class="fa-solid fa-circle-info"></i> <span>{{ $t['note'] }}</span></p>
+                @endif
+                @if ($t['action'])
+                    <button type="button" class="gov-instr-detail-action" onclick="{{ $t['action'][1] }}">
+                        <i class="fa-solid {{ $t['action'][2] }}"></i> {{ $t['action'][0] }}
+                    </button>
+                @elseif ($t['where'])
+                    <p class="gov-instr-detail-where"><i class="fa-solid fa-arrow-up"></i> {{ $t['where'] }}</p>
+                @endif
+            </section>
+            </div>
+            </div>
+        @endforeach
     </div>
 </div>
 
@@ -135,6 +280,33 @@ function openRegisterModal() {
 }
 function openInventoryModal() { document.getElementById('inventoryModal')?.classList.remove('hidden'); }
 function closeInventoryModal() { document.getElementById('inventoryModal')?.classList.add('hidden'); }
+
+// ---- Instructions: "What you can do here" topics ----
+// Click a step to open its details below; click it again (or another step) to close/switch.
+function toggleHelpTopic(key) {
+    document.querySelectorAll('.gov-instr-btn').forEach((btn) => {
+        const on = btn.id === 'helpTab-' + key && btn.getAttribute('aria-expanded') !== 'true';
+        btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+        btn.closest('li')?.classList.toggle('is-open', on);
+        const pane = document.getElementById(btn.getAttribute('aria-controls'));
+        if (pane) {
+            pane.classList.toggle('is-open', on);
+            pane.inert = !on; // closed panels are not focusable
+        }
+    });
+}
+// Opens the visitor form with "Transferring an existing pass?" already switched on.
+function startTransferFromHelp() {
+    openRegisterModal();
+    const toggle = document.getElementById('transferModeToggle');
+    if (!toggle) return;
+    toggle.checked = true;
+    toggleTransferMode(true);
+    requestAnimationFrame(() => (toggle.closest('label') || toggle).scrollIntoView({ block: 'center' }));
+}
+function showCardStatusArea() {
+    document.getElementById('buildingGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 // ---- End Tab 1 ----
 </script>
 
