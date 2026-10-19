@@ -177,14 +177,22 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
             <form method="POST" action="{{ route('passes.inventory.generate') }}" data-inv-panel="generate" class="inv-panel">
                 @csrf
                 <input type="hidden" name="building_id" id="invGenBuilding">
-                <div class="inv-pair">
-                    <div class="inv-field"><label for="invGenFrom">From #</label><input id="invGenFrom" type="number" name="from" value="1" min="1" max="9999" required></div>
-                    <div class="inv-field"><label for="invGenTo">To #</label><input id="invGenTo" type="number" name="to" value="250" min="1" max="9999" required></div>
-                </div>
-                <p class="inv-summary" id="invGenSummary"></p>
-                <p class="inv-help">Existing numbers are skipped and existing QR tokens never change. Generating doesn't print anything.</p>
-                <div class="inv-actions">
-                    <button type="submit" id="invGenBtn" class="gov-btn-camera"><i class="fa-solid fa-plus"></i> Generate passes</button>
+                <div class="inv-split">
+                    <div class="inv-split-main inv-aside">
+                        <span class="inv-aside-title">Pass numbers to create</span>
+                        <div class="inv-pair">
+                            <div class="inv-field"><label for="invGenFrom">From #</label><input id="invGenFrom" type="number" name="from" value="1" min="1" max="9999" required></div>
+                            <div class="inv-field"><label for="invGenTo">To #</label><input id="invGenTo" type="number" name="to" value="250" min="1" max="9999" required></div>
+                        </div>
+                        <div class="inv-actions">
+                            <button type="submit" id="invGenBtn" class="gov-btn-camera"><i class="fa-solid fa-plus"></i> Generate passes</button>
+                        </div>
+                    </div>
+                    <aside class="inv-aside">
+                        <span class="inv-aside-title">What will happen</span>
+                        <p class="inv-summary" id="invGenSummary"></p>
+                        <p class="inv-help">Existing numbers are skipped and existing QR tokens never change. Generating doesn't print anything.</p>
+                    </aside>
                 </div>
             </form>
 
@@ -313,7 +321,7 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                 {{-- QR sheet layout: every input is named q[...] so the GET form sends it to the print sheet as-is --}}
                 <?php
                     $qrRows = [
-                        'Size & grid' => [['size', 'QR size (mm)', 8, 80, 22, 'any'], ['cols', 'Columns', 1, 30, 6, 1], ['rows', 'Rows', 1, 40, 9, 1]],
+                        'Size & grid' => [['size', 'QR size (mm)', 6, 80, 15, 'any'], ['cols', 'Columns', 1, 30, 6, 1], ['rows', 'Rows', 1, 40, 9, 1]],
                         'Spacing' => [['margin', 'Page margin (mm)', 0, 30, 8, 'any'], ['gap', 'Gap (mm)', 0, 20, 2, 'any'], ['pad', 'Cell padding (mm)', 0, 10, 2, 'any']],
                         'Position & label' => [['offset_x', 'Shift right (mm)', -50, 50, 0, 'any'], ['offset_y', 'Shift down (mm)', -50, 50, 0, 'any'], ['label_size', 'Label size (pt)', 4, 14, 7, 'any']],
                     ];
@@ -322,6 +330,19 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                     <div class="cd-head">
                         <span class="inv-opt-label">Sheet layout</span>
                         <span class="cd-hint" id="qrHint"></span>
+                    </div>
+                    <div class="cd-tpl">
+                        <select id="qrTemplate" class="cd-select" onchange="qrPresetPick()">
+                            <option value="">Default (auto layout)</option>
+                            <optgroup label="Built-in">
+                                <option value="b:fill6x9">Fill page · 6 × 9</option>
+                                <option value="b:fill4x6">Fill page · 4 × 6 (bigger QRs)</option>
+                            </optgroup>
+                            <optgroup label="Saved" id="qrSavedGroup" hidden></optgroup>
+                        </select>
+                        <button type="button" class="cd-btn" onclick="qrPresetSave()">Save as new</button>
+                        <button type="button" class="cd-btn" id="qrTplUpdate" onclick="qrPresetUpdate()" disabled>Update</button>
+                        <button type="button" class="cd-btn is-danger" id="qrTplDelete" onclick="qrPresetDelete()" disabled>Delete</button>
                     </div>
                     <p class="cd-msg is-error" id="qrMsg"></p>
                     <div class="cd-grid">
@@ -337,8 +358,8 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                             <div class="inv-field qd-span-2">
                                 <label for="qd_mode">How to place the QRs</label>
                                 <select id="qd_mode" class="cd-select qd-in" data-qd="mode" name="q[mode]">
-                                    <option value="fixed">Fixed size, as many as fit</option>
-                                    <option value="fill">Fill the page (columns × rows)</option>
+                                    <option value="fixed">Auto: I set the QR size</option>
+                                    <option value="fill">Grid: I set columns × rows</option>
                                 </select>
                             </div>
                             <div class="inv-field">
@@ -352,12 +373,13 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                                 <h4 class="qd-cap">{{ $group }}</h4>
                                 @foreach ($fields as [$k, $label, $min, $max, $val, $step])
                                     <div class="inv-field">
-                                        <label for="qd_{{ $k }}">{{ $label }}</label>
+                                        <label for="qd_{{ $k }}" id="qd_label_{{ $k }}">{{ $label }}</label>
                                         <input id="qd_{{ $k }}" class="qd-in" data-qd="{{ $k }}" name="q[{{ $k }}]" type="number" step="{{ $step }}" min="{{ $min }}" max="{{ $max }}" value="{{ $val }}">
                                     </div>
                                 @endforeach
                             @endforeach
                             <div class="qd-checks">
+                                <label class="inv-check"><input type="hidden" name="q[spread]" value="0"><input class="qd-in" data-qd="spread" type="checkbox" name="q[spread]" value="1" checked> Spread evenly across the page</label>
                                 <label class="inv-check"><input type="hidden" name="q[label]" value="0"><input class="qd-in" data-qd="label" type="checkbox" name="q[label]" value="1" checked> Show label under each QR</label>
                                 <label class="inv-check"><input type="hidden" name="q[landscape]" value="0"><input class="qd-in" data-qd="landscape" type="checkbox" name="q[landscape]" value="1"> Landscape paper</label>
                                 <label class="inv-check"><input type="hidden" name="q[guides]" value="0"><input class="qd-in" data-qd="guides" type="checkbox" name="q[guides]" value="1" checked> Cut guides</label>
@@ -372,34 +394,40 @@ function closeInventoryModal() { document.getElementById('inventoryModal')?.clas
                 <input type="hidden" name="building_id" id="invStockBuilding">
                 <input type="hidden" name="mode" id="invStockModeInput" value="desk">
 
-                <p class="inv-intro">Guards can only hand out cards that are at <b>their own desk</b>. Use this to tell the system which card numbers this desk really has.</p>
+                <div class="inv-split">
+                    <div class="inv-split-main">
+                        <p class="inv-intro">Guards can only hand out cards that are at <b>their own desk</b>. Use this to tell the system which card numbers this desk really has.</p>
 
-                <div class="inv-stats">
-                    <span class="inv-stat is-available"><b id="invStockDesk">0</b> at this desk</span>
-                    <span class="inv-stat"><b id="invStockVault">0</b> in storage</span>
-                    <span class="inv-stat is-inactive"><b id="invStockAway">0</b> with another building</span>
-                </div>
-                <p class="inv-warnbox hidden" id="invStockWarn"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></p>
+                        <div class="inv-stats">
+                            <span class="inv-stat is-available"><b id="invStockDesk">0</b> at this desk</span>
+                            <span class="inv-stat"><b id="invStockVault">0</b> in storage</span>
+                            <span class="inv-stat is-inactive"><b id="invStockAway">0</b> with another building</span>
+                        </div>
+                        <p class="inv-warnbox hidden" id="invStockWarn"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></p>
 
-                <div class="inv-choice" role="radiogroup" aria-label="What do you want to do?">
-                    <button type="button" class="inv-choice-btn is-active" data-inv-stockmode="desk" onclick="invStockMode('desk')" role="radio" aria-checked="true">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                        <span><b>Give cards to this desk</b><small>Guards here can start handing them out.</small></span>
-                    </button>
-                    <button type="button" class="inv-choice-btn" data-inv-stockmode="vault" onclick="invStockMode('vault')" role="radio" aria-checked="false">
-                        <i class="fa-solid fa-box-archive"></i>
-                        <span><b>Take cards back to storage</b><small>Guards here can no longer hand them out.</small></span>
-                    </button>
-                </div>
-
-                <div class="inv-pair">
-                    <div class="inv-field"><label for="invStockFrom">First card number</label><input id="invStockFrom" type="number" name="from" value="1" min="1" max="9999" required></div>
-                    <div class="inv-field"><label for="invStockTo">Last card number</label><input id="invStockTo" type="number" name="to" value="50" min="1" max="9999" required></div>
-                </div>
-                <p class="inv-count" id="invStockCount"></p>
-                <p class="inv-summary" id="invStockSummary"></p>
-                <div class="inv-actions">
-                    <button type="submit" id="invStockBtn" class="gov-btn-camera"><i class="fa-solid fa-boxes-packing"></i> <span id="invStockBtnLabel">Update cards</span></button>
+                        <div class="inv-choice" role="radiogroup" aria-label="What do you want to do?">
+                            <button type="button" class="inv-choice-btn is-active" data-inv-stockmode="desk" onclick="invStockMode('desk')" role="radio" aria-checked="true">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                <span><b>Give cards to this desk</b><small>Guards here can start handing them out.</small></span>
+                            </button>
+                            <button type="button" class="inv-choice-btn" data-inv-stockmode="vault" onclick="invStockMode('vault')" role="radio" aria-checked="false">
+                                <i class="fa-solid fa-box-archive"></i>
+                                <span><b>Take cards back to storage</b><small>Guards here can no longer hand them out.</small></span>
+                            </button>
+                        </div>
+                    </div>
+                    <aside class="inv-aside">
+                        <span class="inv-aside-title">Card numbers</span>
+                        <div class="inv-pair">
+                            <div class="inv-field"><label for="invStockFrom">First card number</label><input id="invStockFrom" type="number" name="from" value="1" min="1" max="9999" required></div>
+                            <div class="inv-field"><label for="invStockTo">Last card number</label><input id="invStockTo" type="number" name="to" value="50" min="1" max="9999" required></div>
+                        </div>
+                        <p class="inv-count" id="invStockCount"></p>
+                        <p class="inv-summary" id="invStockSummary"></p>
+                        <div class="inv-actions">
+                            <button type="submit" id="invStockBtn" class="gov-btn-camera"><i class="fa-solid fa-boxes-packing"></i> <span id="invStockBtnLabel">Update cards</span></button>
+                        </div>
+                    </aside>
                 </div>
             </form>
         </main>
@@ -427,10 +455,32 @@ const $i = id => document.getElementById(id);
 const passWord = n => (n === 1 ? 'pass' : 'passes');
 
 function invTab(tab) {
+    // The dialog fits each tab's content; remember its height so the change can be eased instead of snapping
+    const dialog = document.getElementById('inventoryDialog');
+    const from = dialog ? dialog.offsetHeight : 0;
+    if (dialog) {
+        clearTimeout(dialog._fit);
+        dialog.style.transition = 'none';
+        dialog.style.height = '';
+    }
+
     document.querySelectorAll('[data-inv-tab]').forEach(b => b.classList.toggle('is-active', b.dataset.invTab === tab));
     document.querySelectorAll('[data-inv-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.invPanel !== tab));
     // The print actions live in the dialog footer, so it only shows on this tab
     document.getElementById('invPrintFooter')?.classList.toggle('hidden', tab !== 'print');
+
+    if (dialog && from) {
+        const to = dialog.offsetHeight;
+        if (to !== from) {
+            dialog.style.height = from + 'px';
+            void dialog.offsetHeight;   // commit the starting height before animating
+            dialog.style.transition = 'height 0.22s ease';
+            dialog.style.height = to + 'px';
+            dialog._fit = setTimeout(() => { dialog.style.transition = ''; dialog.style.height = ''; }, 260);
+        } else {
+            dialog.style.transition = '';
+        }
+    }
 }
 function invStockMode(mode) {
     $i('invStockModeInput').value = mode;
@@ -679,7 +729,7 @@ function cdFill(selectId) {
 async function cdLoad(selectId) {
     try {
         const res = await fetch(CD_URL, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        cdTemplates = res.ok ? await res.json() : [];
+        cdTemplates = res.ok ? (await res.json()).filter(t => t.kind === 'card') : [];
     } catch (_) {
         cdTemplates = [];
     }
@@ -753,8 +803,8 @@ cdLoad('');
 // ---- QR sheet designer (Print / Export > QR only) ----
 // Mirrors PassInventoryController::QR_DEFAULTS / qrLayout(). Inputs are named q[...], so the print form submits them as-is.
 const QD_NUM = ['size', 'cols', 'rows', 'margin', 'gap', 'pad', 'label_size', 'offset_x', 'offset_y'];
-const QD_BOOL = ['label', 'landscape', 'guides'];
-const QD_DEFAULTS = { mode: 'fixed', size: 22, cols: 6, rows: 9, margin: 8, gap: 2, pad: 2, label: true, label_size: 7, landscape: false, guides: true, color: 'building', offset_x: 0, offset_y: 0 };
+const QD_BOOL = ['label', 'landscape', 'guides', 'spread'];
+const QD_DEFAULTS = { mode: 'fixed', size: 15, cols: 6, rows: 9, margin: 8, gap: 2, pad: 2, label: true, label_size: 7, landscape: false, guides: true, spread: true, color: 'building', offset_x: 0, offset_y: 0 };
 
 function qrEl(k) { return document.querySelector(`[data-qd="${k}"]`); }
 function qrRead() {
@@ -767,7 +817,7 @@ function qrLayoutJs(paper, q, sizeFallback) {
     let [w, h] = PAPER[paper];
     if (q.landscape) [w, h] = [h, w];
     const lb = q.label ? 5 + (q.label_size - 7) * 0.3528 * 1.2 : 0;
-    let cols, rows, cw, ch, size;
+    let cols, rows, cw, ch, size, gx = q.gap, gy = q.gap;
     if (q.mode === 'fill') {
         cols = Math.max(1, Math.trunc(q.cols));
         rows = Math.max(1, Math.trunc(q.rows));
@@ -780,9 +830,14 @@ function qrLayoutJs(paper, q, sizeFallback) {
         ch = size + 2 * q.pad + lb;
         cols = Math.max(1, Math.floor((w - 2 * q.margin + q.gap) / (cw + q.gap)));
         rows = Math.max(1, Math.floor((h - 2 * q.margin + q.gap) / (ch + q.gap)));
+        // Spread the leftover space evenly so the QRs reach the margins (rows keep 0.1 mm spare so the last row never spills onto a new page)
+        if (q.spread) {
+            if (cols > 1) gx = (w - 2 * q.margin - cols * cw) / (cols - 1);
+            if (rows > 1) gy = Math.max(q.gap, (h - 2 * q.margin - rows * ch) / (rows - 1) - 0.1);
+        }
     }
     size = Math.max(4, Math.floor(size * 10) / 10);
-    return { w, h, cols, rows, cw, ch, size, perPage: cols * rows };
+    return { w, h, cols, rows, cw, ch, size, gapX: gx, gapY: gy, perPage: cols * rows };
 }
 function qrPreview() {
     const q = qrRead(), fill = q.mode === 'fill';
@@ -795,7 +850,7 @@ function qrPreview() {
     page.style.height = L.h * k + 'px';
     page.dataset.k = k;
     g.style.cssText = `left:${q.offset_x * k}px;top:${q.offset_y * k}px;padding-top:${q.margin * k}px;` +
-        `grid-template-columns:repeat(${L.cols},${L.cw * k}px);gap:${q.gap * k}px;` +
+        `grid-template-columns:repeat(${L.cols},${L.cw * k}px);gap:${L.gapY * k}px ${L.gapX * k}px;` +
         `--cw:${L.cw * k}px;--ch:${L.ch * k}px;--qs:${L.size * k}px;--qc:${color};` +
         `--cj:${fill ? 'center' : 'flex-start'};--cpt:${fill ? 0 : q.pad * k}px;--lm:${1.2 * k}px;` +
         `--lw:${L.size * k * 0.6}px;--lh:${Math.max(1, q.label_size * 0.3528 * k * 0.8)}px`;
@@ -803,15 +858,19 @@ function qrPreview() {
     const cell = '<div class="qd-cell"><i class="qd-q"></i>' + (q.label ? '<b class="qd-l"></b>' : '') + '</div>';
     g.innerHTML = cell.repeat(Math.min(L.perPage, 600));
     $i('qrHint').textContent = `${L.cols} × ${L.rows} per page · QR ${L.size} mm`;
-    $i('qrMsg').textContent = L.size < 14 ? 'Small QR: test-scan a printed sample before printing a full batch.' : '';
+    $i('qrMsg').textContent = L.size < 12 ? 'Small QR: test-scan a printed sample before printing a full batch.' : '';
+    $i('qrMsg').classList.add('is-error');
 }
 // Enable only the inputs that matter for the chosen arrangement, then redraw
 function qrUi() {
     const fill = qrEl('mode').value === 'fill';
     qrEl('size').disabled = fill;
+    qrEl('spread').disabled = fill;
     qrEl('cols').disabled = qrEl('rows').disabled = !fill;
     qrEl('label_size').disabled = !qrEl('label').checked;
-    document.querySelectorAll('[data-inv-size]').forEach(b => b.classList.toggle('is-active', !fill && b.dataset.invSize === String(+qrEl('size').value)));
+    $i('qd_label_size').textContent = fill ? 'QR size (auto)' : 'QR size (mm)';
+    // In grid mode the QR size is worked out from columns × rows, so show that instead of a stale number
+    if (fill) qrEl('size').value = qrLayoutJs($i('invPaper').value, qrRead(), 0).size;
     qrPreview();
 }
 function qrSync() { qrUi(); invRefresh(); }
@@ -819,6 +878,98 @@ function qrCentre() {
     qrEl('offset_x').value = 0;
     qrEl('offset_y').value = 0;
     qrPreview();
+}
+
+// Presets: built-in layouts plus saved ones (same /passes/inventory/templates endpoints, kind = 'qr')
+const QD_BUILTIN = {
+    fill6x9: { ...QD_DEFAULTS, mode: 'fill', cols: 6, rows: 9 },
+    fill4x6: { ...QD_DEFAULTS, mode: 'fill', cols: 4, rows: 6 },
+};
+let qrTemplates = [];
+
+function qrWrite(s) {
+    qrEl('mode').value = s.mode;
+    qrEl('color').value = s.color;
+    QD_NUM.forEach(k => { qrEl(k).value = s[k]; });
+    QD_BOOL.forEach(k => { qrEl(k).checked = !!s[k]; });
+    qrSync();
+}
+function qrPresetMsg(text, bad) {
+    const m = $i('qrMsg');
+    m.textContent = text || '';
+    m.classList.toggle('is-error', !!bad);
+}
+function qrPresetButtons() {
+    const saved = /^\d+$/.test($i('qrTemplate').value);
+    $i('qrTplUpdate').disabled = $i('qrTplDelete').disabled = !saved;
+}
+function qrPresetFill(selectId) {
+    const sel = $i('qrTemplate'), group = $i('qrSavedGroup');
+    group.replaceChildren(...qrTemplates.map(t => new Option(t.name, t.id)));
+    group.hidden = !qrTemplates.length;
+    const wanted = String(selectId);
+    sel.value = qrTemplates.some(t => String(t.id) === wanted) ? wanted : '';
+    qrPresetButtons();
+}
+async function qrPresetLoad(selectId) {
+    try {
+        const res = await fetch(CD_URL, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        qrTemplates = res.ok ? (await res.json()).filter(t => t.kind === 'qr') : [];
+    } catch (_) {
+        qrTemplates = [];
+    }
+    qrPresetFill(selectId);
+}
+function qrPresetPick() {
+    const v = $i('qrTemplate').value;
+    const tpl = qrTemplates.find(t => String(t.id) === v);
+    qrPresetButtons();
+    qrWrite(tpl ? tpl.settings : (QD_BUILTIN[v.replace('b:', '')] || QD_DEFAULTS));
+    qrPresetMsg('');
+}
+async function qrPresetSend(url, extra) {
+    const body = new URLSearchParams({ kind: 'qr', ...extra });
+    Object.entries(qrRead()).forEach(([k, v]) => body.set(`q[${k}]`, v === true ? 1 : v === false ? 0 : v));
+    const res = await fetch(url, {
+        method: 'POST', credentials: 'same-origin', body,
+        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.errors ? Object.values(data.errors).flat()[0] : (data.message || 'Could not save the preset.'));
+    return data;
+}
+async function qrPresetSave() {
+    const name = (prompt('Preset name:') || '').trim();
+    if (!name) return;
+    try {
+        const d = await qrPresetSend(CD_URL, { name });
+        await qrPresetLoad(d.template.id);
+        qrPresetMsg(`Saved "${d.template.name}".`);
+    } catch (e) { qrPresetMsg(e.message, true); }
+}
+async function qrPresetUpdate() {
+    const id = $i('qrTemplate').value;
+    if (!/^\d+$/.test(id)) return;
+    try {
+        const d = await qrPresetSend(`${CD_URL}/${id}`, { _method: 'PUT' });
+        await qrPresetLoad(d.template.id);
+        qrPresetMsg(`Updated "${d.template.name}".`);
+    } catch (e) { qrPresetMsg(e.message, true); }
+}
+async function qrPresetDelete() {
+    const sel = $i('qrTemplate');
+    if (!/^\d+$/.test(sel.value)) return;
+    const ok = await confirmDialog({
+        title: 'Delete this preset?', subject: sel.selectedOptions[0].textContent,
+        message: 'Only the saved layout is removed. Printed sheets are not affected.', confirmLabel: 'Delete', tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+        await qrPresetSend(`${CD_URL}/${sel.value}`, { _method: 'DELETE' });
+        await qrPresetLoad('');
+        qrWrite(QD_DEFAULTS);
+        qrPresetMsg('Preset deleted.');
+    } catch (e) { qrPresetMsg(e.message, true); }
 }
 
 document.querySelectorAll('.qd-in').forEach(el => ['input', 'change'].forEach(ev => el.addEventListener(ev, qrSync)));
@@ -852,6 +1003,7 @@ $i('invBuilding').addEventListener('change', qrPreview);
     ['pointerup', 'pointercancel'].forEach(ev => page.addEventListener(ev, () => { st = null; }));
 })();
 qrUi();
+qrPresetLoad('');
 // ---- End QR sheet designer ----
 
 ['invBuilding', 'invGenFrom', 'invGenTo', 'invFrom', 'invTo', 'invStart', 'invCount', 'invList', 'invOnlyAvail', 'invStockFrom', 'invStockTo']

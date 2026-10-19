@@ -7,6 +7,7 @@
     $cw      = $grid['cw'];
     $ch      = $grid['ch'];
     $size    = $grid['size'];
+    $labelCode = ['NG' => 'G6'][$building->code] ?? $building->code;   // Gate 6 keeps code NG in tokens, but prints as G6
 @endphp
 <!doctype html>
 <html lang="en">
@@ -22,7 +23,7 @@
     .toolbar button { padding: 8px 16px; border: 0; border-radius: 8px; background: #235aa6; color: #fff; font-weight: 600; cursor: pointer; }
     .toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
     .page { position: relative; left: {{ $q['offset_x'] }}mm; top: {{ $q['offset_y'] }}mm;
-            display: grid; grid-template-columns: repeat({{ $grid['cols'] }}, {{ $cw }}mm); gap: {{ $q['gap'] }}mm;
+            display: grid; grid-template-columns: repeat({{ $grid['cols'] }}, {{ $cw }}mm); column-gap: {{ $grid['gap_x'] }}mm; row-gap: {{ $grid['gap_y'] }}mm;
             justify-content: center; align-content: start; padding: {{ $grid['margin'] }}mm 0; break-after: page; }
     .page:last-child { break-after: auto; }
     .cell { width: {{ $cw }}mm; height: {{ $ch }}mm; padding-top: {{ $fill ? 0 : $q['pad'] }}mm; display: flex; flex-direction: column;
@@ -58,7 +59,7 @@
             <div class="cell">
 <div class="qr sk" data-token="{{ $p->qr_token }}"></div>
                 @if ($q['label'])
-                    <div class="label">{{ $building->code }} · {{ $p->pass_number }}</div>
+                    <div class="label">{{ $labelCode }} · {{ $p->pass_number }}</div>
                 @endif
             </div>
         @endforeach

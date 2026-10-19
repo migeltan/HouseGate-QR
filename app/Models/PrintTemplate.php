@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PrintTemplate extends Model
 {
-    protected $fillable = ['name', 'settings', 'created_by'];
+    protected $fillable = ['kind', 'name', 'settings', 'created_by'];
 
     protected $casts = ['settings' => 'array'];
 }

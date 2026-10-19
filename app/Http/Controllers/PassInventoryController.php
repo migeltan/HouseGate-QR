@@ -9,6 +9,7 @@ use App\Models\VisitorPass;
 use App\Services\PassGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class PassInventoryController extends Controller
 {
@@ -241,7 +242,7 @@ class PassInventoryController extends Controller
         'mode' => 'fixed', 'size' => 0.0, 'cols' => 6.0, 'rows' => 9.0,
         'margin' => 8.0, 'gap' => 2.0, 'pad' => 2.0,
         'label' => true, 'label_size' => 7.0,
-        'landscape' => false, 'guides' => true, 'color' => 'building',
+        'landscape' => false, 'guides' => true, 'spread' => true, 'color' => 'building',
         'offset_x' => 0.0, 'offset_y' => 0.0,
     ];
 
@@ -250,7 +251,7 @@ class PassInventoryController extends Controller
         $request->validate([
             'q'            => 'nullable|array',
             'q.mode'       => 'nullable|in:fixed,fill',
-            'q.size'       => 'nullable|numeric|min:8|max:80',
+            'q.size'       => 'nullable|numeric|min:6|max:80',
             'q.cols'       => 'nullable|integer|min:1|max:30',
             'q.rows'       => 'nullable|integer|min:1|max:40',
             'q.margin'     => 'nullable|numeric|min:0|max:30',
@@ -260,6 +261,7 @@ class PassInventoryController extends Controller
             'q.label_size' => 'nullable|numeric|min:4|max:14',
             'q.landscape'  => 'nullable|boolean',
             'q.guides'     => 'nullable|boolean',
+            'q.spread'     => 'nullable|boolean',
             'q.color'      => 'nullable|in:building,black',
             'q.offset_x'   => 'nullable|numeric|min:-50|max:50',
             'q.offset_y'   => 'nullable|numeric|min:-50|max:50',
@@ -291,6 +293,9 @@ class PassInventoryController extends Controller
         $pad = $q['pad'];
         $labelBlock = $q['label'] ? 5 + ($q['label_size'] - 7) * 0.3528 * 1.2 : 0;
 
+        $gapX = $q['gap'];
+        $gapY = $q['gap'];
+
         if ($q['mode'] === 'fill') {
             $cols = (int) $q['cols'];
             $rows = (int) $q['rows'];
@@ -303,6 +308,17 @@ class PassInventoryController extends Controller
             $ch = $size + 2 * $pad + $labelBlock;
             $cols = max(1, (int) floor(($p['w'] - 2 * $q['margin'] + $q['gap']) / ($cw + $q['gap'])));
             $rows = max(1, (int) floor(($p['h'] - 2 * $q['margin'] + $q['gap']) / ($ch + $q['gap'])));
+
+            // Spread the leftover space evenly so the QRs reach the margins. Rows keep 0.1 mm spare
+            // so the last row never spills onto an extra blank page.
+            if ($q['spread']) {
+                if ($cols > 1) {
+                    $gapX = ($p['w'] - 2 * $q['margin'] - $cols * $cw) / ($cols - 1);
+                }
+                if ($rows > 1) {
+                    $gapY = max($q['gap'], ($p['h'] - 2 * $q['margin'] - $rows * $ch) / ($rows - 1) - 0.1);
+                }
+            }
         }
 
         return [
@@ -313,6 +329,8 @@ class PassInventoryController extends Controller
             'per_page' => $cols * $rows,
             'cw'       => round($cw, 3),
             'ch'       => round($ch, 3),
+            'gap_x'    => round($gapX, 3),
+            'gap_y'    => round($gapY, 3),
             'size'     => max(4.0, floor($size * 10) / 10),
         ];
     }
@@ -348,8 +366,9 @@ class PassInventoryController extends Controller
     {
         return [
             'id'       => $t->id,
+            'kind'     => $t->kind,
             'name'     => $t->name,
-            'settings' => array_merge(self::CARD_DEFAULTS, (array) $t->settings),
+            'settings' => array_merge($t->kind === 'qr' ? self::QR_DEFAULTS : self::CARD_DEFAULTS, (array) $t->settings),
         ];
     }
 
@@ -359,13 +378,17 @@ class PassInventoryController extends Controller
         return response()->json(PrintTemplate::orderBy('name')->get()->map(fn ($t) => $this->templateRow($t))->values());
     }
 
-    /** The editor sends the full settings as t[...], exactly like the print URL. */
+    /** The editors send the full settings as t[...] (card) or q[...] (QR sheet), exactly like the print URL. */
     public function storeTemplate(Request $request)
     {
-        $data = $request->validate(['name' => 'required|string|max:60|unique:print_templates,name']);
+        $kind = $request->input('kind') === 'qr' ? 'qr' : 'card';
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:60', Rule::unique('print_templates', 'name')->where('kind', $kind)],
+        ]);
         $template = PrintTemplate::create([
+            'kind'       => $kind,
             'name'       => $data['name'],
-            'settings'   => $this->cardSettings($request),
+            'settings'   => $kind === 'qr' ? $this->qrSettings($request, 22) : $this->cardSettings($request),
             'created_by' => $request->user()->id,
         ]);
         AdminLog::record('print_template.created', $template->name);
@@ -373,15 +396,17 @@ class PassInventoryController extends Controller
         return response()->json(['ok' => true, 'template' => $this->templateRow($template)], 201);
     }
 
-    /** Rename and/or overwrite settings. Send the FULL t[...] set: a partial one resets the rest to defaults. */
+    /** Rename and/or overwrite settings. Send the FULL t[...] / q[...] set: a partial one resets the rest to defaults. */
     public function updateTemplate(Request $request, PrintTemplate $template)
     {
-        $data = $request->validate(['name' => 'sometimes|required|string|max:60|unique:print_templates,name,' . $template->id]);
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:60', Rule::unique('print_templates', 'name')->where('kind', $template->kind)->ignore($template->id)],
+        ]);
         if (isset($data['name'])) {
             $template->name = $data['name'];
         }
-        if ($request->has('t')) {
-            $template->settings = $this->cardSettings($request);
+        if ($request->has($template->kind === 'qr' ? 'q' : 't')) {
+            $template->settings = $template->kind === 'qr' ? $this->qrSettings($request, 22) : $this->cardSettings($request);
         }
         $template->save();
         AdminLog::record('print_template.updated', $template->name);

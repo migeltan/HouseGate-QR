@@ -3709,3 +3709,81 @@ a.sidebar-btn {
         min-width: 0;
     }
 }
+
+/* ---- Manage Cards: Generate / Desk cards fill the dialog; calmer dropdown arrows ---- */
+.inv-modal .inv-panel[data-inv-panel="generate"],
+.inv-modal .inv-panel[data-inv-panel="stock"] {
+    max-width: none;
+    margin-inline: 0;
+}
+.inv-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+}
+.inv-split-main {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+.inv-aside {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+    padding: 20px;
+    background: #f8fafc;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+}
+.inv-aside-title {
+    font:
+        800 12px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.inv-split .inv-pair {
+    max-width: none;
+}
+.inv-split .inv-actions {
+    display: grid;
+}
+.inv-split .inv-actions > * {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Dropdown arrows get breathing room from the edge */
+.inv-modal select {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 44px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 16px;
+}
+.inv-modal select:disabled {
+    opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+    .inv-split {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+}
+
+/* ---- Manage Cards: the dialog fits each tab; Generate / Desk columns line up ---- */
+.inv-modal {
+    min-height: 0;
+}
+.inv-split {
+    align-items: stretch;
+}
+.inv-aside {
+    align-content: start;
+}
