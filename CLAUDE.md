@@ -98,11 +98,7 @@ Gotchas: fixed `/passes/...` routes above `/passes/{pass}`; scheduler/queue need
 
 make the vistor pass registry grid (1-3 steps) actually useful and explains the features u can do in this tab since theres a lot. maybe like make these info clickable?
 
-1. register normally (lowest pass number in the building you are assigned is automatically registered to the visitor, or choose a specific pass to assign)
-2. transfer passes: transfers the information of a visitor from one pass to another (and multiple) when a sudden change of destination is prompted.
-3. Away cards: indicates which passes are in which location (building, handler, etc.)
-4. Status per card: unassign, revoke, hold cards when necessary.
-5. manage inventory: generate more passes (Above 250), print qr passes, or assign passes to be held by building personnels.
+1. add local dials + trunk line to the congressmen database. the csv for this (attached) can be ur reference but there is also a csv under this project regarding the congressmen's directory so cross reference both spreadsheets.
 
 - Dropped: speed work (he expects the office to optimise at deployment). If revived: self-host `html5-qrcode` (currently from unpkg), hover prefetch, drop `database` session driver.
 
