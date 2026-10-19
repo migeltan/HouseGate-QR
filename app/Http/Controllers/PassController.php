@@ -198,6 +198,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
             'building_ids' => 'required|array|min:1',
             'building_ids.*' => 'exists:buildings,id',
             'pass_id' => 'nullable|integer',   // optional: a specific in-stock card instead of auto-assign
+            'transfer_remarks' => 'nullable|string|max:255',
         ]);
 
         // Registered by is always the signed-in account; whatever the form sent is ignored.
@@ -1254,6 +1255,8 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
             'expected_return_date' => $data['pass_class'] === 'long_term' ? $data['expected_return_date'] : null,
             'office_other' => $data['office_other'] ?? null,
             'others_place' => $data['others_place'] ?? null,
+            // Only meaningful when this registration continues a transfer; ignored otherwise.
+            'transfer_remarks' => $oldRegistration ? ($data['transfer_remarks'] ?? null) : null,
                         'contact_person' => $data['contact_person'] ?? null,
             // Frozen at registration: multi-pass building links are wiped on unassign.
             'buildings_snapshot' => Building::whereIn('id', $data['building_ids'])->orderBy('name')->pluck('name')->join(', '),

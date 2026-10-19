@@ -24,6 +24,9 @@ class CongressmanController extends Controller
                 $q->where(fn ($w) => $w->where('name', 'like', $s)
                     ->orWhere('rep_detail', 'like', $s)
                     ->orWhere('room', 'like', $s)
+                    ->orWhere('local', 'like', $s)
+                    ->orWhere('direct', 'like', $s)
+                    ->orWhere('remarks', 'like', $s)
                     ->orWhere('member_id', 'like', $s));
             })
             ->when($request->filled('building'), fn ($q) => $q->where('building_id', $request->query('building')))
@@ -76,6 +79,10 @@ class CongressmanController extends Controller
                 'color' => $m->building->color_hex ?? '#94a3b8',
                 'floor' => $m->floor,
                 'room' => $m->room,
+                'trunkline' => $m->trunkline,
+                'local' => $m->local,
+                'direct' => $m->direct,
+                'remarks' => $m->remarks,
                 'photo' => $m->photo_url,
                 'active' => $m->is_active,
             ])->values();
@@ -125,6 +132,7 @@ class CongressmanController extends Controller
         $labels = [
             'name' => 'name', 'rep_type' => 'type', 'rep_detail' => 'district / party-list',
             'building_id' => 'building', 'floor' => 'floor', 'room' => 'room',
+            'trunkline' => 'trunk line', 'local' => 'local', 'direct' => 'direct line', 'remarks' => 'remarks',
         ];
         $buildings = Building::pluck('name', 'id');
 
@@ -179,6 +187,10 @@ class CongressmanController extends Controller
             'building_id' => ['required', Rule::exists('buildings', 'id')->where(fn ($q) => $q->whereNotIn('code', ['NG', 'OTH']))],
             'floor' => ['nullable', 'integer', 'min:0', 'max:30'],
             'room' => ['nullable', 'string', 'max:30'],
+            'trunkline' => ['nullable', 'string', 'max:20'],
+            'local' => ['nullable', 'string', 'max:10'],
+            'direct' => ['nullable', 'string', 'max:20'],
+            'remarks' => ['nullable', 'string', 'max:255'],
             'photo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 

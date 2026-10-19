@@ -3964,3 +3964,72 @@ a.sidebar-btn {
 #buildingGrid {
     scroll-margin-top: 1rem;
 }
+/* ===== Transfer trail (registration details modal) ===== */
+.gov-trail {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.gov-trail-leg {
+    position: relative;
+    padding: 0 0 0.9rem 1.5rem;
+}
+.gov-trail-leg:last-child {
+    padding-bottom: 0;
+}
+.gov-trail-leg::before {
+    content: "";
+    position: absolute;
+    left: 0.32rem;
+    top: 0.3rem;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 9999px;
+    background: #cbd5e1;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #cbd5e1;
+}
+.gov-trail-leg::after {
+    content: "";
+    position: absolute;
+    left: 0.58rem;
+    top: 1.05rem;
+    bottom: -0.15rem;
+    width: 2px;
+    background: #e2e8f0;
+}
+.gov-trail-leg:last-child::after {
+    display: none;
+}
+.gov-trail-leg.is-current::before {
+    background: #4338ca;
+    box-shadow: 0 0 0 1px #4338ca;
+}
+.gov-trail-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #0f172a;
+}
+.gov-trail-tag {
+    padding: 0.05rem 0.5rem;
+    border-radius: 9999px;
+    background: #e0e7ff;
+    color: #4338ca;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+.gov-trail-line {
+    margin-top: 0.1rem;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+}
+.gov-trail-id {
+    margin-top: 0.75rem;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--line);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #475569;
+}

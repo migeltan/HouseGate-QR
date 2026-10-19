@@ -8,6 +8,7 @@
                     <th class="py-3 px-4 font-bold">Building</th>
                     <th class="py-3 px-4 font-bold">Floor</th>
                     <th class="py-3 px-4 font-bold">Room</th>
+                    <th class="py-3 px-4 font-bold">Local</th>
                     @if ($isAdmin)
                         <th class="py-3 px-4 font-bold">Status</th>
                     @endif
@@ -25,6 +26,10 @@
                             'color' => $m->building->color_hex ?? '#94a3b8',
                             'floor' => $m->floor,
                             'room' => $m->room,
+                            'trunkline' => $m->trunkline,
+                            'local' => $m->local,
+                            'direct' => $m->direct,
+                            'remarks' => $m->remarks,
                             'photo' => $m->photo_url,
                             'building_id' => $m->building_id,
                             'active' => $m->is_active,
@@ -64,6 +69,7 @@ class="dir-photo h-14 w-11 shrink-0 rounded-md border border-slate-200 object-co
                         </td>
                         <td class="py-3 px-4 text-slate-700 whitespace-nowrap">{{ $m->floor ?? '—' }}</td>
                         <td class="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">{{ $m->room ?? '—' }}</td>
+                        <td class="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">{{ $m->local ?? '—' }}</td>
                         @if ($isAdmin)
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold {{ $m->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600' }}">{{ $m->is_active ? 'Active' : 'Inactive' }}</span>
@@ -71,7 +77,7 @@ class="dir-photo h-14 w-11 shrink-0 rounded-md border border-slate-200 object-co
                         @endif
                     </tr>
                 @empty
-                    <tr><td colspan="{{ $isAdmin ? 6 : 5 }}" class="py-14 text-center">
+                    <tr><td colspan="{{ $isAdmin ? 7 : 6 }}" class="py-14 text-center">
                         <i class="fa-solid fa-address-book text-2xl text-slate-300"></i>
                         <p class="mt-2 text-sm font-semibold text-slate-600">No members found</p>
                         <p class="text-xs text-slate-400">Try adjusting your search or building filter.</p>

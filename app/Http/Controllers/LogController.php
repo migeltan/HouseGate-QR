@@ -8,6 +8,7 @@ use App\Models\ScanLog;
 use App\Models\PassRegistration;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LogController extends Controller
@@ -26,9 +27,12 @@ class LogController extends Controller
             ->latest()->paginate(25)->withQueryString();
 
         $registrations = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request)
+            ->with(['transferredFrom.visitorPass.building', 'transferredTo.visitorPass.building'])
             ->latest('registered_at')->paginate(25, ['*'], 'reg_page')->withQueryString();
 
-        return view('logs.index', compact('logs', 'buildings', 'registrations', 'liveSig'));
+        $trails = $this->transferTrails($registrations);
+
+        return view('logs.index', compact('logs', 'buildings', 'registrations', 'trails', 'liveSig'));
     }
 
     /**
@@ -79,12 +83,13 @@ class LogController extends Controller
     public function exportRegistrations(Request $request): StreamedResponse
     {
         $registrations = $this->applyRegistrationFilters($this->scopedRegistrationsQuery($request), $request)
+            ->with(['transferredFrom', 'transferredTo'])
             ->latest('registered_at')
             ->get();
 
         $callback = function () use ($registrations) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Registered At', 'Visitor Name', 'Buildings to Visit', 'Congressman / Office', 'Contact Person', 'ID Type', 'ID Ref', 'Pass Class', 'Expected Return', 'Registered By', 'Unassigned At', 'Reason']);
+            fputcsv($handle, ['Registered At', 'Visitor Name', 'Buildings to Visit', 'Congressman / Office', 'Contact Person', 'ID Type', 'ID Ref', 'Pass Class', 'Expected Return', 'Registered By', 'Unassigned At', 'Reason', 'Transferred From', 'Transferred To', 'Transfer Remarks']);
             foreach ($registrations as $r) {
                 fputcsv($handle, [
                     $r->registered_at->format('Y-m-d H:i:s'),
@@ -99,6 +104,9 @@ class LogController extends Controller
                     $r->registered_by,
                     $r->unassigned_at?->format('Y-m-d H:i:s'),
                     $r->unassign_reason,
+                    $this->csvSafe($r->transferredFrom?->buildings_snapshot),
+                    $this->csvSafe($r->transferredTo?->buildings_snapshot),
+                    $this->csvSafe($r->transfer_remarks),
                 ]);
             }
             fclose($handle);
@@ -250,5 +258,64 @@ class LogController extends Controller
         }
 
         return $query;
+    }
+
+        /**
+     * Transfer chain (oldest first) for every registration on the page that is part of a transfer,
+     * keyed by registration id: ['legs' => [...], 'from' => building it came from, 'to' => building it moved to].
+     */
+    private function transferTrails(LengthAwarePaginator $registrations): array
+    {
+        $trails = [];
+
+        foreach ($registrations as $r) {
+            if (! $r->transferred_from_registration_id && ! $r->transferredTo) {
+                continue;
+            }
+
+            $chain = [$r];
+            for ($n = $r->transferredFrom, $i = 0; $n && $i < 10; $n = $n->transferredFrom, $i++) {
+                array_unshift($chain, $n);
+            }
+            for ($n = $r->transferredTo, $i = 0; $n && $i < 10; $n = $n->transferredTo, $i++) {
+                $chain[] = $n;
+            }
+
+            $legs = [];
+            $at = 0;
+            foreach ($chain as $k => $leg) {
+                $pass = $leg->visitorPass;
+                $legs[] = [
+                    'building' => $leg->buildings_snapshot ?: '—',
+                    'card' => $pass
+                        ? trim(($pass->is_multi_building ? 'Gate 6' : ($pass->building->name ?? '')) . ' #' . $pass->pass_number)
+                        : null,
+                    'office' => $leg->office_to_visit,
+                    'at' => $leg->registered_at?->format('M j, g:i A'),
+                    'by' => $leg->registered_by,
+                    'remarks' => $leg->transfer_remarks,
+                    'current' => $leg->id === $r->id,
+                ];
+                if ($leg->id === $r->id) {
+                    $at = $k;
+                }
+            }
+
+            $last = $chain[count($chain) - 1];
+
+            $trails[$r->id] = [
+                'legs' => $legs,
+                'from' => $at > 0 ? $legs[$at - 1]['building'] : null,
+                'to' => isset($legs[$at + 1]) ? $legs[$at + 1]['building'] : null,
+                'id' => $last->id_held_building_id
+                    ? [
+                        'desk' => optional($last->idHeldAt)->name,
+                        'returned' => $last->id_returned_at?->format('M j, g:i A'),
+                    ]
+                    : null,
+            ];
+        }
+
+        return $trails;
     }
 }

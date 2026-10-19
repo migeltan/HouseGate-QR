@@ -152,7 +152,41 @@
             return sec;
         }));
 
+        if (type === 'registration' && row.dataset.trail) {
+            try { fieldsGrid.prepend(buildTrailSection(JSON.parse(row.dataset.trail))); } catch (e) { /* malformed trail: show the rest */ }
+        }
+
         overlay.classList.remove('hidden');
+    }
+
+    function buildTrailSection(trail) {
+        const sec = document.createElement('div'); sec.className = 'gov-rec-section';
+        const h = document.createElement('div'); h.className = 'gov-rec-title'; h.textContent = 'Transfer trail';
+        const list = document.createElement('ol'); list.className = 'gov-trail';
+        (trail.legs || []).forEach(leg => {
+            const li = document.createElement('li');
+            li.className = 'gov-trail-leg' + (leg.current ? ' is-current' : '');
+            const head = document.createElement('div'); head.className = 'gov-trail-head';
+            const b = document.createElement('strong'); b.textContent = leg.building;
+            head.appendChild(b);
+            if (leg.current) {
+                const tag = document.createElement('span'); tag.className = 'gov-trail-tag'; tag.textContent = 'This record';
+                head.appendChild(tag);
+            }
+            li.appendChild(head);
+            [leg.card, leg.office, [leg.at, leg.by ? 'by ' + leg.by : null].filter(Boolean).join(' · '), leg.remarks ? 'Remarks: ' + leg.remarks : null].filter(Boolean).forEach(text => {
+                const p = document.createElement('div'); p.className = 'gov-trail-line'; p.textContent = text;
+                li.appendChild(p);
+            });
+            list.appendChild(li);
+        });
+        sec.append(h, list);
+        if (trail.id && trail.id.desk) {
+            const p = document.createElement('div'); p.className = 'gov-trail-id';
+            p.textContent = 'ID held at ' + trail.id.desk + ' desk · ' + (trail.id.returned ? 'returned ' + trail.id.returned : 'not yet marked returned');
+            sec.appendChild(p);
+        }
+        return sec;
     }
 
     function closeRowModal() {

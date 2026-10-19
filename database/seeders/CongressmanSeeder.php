@@ -61,6 +61,9 @@ class CongressmanSeeder extends Seeder
                     'building_id' => $buildingId,
                     'floor' => $data['floor'] !== '' ? (int) $data['floor'] : null,
                     'room' => $data['room'] !== '' ? $data['room'] : null,
+                    'trunkline' => ($data['trunkline'] ?? '') !== '' ? $data['trunkline'] : null,
+                    'local' => ($data['local'] ?? '') !== '' ? $data['local'] : null,
+                    'direct' => ($data['direct'] ?? '') !== '' ? $data['direct'] : null,
                     'is_active' => true,
                 ]
             );

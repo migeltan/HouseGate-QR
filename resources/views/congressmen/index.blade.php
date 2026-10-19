@@ -31,7 +31,7 @@
     <div class="gov-card-body">
         <p class="gov-instr-lead">Members of the 20th Congress. Find which building, floor and room a member's office is in. The Registry's congressman list reads from this directory.</p>
         <ol class="gov-instr-steps">
-            <li><span class="gov-instr-num">1</span><span>Search by name, district, party-list or room</span></li>
+            <li><span class="gov-instr-num">1</span><span>Search by name, district, party-list, room or local number</span></li>
             <li><span class="gov-instr-num">2</span><span>Narrow the list by building</span></li>
             <li><span class="gov-instr-num">3</span><span>Click a row to enlarge the photo</span></li>
             @if ($isAdmin)
@@ -50,7 +50,7 @@
         <div class="relative min-w-0 flex-1">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
             <input type="text" name="q" value="{{ request('q') }}" autocomplete="off"
-                   placeholder="Search by name, district, party-list, room..."
+                   placeholder="Search by name, district, party-list, room, local..."
                    class="h-11 w-full rounded-[8.1px] border border-slate-400 bg-slate-50 pl-9 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
         </div>
 
@@ -113,6 +113,9 @@
                     <dd class="mt-0.5"><span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700"><span class="h-2 w-2 rounded-full" id="mmDot"></span><span id="mmBuilding"></span></span></dd>
                 </div>
                 <div><dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Floor / Room</dt><dd class="font-mono font-semibold text-slate-800" id="mmLocation"></dd></div>
+                <div><dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Local / Trunk line</dt><dd class="font-mono font-semibold text-slate-800" id="mmPhone"></dd></div>
+                <div><dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Direct line</dt><dd class="font-mono font-semibold text-slate-800" id="mmDirect"></dd></div>
+                <div id="mmRemarksWrap" class="hidden"><dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Remarks</dt><dd class="font-semibold text-slate-800" id="mmRemarks" style="overflow-wrap:anywhere;"></dd></div>
                 <div><dt class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Member ID</dt><dd class="font-mono text-slate-600" id="mmId"></dd></div>
             </dl>
         </div>
@@ -192,6 +195,26 @@
                         <input id="ef-room" name="room" type="text" class="dir-input" placeholder="e.g. SWA-316">
                         <p class="dir-error hidden" data-error="room"></p>
                     </div>
+                    <div class="sm:col-span-2">
+                        <label class="dir-label" for="ef-trunkline">Trunk line</label>
+                        <input id="ef-trunkline" name="trunkline" type="text" class="dir-input" placeholder="e.g. 8931-5001">
+                        <p class="dir-error hidden" data-error="trunkline"></p>
+                    </div>
+                    <div>
+                        <label class="dir-label" for="ef-local">Local</label>
+                        <input id="ef-local" name="local" type="text" class="dir-input" placeholder="e.g. 7286">
+                        <p class="dir-error hidden" data-error="local"></p>
+                    </div>
+                    <div>
+                        <label class="dir-label" for="ef-direct">Direct line</label>
+                        <input id="ef-direct" name="direct" type="text" class="dir-input" placeholder="e.g. 8951-4327">
+                        <p class="dir-error hidden" data-error="direct"></p>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="dir-label" for="ef-remarks">Remarks</label>
+                        <input id="ef-remarks" name="remarks" type="text" maxlength="255" class="dir-input" placeholder="Optional note, e.g. office closed on Fridays">
+                        <p class="dir-error hidden" data-error="remarks"></p>
+                    </div>
                 </div>
             </div>
             <p class="dir-error hidden mt-3" data-form-error></p>
@@ -269,7 +292,7 @@
     // Lowercase + strip accents, so "pena" finds "Peña" (the old server search was accent-insensitive too).
     const norm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     function prepare(r) {
-        r.members.forEach(m => hay.set(m, [m.name, m.detail, m.room, m.member_id].map(norm)));
+        r.members.forEach(m => hay.set(m, [m.name, m.detail, m.room, m.local || '', m.direct || '', m.remarks || '', m.remarks || '', m.member_id].map(norm)));
         return r;
     }
 
@@ -343,6 +366,7 @@
         const payload = {
             member_id: m.member_id, name: m.name, type: m.type, detail: m.detail, building: m.building,
             color: m.color, floor: m.floor, room: m.room, photo: m.photo, building_id: m.building_id, active: m.active,
+            trunkline: m.trunkline, local: m.local, direct: m.direct, remarks: m.remarks, remarks: m.remarks,
             urls: admin && roster.urls ? {
                 update: fill(roster.urls.update), deactivate: fill(roster.urls.deactivate), reactivate: fill(roster.urls.reactivate)
             } : null,
@@ -369,6 +393,7 @@
             </td>
             <td class="py-3 px-4 text-slate-700 whitespace-nowrap">${esc(m.floor ?? '—')}</td>
             <td class="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">${esc(m.room ?? '—')}</td>
+            <td class="py-3 px-4 font-mono text-slate-700 whitespace-nowrap">${esc(m.local ?? '—')}</td>
             ${admin ? `<td class="py-3 px-4 whitespace-nowrap">
                 <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">${m.active ? 'Active' : 'Inactive'}</span>
             </td>` : ''}
@@ -380,7 +405,7 @@
     }
 
     function tableHtml(rows, total, last, admin) {
-        const empty = `<tr><td colspan="${admin ? 6 : 5}" class="py-14 text-center">
+        const empty = `<tr><td colspan="${admin ? 7 : 6}" class="py-14 text-center">
             <i class="fa-solid fa-address-book text-2xl text-slate-300"></i>
             <p class="mt-2 text-sm font-semibold text-slate-600">No members found</p>
             <p class="text-xs text-slate-400">Try adjusting your search or building filter.</p>
@@ -395,6 +420,7 @@
                             <th class="py-3 px-4 font-bold">Building</th>
                             <th class="py-3 px-4 font-bold">Floor</th>
                             <th class="py-3 px-4 font-bold">Room</th>
+                            <th class="py-3 px-4 font-bold">Local</th>
                             ${admin ? '<th class="py-3 px-4 font-bold">Status</th>' : ''}
                         </tr>
                     </thead>
@@ -491,6 +517,10 @@
         byId('mmBuilding').textContent = m.building || '—';
         byId('mmDot').style.background = m.color;
         byId('mmLocation').textContent = [m.floor ? 'Floor ' + m.floor : null, m.room].filter(Boolean).join(' · ') || '—';
+        byId('mmPhone').textContent = [m.local ? 'Local ' + m.local : null, m.trunkline ? 'Trunk ' + m.trunkline : null].filter(Boolean).join(' · ') || '—';
+        byId('mmDirect').textContent = m.direct || '—';
+        byId('mmRemarks').textContent = m.remarks || '';
+        byId('mmRemarksWrap').classList.toggle('hidden', !m.remarks);
         byId('mmId').textContent = m.member_id;
 
         const img = byId('mmPhoto'), none = byId('mmNoPhoto');
@@ -568,6 +598,10 @@
                 field('building_id').value = m.building_id;
                 field('floor').value = m.floor ?? '';
                 field('room').value = m.room || '';
+                field('trunkline').value = m.trunkline || '';
+                field('local').value = m.local || '';
+                field('direct').value = m.direct || '';
+                field('remarks').value = m.remarks || '';
             }
             saveBtn.disabled = false;
             saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + (m ? 'Save changes' : 'Add member');

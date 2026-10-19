@@ -14,7 +14,8 @@ class Congressman extends Model
 
     protected $fillable = [
         'member_id', 'name', 'rep_type', 'rep_detail',
-        'building_id', 'floor', 'room', 'photo_path', 'is_active',
+        'building_id', 'floor', 'room', 'photo_path',
+        'trunkline', 'local', 'direct', 'remarks', 'is_active',
     ];
 
     protected $casts = [

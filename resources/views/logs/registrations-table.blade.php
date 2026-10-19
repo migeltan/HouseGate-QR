@@ -88,6 +88,7 @@
                                         default => 'Returned',
                                     };
                                 $regPassClassLabel = $r->pass_class === 'long_term' ? 'Long-term' : 'Day';
+                                $trail = $trails[$r->id] ?? null;
                                 // Files are deleted when a card is returned; only show photos that still exist.
                                 $regDisk = \Illuminate\Support\Facades\Storage::disk('public');
                                 $regPhotoOk = $r->photo_path && $regDisk->exists($r->photo_path);
@@ -116,6 +117,7 @@
                                 data-expected-return="{{ $regReturnLabel }}"
                                 data-registered-by="{{ $r->registered_by ?? '—' }}"
                                 data-status="{{ $regStatusLabel }}"
+                                @if ($trail) data-trail="{{ json_encode($trail) }}" @endif
                                 @if ($regPhotoOk) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
                                 @if ($regIdPhotoOk) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
                                 onclick="openRowModal(this)">
@@ -152,7 +154,12 @@
                                     </div>
                                 </td>
                                 {{-- Buildings --}}
-                                <td class="py-3 px-4 text-center text-slate-700">{{ $r->buildings_snapshot ?? '—' }}</td>
+                                <td class="py-3 px-4 text-center text-slate-700">
+                                    {{ $r->buildings_snapshot ?? '—' }}
+                                    @if ($trail && $trail['from'])
+                                        <div class="reg-sub">← from {{ $trail['from'] }}</div>
+                                    @endif
+                                </td>
                                 {{-- Office + contact person --}}
                                 <td class="py-3 px-4 text-slate-700" style="max-width: 300px;">
                                     <div class="reg-cell-stack">
@@ -176,6 +183,9 @@
                                     <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ ! $r->unassigned_at ? 'bg-emerald-100 text-emerald-700' : ($r->unassign_reason === 'transferred' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-600') }}">
                                         {{ $regStatusLabel }}
                                     </span>
+                                    @if ($trail && $trail['to'])
+                                        <div class="reg-sub">→ {{ $trail['to'] }}</div>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

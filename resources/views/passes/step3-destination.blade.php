@@ -34,6 +34,13 @@
             </p>
         </div>
 
+        {{-- Only while a verified old card is being transferred; shown/hidden by syncTransferRemarks(). --}}
+        <div class="reg-field full hidden" id="transferRemarksField">
+            <label class="optional" for="transferRemarksInput">Transfer remarks <span class="optional">(optional: why is this visitor being moved?)</span></label>
+            <input type="text" name="transfer_remarks" id="transferRemarksInput" maxlength="255" autocomplete="off" disabled
+                placeholder="e.g. Wrong building, redirected by the office">
+        </div>
+
         {{-- Optional extras in one list, one pattern per row: label · value · action. Required fields stay outside it. --}}
         <div class="reg-field full reg-opts">
             {{-- Gate 6 only. Optional; saved for the logs, not used for authorization. --}}

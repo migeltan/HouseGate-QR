@@ -1202,6 +1202,7 @@
             toggleDupSkeleton(false);
             dupState = match ? match.level : null;
             dupTransferReady = !!transferReady;
+            syncTransferRemarks();
             document.getElementById('dupConfirmCheck').checked = false; // any new result must be re-confirmed
             document.getElementById('dupWarning').classList.toggle('hidden', !match);
             document.getElementById('dupTransferBlock').classList.toggle('hidden', !match);
@@ -1492,6 +1493,7 @@
             document.getElementById('transferQrTokenInput').value = '';
             transferHwInput.value = '';
             dupTransferReady = false;
+            syncTransferRemarks();
             document.getElementById('transferQrSuccess').classList.add('hidden');
             document.getElementById('transferClearBtn').classList.add('hidden');
             setTransferStatus('', 'neutral');
@@ -1717,6 +1719,7 @@
         function syncTransferUi() {
             const on = transferModeActive;
             const verified = on && !!transferSource;
+            syncTransferRemarks();
 
             const banner = document.getElementById('transferBanner');
             banner.classList.toggle('hidden', !on);
@@ -1751,6 +1754,15 @@
                     tag.remove();
                 }
             });
+        }
+
+        // One optional "why" box, shown only while a verified old card is being transferred (either entry point).
+        function syncTransferRemarks() {
+            const show = (transferModeActive && !!transferSource) || dupTransferReady;
+            const input = document.getElementById('transferRemarksInput');
+            document.getElementById('transferRemarksField').classList.toggle('hidden', !show);
+            input.disabled = !show;
+            if (!show) input.value = '';
         }
 
         function fillTransferSummary(pass) {
