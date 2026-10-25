@@ -168,6 +168,7 @@ Deactivated users are logged out immediately.
 - Destination chosen from the congressman roster (limited to the selected building(s)) and/or another office.
 - Duplicate detection: an exact ID match with an active pass blocks the registration; a fuzzy match requires explicit confirmation.
 - **Pass transfer**: a visitor can swap cards while keeping their identity, and the old registration is closed as `transferred`.
+- Will update
 
 **Scanning**
 
