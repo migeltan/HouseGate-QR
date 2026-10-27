@@ -1,6 +1,6 @@
 <div align="center">
 
-# HouseGate
+# HouseGate QR
 
 **QR-based visitor building access control and monitoring for the House of Representatives of the Philippines**
 
