@@ -27,13 +27,18 @@ class ScannerController extends Controller
 
     private function storeVerificationPhoto(string $base64, ScanLog $log, ?VisitorPass $pass): void
 {
-        if (! preg_match('/^data:image\/(\w+);base64,/', $base64, $m)) {
+        // Fail closed: only real raster images are stored, always re-encoded as .jpg, so the client
+        // can never choose the file extension or smuggle in php/svg/html content.
+        if (strlen($base64) > 4_000_000 || ! preg_match('/^data:image\/(?:png|jpe?g|webp);base64,/', $base64)) {
             return;
         }
-        $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
-        $raw = base64_decode(substr($base64, strpos($base64, ',') + 1));
-        $path = 'verification-photos/' . $log->id . '_' . uniqid() . '.' . $ext;
-        Storage::disk('public')->put($path, $raw);
+        $raw = base64_decode(substr($base64, strpos($base64, ',') + 1), true);
+        $jpeg = $raw === false ? null : \App\Services\PhotoResizer::toJpeg($raw, 800);
+        if ($jpeg === null) {
+            return;
+        }
+        $path = 'verification-photos/' . $log->id . '_' . \Illuminate\Support\Str::random(40) . '.jpg';
+        Storage::disk('public')->put($path, $jpeg);
 
         \App\Models\ScanVerificationPhoto::create([
             'scan_log_id' => $log->id,
