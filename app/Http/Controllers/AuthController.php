@@ -19,6 +19,9 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        // NEW: trim first so "0012 " can't dodge the per-ID lockout (MySQL ignores trailing spaces when comparing).
+        $request->merge(['hrep_id' => trim((string) $request->input('hrep_id'))]);
+
         $validated = $request->validate([
             'hrep_id' => ['required', 'string'],
             'password' => ['required', 'string'],

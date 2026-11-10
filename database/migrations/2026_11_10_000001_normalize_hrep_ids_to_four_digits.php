@@ -21,6 +21,11 @@ return new class extends Migration
         foreach ($users as $u) {
             $id = trim((string) $u->hrep_id);
             if (preg_match('/^\d{4}$/', $id)) {
+                // NEW: two users already holding the same 4-digit ID used to overwrite each other silently.
+                if (isset($seen[$id])) {
+                    $collisions[] = "{$u->name} ('{$u->hrep_id}') duplicates user #{$seen[$id]}";
+                    continue;
+                }
                 $seen[$id] = $u->id;
             }
         }
