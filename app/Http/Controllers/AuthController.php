@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Building;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -31,10 +33,25 @@ class AuthController extends Controller
             'building_id.exists' => 'That building is not available. Please choose again.',
         ]);
 
+        // Brute-force guard: 5 failed sign-ins per 5 minutes for the same HREP ID from the same IP.
+        // Keyed on ID + IP (not IP alone) so guards sharing one office IP cannot lock each other out.
+        // Hashed so an oversized input can never exceed the cache key length.
+        $throttleKey = 'login:'.sha1(Str::lower($validated['hrep_id']).'|'.$request->ip());
+        $ipKey = 'login-ip:'.sha1((string) $request->ip());   // one IP trying many IDs (IDs are only 4 digits)
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5) || RateLimiter::tooManyAttempts($ipKey, 30)) {
+            $minutes = (int) ceil(max(RateLimiter::availableIn($throttleKey), RateLimiter::availableIn($ipKey)) / 60);
+
+            return back()->withErrors(['hrep_id' => "Too many failed attempts. Try again in {$minutes} minute(s)."])->onlyInput('hrep_id', 'role', 'building_id');
+        }
+
         if (! Auth::attempt([
             'hrep_id' => $validated['hrep_id'],
             'password' => $validated['password'],
         ])) {
+            RateLimiter::hit($throttleKey, 300);
+            RateLimiter::hit($ipKey, 300);
+
             return back()->withErrors(['hrep_id' => 'Invalid HREP ID or password.'])->onlyInput('hrep_id', 'role', 'building_id');
         }
 
@@ -47,6 +64,8 @@ class AuthController extends Controller
         }
 
         if ($user->role !== $validated['role']) {
+            RateLimiter::hit($throttleKey, 300);
+            RateLimiter::hit($ipKey, 300);
             Auth::logout();
             return back()->withErrors(['role' => 'Selected role does not match this account.'])->onlyInput('hrep_id', 'role', 'building_id');
         }
@@ -56,6 +75,8 @@ class AuthController extends Controller
         if ($request->boolean('remember')) {
             Auth::login($user, true);
         }
+
+        RateLimiter::clear($throttleKey);
 
         $request->session()->regenerate();
 

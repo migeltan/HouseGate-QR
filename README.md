@@ -254,7 +254,7 @@ npm run build
 
 ### Demo accounts
 
-`UserSeeder` creates one admin and one guard account (see `database/seeders/UserSeeder.php`). **Change both passwords immediately after seeding.**
+`UserSeeder` creates a single administrator (HREP ID `0012`) with a randomly generated password, printed once in the console when the seeder runs. No password is stored in the repository. Sign in, change it, then create every other account (guards, additional admins) from the Users page. Re-running the seeder never changes an existing account.
 
 ---
 
@@ -387,7 +387,7 @@ This is a prototype. Be aware of the following before any real deployment:
 
 - **Photos:** visitor, ID and scan verification photos are stored unencrypted on the public disk. Unassigning a pass deletes its visitor and ID photos, but scan verification photos remain for audit.
 - **Seeded demo passes:** `DatabaseSeeder` uses a static token suffix, which is guessable, unlike tokens from `PassGenerator`. Generate real stock through the pass inventory before production use.
-- **Login hardening:** there is no rate limiting on login attempts and no self-service password reset (admins reset passwords for users).
+- **Login hardening:** sign-in is rate-limited to 5 failed attempts per 5 minutes per HREP ID and IP address (stored in the cache). There is still no self-service password reset (admins reset passwords for users) and no forced password change on first login. The client IP comes from forwarded headers (`trustProxies` is `*`), so restrict it to HREP's proxy addresses in production.
 - **Tests:** only scaffold tests exist. Behavior is verified through manual runs.
 - **Linux hosting:** the folder `app/console/commands/` is lowercase while its namespace is `App\Console\Commands`. This works on Windows and macOS but breaks autoloading on case-sensitive Linux servers until renamed to `app/Console/Commands/`.
 - **Email:** reminders are queued and the default mailer only logs. Nothing is delivered without a queue worker and a configured mailer.

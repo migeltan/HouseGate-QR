@@ -102,10 +102,10 @@ class AccountController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'hrep_id' => ['required', 'string', 'max:50', 'unique:users,hrep_id'],
+            'hrep_id' => ['required', 'regex:/^\d{4}$/', 'unique:users,hrep_id'],
             'role' => ['required', Rule::in(['admin', 'guard'])],
             'password' => ['required', Password::min(8)],
-        ]);
+        ], ['hrep_id.regex' => 'HREP ID must be exactly 4 digits.']);
 
         $user = User::create($data);   // 'hashed' cast
         AdminLog::record('account.created', $user->name, "HREP ID {$user->hrep_id} · role {$user->role}");
@@ -118,9 +118,9 @@ class AccountController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'hrep_id' => ['required', 'string', 'max:50', Rule::unique('users', 'hrep_id')->ignore($user->id)],
+            'hrep_id' => ['required', 'regex:/^\d{4}$/', Rule::unique('users', 'hrep_id')->ignore($user->id)],
             'role' => ['required', Rule::in(['admin', 'guard'])],
-        ]);
+        ], ['hrep_id.regex' => 'HREP ID must be exactly 4 digits.']);
 
         // The acting admin is always an active admin, so blocking a self-role-change
         // also means the last remaining admin can never be demoted.

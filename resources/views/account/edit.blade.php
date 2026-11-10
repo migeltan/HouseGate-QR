@@ -262,7 +262,7 @@
                 </div>
                 <div data-modes="create edit">
                     <label class="acct-label" for="u-hrep">HREP ID</label>
-                    <input id="u-hrep" name="hrep_id" type="text" autocomplete="off" class="acct-input">
+                    <input id="u-hrep" name="hrep_id" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" placeholder="0000" autocomplete="off" class="acct-input">
                     <p class="acct-field-error hidden" data-error="hrep_id"></p>
                 </div>
                 <div data-modes="create edit">
