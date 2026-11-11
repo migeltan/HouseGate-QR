@@ -40,7 +40,7 @@ class AuthController extends Controller
         // Keyed on ID + IP (not IP alone) so guards sharing one office IP cannot lock each other out.
         // Hashed so an oversized input can never exceed the cache key length.
         $throttleKey = 'login:'.sha1(Str::lower($validated['hrep_id']).'|'.$request->ip());
-        $ipKey = 'login-ip:'.sha1((string) $request->ip());   // one IP trying many IDs (IDs are only 4 digits)
+        $ipKey = 'login-ip:'.sha1((string) $request->ip());   // one IP trying many IDs (IDs are only 5 digits)
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5) || RateLimiter::tooManyAttempts($ipKey, 30)) {
             $minutes = (int) ceil(max(RateLimiter::availableIn($throttleKey), RateLimiter::availableIn($ipKey)) / 60);

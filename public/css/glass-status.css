@@ -3054,6 +3054,48 @@ a.sidebar-btn {
     color: #6d28d9;
 }
 
+/* Registrations table: Buildings column */
+.reg-bldg-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+}
+.reg-bldg-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 5px;
+}
+.reg-bldg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    background: #f8fafc;
+    font-size: 11px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+}
+.reg-bldg-chip i {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+}
+.reg-bldg-g6 {
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: #fce7f3;
+    color: #be185d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 /* ===== Read-only screens: visitor data shown in capitals ===== */
 .gov-meta-value,
 .gov-pass-card-name,

@@ -33,7 +33,7 @@ class UserSeeder extends Seeder
             'name' => 'Admin Account',
             'password' => $password,   // 'hashed' cast
             'role' => 'admin',
-            'hrep_id' => '0012',
+            'hrep_id' => '00012',
         ])->save();
 
         $this->command->warn("Admin created. HREP ID: 0012  Password: {$password}");

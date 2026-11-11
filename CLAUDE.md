@@ -70,13 +70,13 @@ routes/web.php | routes/console.php | bootstrap/app.php
 app/Http/Controllers/  PassController (~1100 lines) ScannerController LogController CongressmanController
                        AccountController PassInventoryController AuthController BuildingSelectController ...
 app/Models/ VisitorPass Building PassRegistration ScanLog Congressman AdminLog User
-app/Services/ PassGenerator PhotoResizer AwayCards PassesLive     app/console/commands/ (lowercase dir)
+app/Services/ PassGenerator PhotoResizer AwayCards PassesLive     app/Console/Commands/
 resources/views/ passes/ (index ~1570, tab1-instructions, tab2-buildings, step1-3, away-modal) logs/ scanner/ layouts/app
 public/css/ glass-status.css (modals, inventory, away, scanner pill), registration-modal.css (card picker), sidebar.css | database/migrations (to 2026_10_15)
 ```
 
 - Heavy files: `grep -n` first. `passes/index.blade.php` holds most inline JS. In-place responses: `passActionResponse`, `registerResponse`, `passPayload`. Live polling: `window.hgLive` (layout) + `PassesLive`.
-- Tests: `ExampleTest` uses `RefreshDatabase` + `withoutVite()`. On SQLite the `unassign_reason` enum lacks `transferred`. `app/console/commands` lowercase breaks autoload on Linux hosting.
+- Tests: `ExampleTest` uses `RefreshDatabase` + `withoutVite()`. On SQLite the `unassign_reason` enum lacks `transferred`. Folder names must match namespaces exactly (Linux is case-sensitive); `ConsoleCommandsTest` guards `app/Console/Commands`.
 
 **Pushed (master at `e561a56`):** everything through custody phases A-C, race fix, 7-day cap, live updates, hold fields. **Done this conversation, applied locally (verify/push):** (1) Registry counts fix: `->pluck('n', 'bucket')` in `PassController@index`; (2) scanner Live Feed pill `#camStatePill`; (3) specific-card picker redesign; (4) **Step 1 rename to Gate 6** (migration `2026_10_16_000001`, strings, registry title "Gate 6 (General Pass)"); (5) **Step 3a backend** (migration `2026_10_16_000002` adds `others_place`; Building scopes; `register()` rules; `officeSummary($c,$other,$place)`). Not started: 3b, 3c, 4, 5.
 

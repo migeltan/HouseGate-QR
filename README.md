@@ -254,7 +254,7 @@ npm run build
 
 ### Demo accounts
 
-`UserSeeder` creates a single administrator (HREP ID `0012`) with a randomly generated password, printed once in the console when the seeder runs. No password is stored in the repository. Sign in, change it, then create every other account (guards, additional admins) from the Users page. Re-running the seeder never changes an existing account.
+`UserSeeder` creates a single administrator (HREP ID `00012`) with a randomly generated password, printed once in the console when the seeder runs. No password is stored in the repository. Sign in, change it, then create every other account (guards, additional admins) from the Users page. Re-running the seeder never changes an existing account.
 
 ---
 
@@ -364,7 +364,7 @@ app/
                       Building, Congressman, User, AdminLog
   Services/           PassGenerator (tokens), PhotoResizer
   Mail/               MissingEgressReminder, PassExpiringSoon
-  console/commands/   ExpirePasses, DailyPassSweep, GeneratePasses, ...
+       Console/Commands/   ExpirePasses, DailyPassSweep, GeneratePasses, ...
 database/
   migrations/         schema history
   seeders/            users, buildings, passes, congressmen
@@ -389,7 +389,7 @@ This is a prototype. Be aware of the following before any real deployment:
 - **Seeded demo passes:** `DatabaseSeeder` uses a static token suffix, which is guessable, unlike tokens from `PassGenerator`. Generate real stock through the pass inventory before production use.
 - **Login hardening:** sign-in is rate-limited to 5 failed attempts per 5 minutes per HREP ID and IP address (stored in the cache). There is still no self-service password reset (admins reset passwords for users) and no forced password change on first login. The client IP comes from forwarded headers (`trustProxies` is `*`), so restrict it to HREP's proxy addresses in production.
 - **Tests:** only scaffold tests exist. Behavior is verified through manual runs.
-- **Linux hosting:** the folder `app/console/commands/` is lowercase while its namespace is `App\Console\Commands`. This works on Windows and macOS but breaks autoloading on case-sensitive Linux servers until renamed to `app/Console/Commands/`.
+- **Linux hosting:** folder names must match their namespaces exactly (`app/Console/Commands/`). After deploying, run `composer dump-autoload -o --strict-psr` and `php artisan schedule:list`. The scheduler needs a cron entry (`* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1`), and `php artisan queue:work` needs a supervisor or systemd service. Without them, pass expiry sweeps and reminder emails will not run.
 - **Email:** reminders are queued and the default mailer only logs. Nothing is delivered without a queue worker and a configured mailer.
 - **Day-pass expiry** is time-based (19:00), not tied to a scan-out. A visitor still inside is cleared by the sweep.
 - **Data privacy:** the system handles visitor identities and ID photos. Any real use needs review under the Data Privacy Act of 2012.

@@ -63,13 +63,17 @@
     <div class="px-10 pb-5">
         <div class="overflow-hidden rounded-xl border border-slate-300">
             <div class="max-h-[440px] overflow-auto">
-                <table class="w-full border-collapse text-left text-xs" style="min-width: 1080px;">
+                @php
+    // name => colour, for the building chips below (queried once, not per row)
+    $bldgColors = \App\Models\Building::pluck('color_hex', 'name');
+@endphp
+<table class="w-full border-collapse text-left text-xs" style="min-width: 1300px;">
                     <thead class="uppercase tracking-wide text-slate-600 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-slate-100 [&_th]:shadow-[inset_0_-1px_0_#cbd5e1]">
                         <tr>
                             <th class="py-3 px-4 font-bold text-center">Photos</th>
                             <th class="py-3 px-4 font-bold">Registered at</th>
                             <th class="py-3 px-4 font-bold">Visitor</th>
-                            <th class="py-3 px-4 font-bold text-center">Buildings</th>
+                            <th class="py-3 px-4 font-bold" style="min-width: 300px;">Buildings</th>
                             <th class="py-3 px-4 font-bold">Congressman / Office</th>
                             <th class="py-3 px-4 font-bold">ID type / ref</th>
                             <th class="py-3 px-4 font-bold text-center">Expected return</th>
@@ -125,10 +129,10 @@
                                 <td class="py-3 px-4">
                                     <div class="flex items-center justify-center gap-1.5">
                                         @if ($regPhotoOk)
-                                            <img src="{{ route('photos.registration', [$r, 'visitor']) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                            <img src="{{ route('photos.registration', [$r, 'visitor']) }}" alt="Visitor photo" loading="lazy" decoding="async" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
                                         @if ($regIdPhotoOk)
-                                            <img src="{{ route('photos.registration', [$r, 'id']) }}" alt="ID photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                            <img src="{{ route('photos.registration', [$r, 'id']) }}" alt="ID photo" loading="lazy" decoding="async" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
                                         @if (! $regPhotoOk && ! $regIdPhotoOk)
                                             @if ($regPhotoGone)
@@ -153,13 +157,33 @@
                                         <span class="reg-pill {{ $r->pass_class === 'long_term' ? 'reg-pill-long' : 'reg-pill-day' }}">{{ $regPassClassLabel }}</span>
                                     </div>
                                 </td>
-                                {{-- Buildings --}}
-                                <td class="py-3 px-4 text-center text-slate-700">
-                                    {{ $r->buildings_snapshot ?? '—' }}
-                                    @if ($trail && $trail['from'])
-                                        <div class="reg-sub">← from {{ $trail['from'] }}</div>
-                                    @endif
-                                </td>
+{{-- Buildings: one chip each; Gate 6 tag when it is a general pass --}}
+<td class="py-3 px-4 text-slate-700">
+    @php
+        $regBldgs = collect(explode(',', (string) $r->buildings_snapshot))
+            ->map(fn ($n) => trim($n))->filter()->values();
+        $regIsGate6 = $regBldgs->count() >= 2 || $regBldgs->contains('Others');
+    @endphp
+    @if ($regBldgs->isEmpty())
+        —
+    @else
+        <div class="reg-bldg-cell">
+            @if ($regIsGate6)
+                <span class="reg-bldg-g6">Gate 6</span>
+            @endif
+            <div class="reg-bldg-list">
+                @foreach ($regBldgs as $bn)
+                    <span class="reg-bldg-chip" title="{{ $bn }}">
+                        <i style="background: {{ in_array($bn, ['Others', 'Gate 6', 'North Gate'], true) ? '#db2777' : ($bldgColors[$bn] ?? '#94a3b8') }}"></i>{{ $bn }}
+                    </span>
+                @endforeach
+            </div>
+        </div>
+    @endif
+    @if ($trail && $trail['from'])
+        <div class="reg-sub">← from {{ $trail['from'] }}</div>
+    @endif
+</td>
                                 {{-- Office + contact person --}}
                                 <td class="py-3 px-4 text-slate-700" style="max-width: 300px;">
                                     <div class="reg-cell-stack">
