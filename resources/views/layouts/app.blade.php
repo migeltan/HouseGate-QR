@@ -136,6 +136,9 @@
 
     // Only one popup on screen at a time — a new call replaces whatever's showing
     // instead of stacking beside it (e.g. "Reading ID…" then the result).
+    // in fullscreen only the fullscreen element is drawn, so host the toasts inside it
+    const toastHost = document.fullscreenElement || document.body;
+    if (container.parentElement !== toastHost) toastHost.appendChild(container);
     container.querySelectorAll('.gov-toast').forEach(t => t.remove());
 
     const toast = document.createElement('div');

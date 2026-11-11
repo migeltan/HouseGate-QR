@@ -71,11 +71,25 @@
         }
 
         // Show "Which place?" only with Others ticked and keep the submitted others_place in sync.
+        // Chip click: pick a place; clicking the active chip again clears it.
+        function pickOthersPlace(btn) {
+            const sel = document.getElementById('othersPlaceSelect');
+            sel.value = sel.value === btn.dataset.place ? '' : btn.dataset.place;
+            syncOthersPlace();
+            if (sel.value === '__other') document.getElementById('othersPlaceTyped').focus();
+        }
+
         function syncOthersPlace() {
             const on = othersTicked();
             const sel = document.getElementById('othersPlaceSelect');
             const typed = document.getElementById('othersPlaceTyped');
             const out = document.getElementById('othersPlace');
+            if (!on) { sel.value = ''; typed.value = ''; } // Others unticked: forget the place
+            document.querySelectorAll('#othersPlaceChips .reg-chip').forEach(c => {
+                const active = on && c.dataset.place === sel.value;
+                c.classList.toggle('is-active', active);
+                c.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
             const another = on && sel.value === '__other';
 
             document.getElementById('othersPlaceField').classList.toggle('hidden', !on);
@@ -111,7 +125,14 @@
         }
 
         function updateBuildingSelection() {
-            document.getElementById('northGateHint').classList.toggle('is-active', isGate6());
+            const g6 = isGate6();
+            document.getElementById('regBuildingGrid').classList.toggle('is-gate6', g6);
+            document.getElementById('northGateHint').classList.toggle('is-active', g6);
+            if (g6) {
+                const names = [...document.querySelectorAll('#regBuildingGrid input:checked')]
+                    .map(i => i.dataset.label || i.closest('label').querySelector('.reg-building-name').textContent.trim());
+                document.getElementById('northGateHintList').textContent = names.join(' + ');
+            }
 
             syncOthersPlace();
             refreshCongPicker(); // also re-evaluates the submit button

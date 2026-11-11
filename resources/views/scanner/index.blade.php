@@ -537,6 +537,7 @@ function displayScanResultUI(data) {
         photoPlaceholder.classList.remove('hidden');
     }
 
+    closeIdPhotoPopup(); // never leave the previous visitor's ID open over a new scan
     window.__lastIdPhotoUrl = data.id_photo_url || null;
     window.__lastIdPhotoLabel = data.id_photo_label || null; // optional, see note below
     window.__lastPassNumber = data.pass_number || '';
@@ -645,6 +646,9 @@ function toggleFullscreen(elId) {
 
 document.addEventListener('fullscreenchange', () => {
     const isFs = !!document.fullscreenElement;
+    // keep an open ID viewer visible when fullscreen is entered or left
+    const idv = document.querySelector('.gov-idviewer');
+    if (idv) (document.fullscreenElement || document.body).appendChild(idv);
     document.querySelectorAll('.gov-btn-icon i').forEach(icon => {
         icon.classList.toggle('fa-expand', !isFs);
         icon.classList.toggle('fa-compress', isFs);
@@ -782,8 +786,15 @@ function captureSecurityFrame() {
     return canvas.toDataURL('image/jpeg', 0.85);
 }
 
+// One ID viewer at a time. It must live inside the fullscreen element: in fullscreen only that
+// element's subtree is drawn, so anything appended to document.body stays hidden behind it.
+function closeIdPhotoPopup() {
+    document.querySelectorAll('.gov-idviewer').forEach(o => (o._close ? o._close() : o.remove()));
+}
+
 function showIdPhotoPopup() {
     if (!window.__lastIdPhotoUrl) return;
+    if (document.querySelector('.gov-idviewer')) return; // already open: repeat clicks do nothing
     const overlay = document.createElement('div');
     overlay.className = 'gov-idviewer';
     overlay.setAttribute('role', 'dialog');
@@ -817,8 +828,9 @@ function showIdPhotoPopup() {
     const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     overlay.querySelector('.gov-idviewer-close').addEventListener('click', close);
+    overlay._close = close;
     document.addEventListener('keydown', onKey);
-    document.body.appendChild(overlay);
+    (document.fullscreenElement || document.body).appendChild(overlay);
 }
 
 </script>

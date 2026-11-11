@@ -325,10 +325,77 @@
     border-radius: 8px;
     font-size: 12.5px;
     font-weight: 600;
-    background: #eef4fc;
-    color: #245ba6;
-    border: 1px solid #cfe0f5;
+    background: #fdf2f8;
+    color: #9d174d;
+    border: 1px solid #fbcfe8;
     display: none;
+}
+
+/* Gate 6 (Others tile, or 2+ buildings): the whole picker turns pink */
+.reg-building-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+.reg-building-sub {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9d174d;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.reg-building-grid.is-gate6 {
+    border-color: #db2777;
+    background: #fdf2f8;
+}
+#regBuildingGrid.is-gate6 .reg-building-option:hover {
+    border-color: #db2777;
+}
+#regBuildingGrid.is-gate6 .reg-building-option input[type="checkbox"] {
+    accent-color: #db2777;
+}
+#regBuildingGrid.is-gate6 .reg-building-option:has(input:checked) {
+    background: #fdf2f8;
+    border-color: #db2777;
+    box-shadow: inset 0 0 0 1px #db2777;
+}
+
+/* "Place" chips (Gate 6 only) */
+#othersPlaceField .reg-opt-row {
+    border-left: 3px solid #db2777;
+}
+.reg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.reg-chip {
+    padding: 5px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9999px;
+    background: #fff;
+    font:
+        600 12.5px "Source Sans 3",
+        "Source Sans Pro",
+        sans-serif;
+    color: #334155;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+.reg-chip:hover {
+    border-color: #db2777;
+    color: #9d174d;
+}
+.reg-chip.is-active {
+    background: #db2777;
+    border-color: #db2777;
+    color: #fff;
 }
 .reg-north-gate-hint.is-active {
     display: block;

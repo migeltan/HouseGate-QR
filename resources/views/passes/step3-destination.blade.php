@@ -20,17 +20,25 @@
             <div class="reg-building-grid" id="regBuildingGrid">
                 {{-- Same order as the Registry tiles (alphabetical by the name shown); the hidden Others row is shown as "Gate 6". --}}
                 @foreach ($buildings->sortBy(fn ($b) => $b->code === \App\Models\Building::OTHERS_CODE ? 'Gate 6' : $b->name) as $b)
-                    <label class="reg-building-option"
-                        @if ($b->code === \App\Models\Building::OTHERS_CODE) title="Gate 6 pass for other offices: LIRMD, LSB, People's Center, Bank, Procurement…" @endif>
+                    @php $isOth = $b->code === \App\Models\Building::OTHERS_CODE; @endphp
+                    <label class="reg-building-option">
                         <input type="checkbox" name="building_ids[]" value="{{ $b->id }}"
+                            @if ($isOth) data-label="Others" @endif
                             onchange="updateBuildingSelection()">
-                        <span class="reg-building-dot" style="background:{{ $b->color_hex }}"></span>
-                        <span class="reg-building-name">{{ $b->code === \App\Models\Building::OTHERS_CODE ? 'Gate 6' : $b->name }}</span>
+                        <span class="reg-building-dot" style="background:{{ $isOth ? '#db2777' : $b->color_hex }}"></span>
+                        @if ($isOth)
+                            <span class="reg-building-text">
+                                <span class="reg-building-name">Gate 6</span>
+                                <small class="reg-building-sub">Others: LIRMD, LSB, Bank…</small>
+                            </span>
+                        @else
+                            <span class="reg-building-name">{{ $b->name }}</span>
+                        @endif
                     </label>
                 @endforeach
             </div>
             <p class="reg-north-gate-hint" id="northGateHint">
-                <strong>Gate 6</strong> general pass — valid at every selected destination.
+                <strong>Gate 6</strong> general pass — valid at <span id="northGateHintList">every selected destination</span>.
             </p>
         </div>
 
@@ -48,15 +56,16 @@
                 <div class="reg-opt-row">
                     <span class="reg-opt-label">Place</span>
                     <span class="reg-opt-value">
-                        <select id="othersPlaceSelect" onchange="syncOthersPlace()" aria-label="Which place (optional)">
-                            <option value="">Not specified</option>
-                            <option value="LIRMD">LIRMD</option>
-                            <option value="LSB">LSB</option>
-                            <option value="People's Center">People's Center</option>
-                            <option value="Bank">Bank</option>
-                            <option value="Procurement">Procurement</option>
-                            <option value="__other">Another place…</option>
-                        </select>
+                        {{-- Holds the chosen chip (same id as the old select, so syncOthersPlace keeps working). --}}
+                        <input type="hidden" id="othersPlaceSelect" value="">
+                        <span class="reg-chips" id="othersPlaceChips" role="group" aria-label="Which place (optional)">
+                            @foreach (['LIRMD', 'LSB', "People's Center", 'Bank', 'Procurement'] as $place)
+                                <button type="button" class="reg-chip" data-place="{{ $place }}" aria-pressed="false"
+                                    onclick="pickOthersPlace(this)">{{ $place }}</button>
+                            @endforeach
+                            <button type="button" class="reg-chip" data-place="__other" aria-pressed="false"
+                                onclick="pickOthersPlace(this)">Another place…</button>
+                        </span>
                         <input type="text" id="othersPlaceTyped" class="hidden" maxlength="255" autocomplete="off"
                             placeholder="Type the place" oninput="syncOthersPlace()">
                         {{-- The value actually submitted; kept in sync by syncOthersPlace(). --}}
