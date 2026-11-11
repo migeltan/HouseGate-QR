@@ -707,7 +707,12 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         $already = DB::transaction(function () use ($pass, &$photoPaths, &$holder, &$handBack) {
             $this->lockFresh($pass);
 
-            if ($pass->status === 'available') {
+            // Genuinely free card: nothing to clear. A card flagged 'available' that still carries
+            // visitor data is a stale record, so it falls through and gets cleaned like any other.
+            if ($pass->status === 'available'
+                && $pass->visitor_name === null
+                && $pass->photo_path === null
+                && $pass->id_photo_path === null) {
                 return true;
             }
 
@@ -743,7 +748,8 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         }
 
         foreach ($photoPaths as $path) {
-            Storage::disk('public')->delete($path);
+            Storage::disk('photos')->delete($path);
+            Storage::disk('public')->delete($path); // legacy copy, until photos:migrate-private has run
         }
 
         AdminLog::record('pass.unassigned', $holder, "Pass #{$pass->pass_number} returned to available stock.");
@@ -1141,7 +1147,8 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
         }
 
         foreach ($photoPaths as $path) {
-            Storage::disk('public')->delete($path);
+            Storage::disk('photos')->delete($path);
+            Storage::disk('public')->delete($path); // legacy copy, until photos:migrate-private has run
         }
 
         if (! $heldAway) {
@@ -1311,23 +1318,39 @@ private function assignVisitorToPass(VisitorPass $pass, array $data, Request $re
 
     private function storeVisitorPhoto(Request $request): ?string
     {
-        if (! $request->filled('photo_data')) {
-            return null;
-        }
-        $imageData = base64_decode(substr($request->input('photo_data'), strpos($request->input('photo_data'), ',') + 1));
-        $filename = 'visitor-photos/' . uniqid('visitor_') . '.jpg';
-        Storage::disk('public')->put($filename, $imageData);
-        return $filename;
+        return $this->storeSensitivePhoto($request, 'photo_data', 'visitor-photos', 800);
     }
 
     private function storeIdPhoto(Request $request): ?string
     {
-        if (! $request->filled('id_photo_data')) {
+        // Larger cap than the face photo: the ID text has to stay readable.
+        return $this->storeSensitivePhoto($request, 'id_photo_data', 'id-photos', 1600);
+    }
+
+    /**
+     * Validates a base64 image from the camera, re-encodes it as a JPEG (so the client never controls
+     * the bytes or the extension), and stores it on the private disk under a random name.
+     */
+    private function storeSensitivePhoto(Request $request, string $field, string $dir, int $maxSide): ?string
+    {
+        if (! $request->filled($field)) {
             return null;
         }
-        $imageData = base64_decode(substr($request->input('id_photo_data'), strpos($request->input('id_photo_data'), ',') + 1));
-        $filename = 'id-photos/' . uniqid('id_') . '.jpg';
-        Storage::disk('public')->put($filename, $imageData);
-        return $filename;
+
+        $data = (string) $request->input($field);
+        if (strlen($data) > 8_000_000 || ! preg_match('/^data:image\/(?:png|jpe?g|webp);base64,/', $data)) {
+            throw ValidationException::withMessages([$field => 'The photo could not be read. Please retake it.']);
+        }
+
+        $raw = base64_decode(substr($data, strpos($data, ',') + 1), true);
+        $jpeg = $raw === false ? null : \App\Services\PhotoResizer::toJpeg($raw, $maxSide);
+        if ($jpeg === null) {
+            throw ValidationException::withMessages([$field => 'The photo could not be read. Please retake it.']);
+        }
+
+        $path = $dir . '/' . Str::random(40) . '.jpg';
+        Storage::disk('photos')->put($path, $jpeg);
+
+        return $path;
     }
 }

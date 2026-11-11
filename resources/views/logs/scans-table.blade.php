@@ -92,7 +92,7 @@
                             @php
                                 // Photo files can be deleted later; only show the ones that still exist.
                                 $scanPhotoPath = $l->verificationPhoto?->photo_path;
-                                $scanPhotoOk = $scanPhotoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($scanPhotoPath);
+                                $scanPhotoOk = $scanPhotoPath && \Illuminate\Support\Facades\Storage::disk('photos')->exists($scanPhotoPath);
                                 $scanPhotoGone = $scanPhotoPath && ! $scanPhotoOk;
                             @endphp
                             <tr class="cursor-pointer transition-colors duration-150 hover:bg-blue-50/60" data-log-id="{{ $l->id }}"
@@ -104,13 +104,13 @@
                                     data-scanned-at="{{ $l->scannedBuilding->name ?? '' }}"
                                     data-result="{{ ucfirst(strtolower($l->result)) }}"
                                     data-reason="{{ $l->reason }}"
-                                    data-photo="{{ $scanPhotoOk ? asset('storage/' . $scanPhotoPath) : '' }}"
+                                    data-photo="{{ $scanPhotoOk ? route('photos.scan', $l) : '' }}"
                                     onclick="openRowModal(this)">
                                     {{-- Photo --}}
                                     <td class="py-3 px-4">
                                         <div class="flex items-center justify-center">
                                             @if ($scanPhotoOk)
-                                                <img src="{{ asset('storage/' . $scanPhotoPath) }}" alt="Verification photo" loading="lazy" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                                <img src="{{ route('photos.scan', $l) }}" alt="Verification photo" loading="lazy" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                             @elseif ($scanPhotoGone)
                                                 <span class="text-[11px] text-slate-400" title="Photo no longer on disk">Removed</span>
                                             @else

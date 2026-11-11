@@ -9,6 +9,7 @@ use App\Http\Controllers\LogController;
 use App\Http\Controllers\PassController;
 use App\Http\Controllers\PassInventoryController;
 use App\Http\Controllers\ScannerController;
+use App\Http\Controllers\SensitivePhotoController;
 use App\Http\Controllers\WhatsNewController;
 use App\Http\Controllers\LivePulseController;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +62,13 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/directory', [CongressmanController::class, 'index'])->name('congressmen.index');
         Route::get('/directory/roster', [CongressmanController::class, 'roster'])->name('congressmen.roster');
+
+        // Sensitive photos: login required, throttled, never a public /storage URL.
+        Route::middleware('throttle:600,1')->prefix('photos')->group(function () {
+            Route::get('/pass/{pass}/{kind}', [SensitivePhotoController::class, 'pass'])->whereIn('kind', ['visitor', 'id'])->name('photos.pass');
+            Route::get('/registration/{registration}/{kind}', [SensitivePhotoController::class, 'registration'])->whereIn('kind', ['visitor', 'id'])->name('photos.registration');
+            Route::get('/scan/{scanLog}', [SensitivePhotoController::class, 'scan'])->name('photos.scan');
+        });
 
         Route::get('/logs', [LogController::class, 'index'])->name('logs.index');
         Route::get('/logs/export', [LogController::class, 'export'])->name('logs.export');

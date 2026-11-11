@@ -38,6 +38,17 @@ return [
             'report' => false,
         ],
 
+        // Visitor photos, ID photos and scan verification photos. Never served directly:
+        // no URL and no public symlink. Access goes through SensitivePhotoController.
+        'photos' => [
+            'driver' => 'local',
+            'root' => env('PHOTOS_DISK_ROOT', storage_path('app/private/photos')),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

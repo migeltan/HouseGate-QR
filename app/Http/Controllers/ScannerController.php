@@ -37,8 +37,8 @@ class ScannerController extends Controller
         if ($jpeg === null) {
             return;
         }
-        $path = 'verification-photos/' . $log->id . '_' . \Illuminate\Support\Str::random(40) . '.jpg';
-        Storage::disk('public')->put($path, $jpeg);
+        $path = 'verification-photos/' . \Illuminate\Support\Str::random(40) . '.jpg';
+        Storage::disk('photos')->put($path, $jpeg);
 
         \App\Models\ScanVerificationPhoto::create([
             'scan_log_id' => $log->id,
@@ -88,10 +88,8 @@ class ScannerController extends Controller
             $passNumber = $pass->pass_number;
             $authorizedBuildingName = $pass->authorizedBuildingNames();
             $colorHex = $pass->is_multi_building ? self::BADGE_MULTI_COLOR : $pass->building->color_hex;
-                        /** @var \Illuminate\Filesystem\FilesystemAdapter $publicDisk */
-            $publicDisk = Storage::disk('public');
-            $photoUrl = $pass->photo_path ? $publicDisk->url($pass->photo_path) : null;
-            $idPhotoUrl = $pass->id_photo_path ? $publicDisk->url($pass->id_photo_path) : null;
+$photoUrl = $pass->photo_path ? route('photos.pass', [$pass, 'visitor']) : null;
+$idPhotoUrl = $pass->id_photo_path ? route('photos.pass', [$pass, 'id']) : null;
 
             if ($pass->status === 'available') {
                 // Card exists but nobody holds it: never approve, never check in/out.

@@ -263,8 +263,8 @@ class VisitorPass extends Model
             'pass_class' => $this->pass_class,
             'issued_at' => $this->issued_at?->format('M j, Y g:i A'),
             'expected_return_date' => $this->expected_return_date?->format('M j, Y'),
-            'photo_url' => $this->photo_path ? asset('storage/' . $this->photo_path) : null,
-            'id_photo_url' => $this->id_photo_path ? asset('storage/' . $this->id_photo_path) : null,
+            'photo_url' => $this->photo_path ? route('photos.pass', [$this, 'visitor']) : null,
+            'id_photo_url' => $this->id_photo_path ? route('photos.pass', [$this, 'id']) : null,
         ];
     }
 }

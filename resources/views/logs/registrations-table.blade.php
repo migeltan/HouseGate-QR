@@ -90,7 +90,7 @@
                                 $regPassClassLabel = $r->pass_class === 'long_term' ? 'Long-term' : 'Day';
                                 $trail = $trails[$r->id] ?? null;
                                 // Files are deleted when a card is returned; only show photos that still exist.
-                                $regDisk = \Illuminate\Support\Facades\Storage::disk('public');
+                                $regDisk = \Illuminate\Support\Facades\Storage::disk('photos');
                                 $regPhotoOk = $r->photo_path && $regDisk->exists($r->photo_path);
                                 $regIdPhotoOk = $r->id_photo_path && $regDisk->exists($r->id_photo_path);
                                 $regPhotoGone = ($r->photo_path && ! $regPhotoOk) || ($r->id_photo_path && ! $regIdPhotoOk);
@@ -118,17 +118,17 @@
                                 data-registered-by="{{ $r->registered_by ?? '—' }}"
                                 data-status="{{ $regStatusLabel }}"
                                 @if ($trail) data-trail="{{ json_encode($trail) }}" @endif
-                                @if ($regPhotoOk) data-photo="{{ asset('storage/' . $r->photo_path) }}" @endif
-                                @if ($regIdPhotoOk) data-id-photo="{{ asset('storage/' . $r->id_photo_path) }}" @endif
+                                @if ($regPhotoOk) data-photo="{{ route('photos.registration', [$r, 'visitor']) }}" @endif
+                                @if ($regIdPhotoOk) data-id-photo="{{ route('photos.registration', [$r, 'id']) }}" @endif
                                 onclick="openRowModal(this)">
                                 {{-- Photos --}}
                                 <td class="py-3 px-4">
                                     <div class="flex items-center justify-center gap-1.5">
                                         @if ($regPhotoOk)
-                                            <img src="{{ asset('storage/' . $r->photo_path) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                            <img src="{{ route('photos.registration', [$r, 'visitor']) }}" alt="Visitor photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
                                         @if ($regIdPhotoOk)
-                                            <img src="{{ asset('storage/' . $r->id_photo_path) }}" alt="ID photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
+                                            <img src="{{ route('photos.registration', [$r, 'id']) }}" alt="ID photo" class="h-9 w-9 rounded-md object-cover ring-1 ring-slate-200">
                                         @endif
                                         @if (! $regPhotoOk && ! $regIdPhotoOk)
                                             @if ($regPhotoGone)
