@@ -54,14 +54,20 @@
                     <label class="block mb-1 font-bold text-slate-700">HREP ID</label>
                     <input type="text" name="hrep_id" required {{ $errors->has('hrep_id') ? '' : 'autofocus' }}
                         class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('hrep_id') ? 'has-error' : '' }}"
-                        placeholder="0000" inputmode="numeric" value="{{ old('hrep_id') }}">
+                        placeholder="Enter HREP ID" inputmode="numeric" value="{{ old('hrep_id') }}">
                 </div>
 
                 <div>
                     <label class="block mb-1 font-bold text-slate-700">Password</label>
                     {{-- after a failed sign-in the HREP ID is kept, so put the cursor here --}}
-                    <input type="password" name="password" required {{ $errors->has('hrep_id') ? 'autofocus' : '' }}
-                        class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('hrep_id') || $errors->has('password') ? 'has-error' : '' }}">
+                    <div class="login-pw">
+                        <input type="password" name="password" id="loginPassword" required {{ $errors->has('hrep_id') ? 'autofocus' : '' }}
+                            class="login-input w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-800 {{ $errors->has('hrep_id') || $errors->has('password') ? 'has-error' : '' }}">
+                        <button type="button" id="loginPwToggle" class="login-pw-toggle" aria-label="Show password" aria-pressed="false">
+                            <svg class="pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="pw-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5.6 19 2 12 2 12a18.6 18.6 0 0 1 5.1-5.9M9.9 5.2A10 10 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label class="block mb-1 font-bold text-slate-700">Workstation</label>
@@ -115,6 +121,21 @@
     role.addEventListener('change', sync);
     window.addEventListener('pageshow', sync);   // back/forward cache can restore the role without firing 'change'
     sync();
+})();
+
+// Show / hide password
+(function () {
+    const pw = document.getElementById('loginPassword');
+    const btn = document.getElementById('loginPwToggle');
+    const set = (show) => {
+        pw.type = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    };
+    btn.addEventListener('click', () => { set(pw.type === 'password'); pw.focus(); });
+    // never leave a revealed password on screen after submit or when the page is restored from cache
+    pw.form.addEventListener('submit', () => set(false));
+    window.addEventListener('pageshow', () => set(false));
 })();
 </script>
 @endsection

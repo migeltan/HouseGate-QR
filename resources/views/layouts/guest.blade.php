@@ -16,7 +16,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;900&family=Source+Serif+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 
     {{-- Adjust to match however your app.css / app.js are actually loaded elsewhere in the project --}}
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- CHANGED: use the prebuilt CSS like layouts/app.blade.php, so the login page never waits on Vite (hot file / dev server). --}}
+    <link rel="stylesheet" href="{{ asset('css/tailwind.css') }}?v={{ filemtime(public_path('css/tailwind.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/login.css') }}?v={{ filemtime(public_path('css/login.css')) }}">
 
     <style>

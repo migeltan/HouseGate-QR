@@ -80,3 +80,51 @@
         transition: none;
     }
 }
+/* Password field with a show / hide button inside it */
+.login-pw {
+    position: relative;
+}
+.login-pw .login-input {
+    padding-right: 2.6rem;
+}
+/* Edge draws its own reveal icon on password fields; hide it so there is only one eye */
+.login-pw input::-ms-reveal,
+.login-pw input::-ms-clear {
+    display: none;
+}
+.login-pw-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.4rem;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+.login-pw-toggle:hover {
+    color: #0f172a;
+    background: #e2e8f0;
+}
+.login-pw-toggle:focus-visible {
+    outline: 2px solid #1e40af;
+    outline-offset: 1px;
+}
+.login-pw-toggle svg {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+.login-pw-toggle .pw-eye-off {
+    display: none;
+}
+.login-pw-toggle[aria-pressed="true"] .pw-eye {
+    display: none;
+}
+.login-pw-toggle[aria-pressed="true"] .pw-eye-off {
+    display: block;
+}
