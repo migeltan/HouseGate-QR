@@ -6,7 +6,7 @@
 
 Legislative Security Bureau (LSB) · Perimeter Security Group · Office of the Sergeant at Arms
 
-Built by **Migel H. Tan** during the **INSPIRE Internship Program** (formerly SMART Internship Program)
+Built by **Migel H. Tan** during ttttttthe **INSPIRE Internship Program** (formerly SMART Internship Program)
 
 </div>
 
