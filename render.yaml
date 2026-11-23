@@ -4,7 +4,8 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./housegate/Dockerfile
+    dockerContext: ./housegate
     healthCheckPath: /login
     autoDeploy: true
     envVars:
@@ -14,8 +15,6 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
-      - key: APP_TIMEZONE
-        value: Asia/Manila
       - key: APP_KEY
         sync: false
       - key: APP_URL
