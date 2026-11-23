@@ -262,7 +262,7 @@ Deactivated users are logged out immediately.
 
 ```bash
 git clone https://github.com/migeltan/HouseGate-QR.git
-cd HouseGate-QR
+cd HouseGate-QR/housegate        # the Laravel app lives in this folder; run every command below from here
 
 composer install
 cp .env.example .env
@@ -334,21 +334,21 @@ To demo from other laptops and phones on different networks without hosting anyt
 
 1. **Laravel Herd only:** serve the site over plain HTTP with `herd unsecure`. A secured site makes Herd's nginx redirect every request to `https://<site>.test`, which other devices cannot reach.
 2. **Set `.env`** to match your tunnel URL, then run `php artisan config:clear`:
-    ```dotenv
-    APP_URL=https://<your-domain>.ngrok-free.dev
-    APP_DEBUG=false
-    SESSION_SECURE_COOKIE=true
-    ```
+   ```dotenv
+   APP_URL=https://<your-domain>.ngrok-free.dev
+   APP_DEBUG=false
+   SESSION_SECURE_COOKIE=true
+   ```
 3. **Storage link:** run `php artisan storage:link` once (needed for directory photos).
 4. **ngrok:** install it, add your auth token, and find your free dev domain in the ngrok dashboard under Domains.
 
 ### Every demo: run these three terminals
 
-With Herd already serving the site, open three terminals in the project folder:
+With Herd already serving the site, open three terminals in the `housegate` folder:
 
 ```bash
 # Terminal 1: the tunnel (replace the domain and the Herd site name)
-ngrok http 80 --url=<your-domain>.ngrok-free.dev --host-header=housegate-qr.test
+ngrok http 80 --url=gainfully-strum-viewpoint.ngrok-free.dev --host-header=housegate.test
 
 # Terminal 2: scheduler (pass expiry every 5 minutes, daily sweep at 19:00)
 php artisan schedule:work
@@ -359,7 +359,7 @@ php artisan queue:work
 
 Without Herd, run `php artisan serve` and tunnel to its port instead (`ngrok http 8000 --url=...`, no `--host-header` needed). Note that `php artisan serve` handles one request at a time on Windows.
 
-Then open `https://<your-domain>.ngrok-free.dev` on any device. On the free ngrok plan, each new browser shows a one-time warning page: click **Visit Site**.
+Then open `https://gainfully-strum-viewpoint.ngrok-free.dev` on any device. On the free ngrok plan, each new browser shows a one-time warning page: click **Visit Site**.
 
 ### Before you present
 
@@ -378,11 +378,13 @@ Then open `https://<your-domain>.ngrok-free.dev` on any device. On the free ngro
 | Camera does not start                                             | The page is not on HTTPS, or camera permission was denied in the browser.                                                                           |
 | Webcam scanner does not load                                      | The scanner library comes from a CDN, so the device needs internet access. The USB scanner and manual entry still work.                             |
 
-> A laptop with a tunnel is a demo setup, not a deployment. For real use, host it on a proper server, ideally inside the LSB network, with HTTPS (still required for the camera).
+> A laptop with a tunnel is a demo setup, not a deployment. For real use, host it on a proper server, ideally inside the LSB network, with HTTPS (still required for the camera). Point the web server's document root at `housegate/public`, not the repository root.
 
 ---
 
 ## Project Structure
+
+The repository root holds only README.md, CLAUDE.md and docs/. The Laravel app lives in housegate/, and every path and command in this README is relative to that folder.
 
 ```
 app/
@@ -423,7 +425,7 @@ This is a prototype. Be aware of the following before any real deployment:
 - **Login hardening:** sign-in is rate-limited to 5 failed attempts per 5 minutes per HREP ID and IP address, and 30 per IP (stored in the cache). There is still no self-service password reset (admins reset passwords for users) and no forced password change on first login. The client IP comes from forwarded headers (`trustProxies` is `*`), so restrict it to HREP's proxy addresses in production.
 - **Tests:** only three small feature tests exist (login page loads, console commands are registered, private photo routes are protected). Scan decisions, expiry, transfers and role scoping are verified through manual runs.
 - **Webcam scanner needs internet:** `html5-qrcode` is loaded from a CDN. On a network with no internet, use the USB scanner or manual entry, or self-host the library.
-- **Linux hosting:** folder names must match their namespaces exactly (`app/Console/Commands/`). After deploying, run `composer dump-autoload -o --strict-psr` and `php artisan schedule:list`. The scheduler needs a cron entry (`* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1`), and `php artisan queue:work` needs a supervisor or systemd service. Without them, pass expiry sweeps and reminder emails will not run.
+- **Linux hosting:** folder names must match their namespaces exactly (`app/Console/Commands/`). After deploying, run `composer dump-autoload -o --strict-psr` and `php artisan schedule:list`. The scheduler needs a cron entry (`* * * * * cd /path/to/HouseGate-QR/housegate && php artisan schedule:run >> /dev/null 2>&1`), and `php artisan queue:work` needs a supervisor or systemd service. Without them, pass expiry sweeps and reminder emails will not run.
 - **Email:** reminders are queued and the default mailer only logs. Nothing is delivered without a queue worker and a configured mailer.
 - **Day-pass expiry** is time-based (19:00), not tied to a scan-out. A visitor still inside is cleared by the sweep.
 - **Cards that never come back:** a card handed over but never scanned back stays "away" with its ID outstanding. The Away cards list and the 12-hour overdue flag are the only safeguard.
