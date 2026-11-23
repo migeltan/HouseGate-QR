@@ -13,7 +13,7 @@ Kickoff prompt: "Continue HouseGate QR. Clone master, read /CLAUDE.md, verify st
 ## 1. How we work
 
 - **Phases:** understand (no code) -> discuss (no code) -> implement only when he explicitly says so ("go", "next"). **One feature at a time, in small steps** (a previous conversation died on a big one-shot rewrite). Present exact snippets grouped by file in implementation order: `Replace this:` (existing code, verbatim) then `with this:`. New file or heavy rewrite: exact path, one-line reason, full contents. No unrelated refactors.
-- **The user applies changes himself** (Windows, Laravel Herd, `C:\Users\migel\Herd\HouseGate-QR`). No output files or present_files unless he asks (CLAUDE.md is the exception: downloadable `.md`). Code goes in chat.
+- **The user applies changes himself** (Windows, Laravel Herd, `C:\Users\migel\Herd\HouseGate-QR\housegate`). No output files or present_files unless he asks (CLAUDE.md is the exception: downloadable `.md`). Code goes in chat.
 - Match files by content (indentation is inconsistent). If a snippet cannot match, ask him to paste the file, then return it in full. If a change can alter live behaviour before its supporting screen exists, order the steps so the behaviour change comes last.
 - State manual steps explicitly (commands, env, migrations, asset paths, URLs, imports). The app is **deployed**: remind him to run `php artisan migrate --force` and `view:clear` there after pulling.
 - **Cannot run PHP, tests, a browser or the app** (no `vendor/`, no `php`). Verify by applying each snippet to a scratch copy with an exact-match script (each "Replace this" must match once), brace-count PHP/CSS, and `node --check` extracted inline JS. Say "syntax-checked" vs "not run". He runs `php artisan test` and sends screenshots/console output. Static-analysis warnings in his editor (Intelephense) are usually harmless; avoid by-reference closures.
@@ -28,6 +28,7 @@ mkdir -p /home/claude/migeltan && cd /home/claude/migeltan
 cd housegate && git fetch --depth 15 origin master && git reset --hard FETCH_HEAD && git log --oneline -5
 ```
 
+- The Laravel app is in the repo's `housegate/` subfolder (the repo root holds only README, CLAUDE.md and docs/). Every path in this file is relative to it: work in `/home/claude/migeltan/housegate/housegate`.
 - Read-only reference; never push. It shows only what is **pushed to `master`**; his local copy is often ahead (treat unpushed work as intentional). If he says he applied something not visible, ask him to push or paste it.
 - Never run `composer install`, `npm install`, `pip install`. Ignore README prose beyond what is below.
 
@@ -83,7 +84,7 @@ public/css/ glass-status.css (modals, inventory, away, scanner pill), registrati
 **Verify (run in the clone):**
 
 ```bash
-cd /home/claude/migeltan/housegate && git log --oneline -3
+cd /home/claude/migeltan/housegate/housegate && git log --oneline -3
 grep -c "pluck('n', 'bucket')" app/Http/Controllers/PassController.php     # counts fix (expect 2)
 grep -c "camStatePill" resources/views/scanner/index.blade.php             # live pill
 grep -c "pickManualCard" resources/views/passes/index.blade.php            # card picker
