@@ -4,7 +4,7 @@
 
 **QR-based visitor building access control and monitoring for the House of Representatives of the Philippines**
 
-Legislative Security Bureau (LSB) · Perimeter Security Group · Office of the Sergeant at Arms
+Office of the Sergeant at Arms, Legislative Security Bureau (Perimeter Security Group)
 
 Built by **Migel H. Tan** during the **INSPIRE Internship Program** (formerly SMART Internship Program)
 
@@ -28,8 +28,8 @@ It is designed to **supplement** existing guards and physical passes, not replac
 
 | Resource         | Link                                                                         |
 | ---------------- | ---------------------------------------------------------------------------- |
-| Video demo       | _Add link here_                                                              |
-| Project document | _Add link here_                                                              |
+| Video demo       |                                                             |
+| Project document |                                                           |
 | Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR) |
 
 ---
