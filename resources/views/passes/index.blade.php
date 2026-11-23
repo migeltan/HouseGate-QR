@@ -527,17 +527,6 @@
             }
         }
 
-        function addWorkingDaysClientSide(startDate, days) {
-            const date = new Date(startDate);
-            let added = 0;
-            while (added < days) {
-                date.setDate(date.getDate() + 1);
-                const dow = date.getDay();
-                if (dow >= 1 && dow <= 4) added++;
-            }
-            return date;
-        }
-
         // ---- Photo capture (visitor face) ----
         let photoStream = null;
 

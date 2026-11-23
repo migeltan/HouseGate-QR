@@ -36,7 +36,8 @@ class UserSeeder extends Seeder
             'hrep_id' => '00012',
         ])->save();
 
-        $this->command->warn("Admin created. HREP ID: 0012  Password: {$password}");
+        // Print the same 5-digit ID that is saved above, so what the admin types matches the account
+        $this->command->warn("Admin created. HREP ID: 00012  Password: {$password}");
         $this->command->warn('Shown once. Sign in, change it, then create all other accounts from the Users page.');
     }
 }

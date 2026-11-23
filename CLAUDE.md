@@ -29,7 +29,7 @@ cd housegate && git fetch --depth 15 origin master && git reset --hard FETCH_HEA
 ```
 
 - Read-only reference; never push. It shows only what is **pushed to `master`**; his local copy is often ahead (treat unpushed work as intentional). If he says he applied something not visible, ask him to push or paste it.
-- Never run `composer install`, `npm install`, `pip install`. Ignore `resources.zip` and README prose beyond what is below.
+- Never run `composer install`, `npm install`, `pip install`. Ignore README prose beyond what is below.
 
 ## 3. Project
 

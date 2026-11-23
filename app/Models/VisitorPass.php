@@ -34,8 +34,7 @@ class VisitorPass extends Model
         'hold_at' => 'datetime',
     ];
 
-    const MAX_LONG_TERM_DAYS = 7;          // calendar days from today (was 30 working days)
-    const WORKING_WEEKDAYS = [1, 2, 3, 4]; // Mon–Thu, HOR's compressed 4-day week
+    const MAX_LONG_TERM_DAYS = 7;          // calendar days from today
     const STALE_OCCUPANCY_HOURS = 16;      // e.g. forgot to scan out Friday evening
     const MIN_DESK_STOCK = 50;             // each desk should physically hold at least this many blank cards
     const HOLD_REASONS = ['missing' => 'Missing', 'damaged' => 'Damaged', 'other' => 'Other'];   // card on hold: never issued
@@ -113,19 +112,6 @@ class VisitorPass extends Model
         }
 
         return $this->building?->name ?? 'None';
-    }
-
-    public static function addWorkingDays(Carbon $start, int $days): Carbon
-    {
-        $date = $start->copy();
-        $added = 0;
-        while ($added < $days) {
-            $date->addDay();
-            if (in_array($date->dayOfWeekIso, self::WORKING_WEEKDAYS, true)) {
-                $added++;
-            }
-        }
-        return $date;
     }
 
     public function isLongTerm(): bool
