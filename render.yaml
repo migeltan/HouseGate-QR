@@ -46,4 +46,4 @@ services:
       - key: MAIL_MAILER
         value: log
       - key: RUN_SEED
-        value: "true"
+        value: "false"
