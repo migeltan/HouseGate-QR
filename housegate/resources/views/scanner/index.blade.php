@@ -569,6 +569,13 @@ function displayScanResultUI(data) {
     document.getElementById('statusText').innerHTML =
         `<i class="fa-solid ${statusIcons[data.result] || 'fa-circle-question'} gov-status-icon"></i>${titlePrefix} <span class="gov-status-title-accent">${label}</span>`;
     renderReason(data.reason);
+    // Show why the pass was revoked, on its own line under the reason (textContent: notes are typed by staff)
+    if (data.revoke_note) {
+        const note = document.createElement('div');
+        note.className = 'gov-status-extra-line';
+        note.textContent = 'Reason: ' + data.revoke_note;
+        document.getElementById('statusSubtitle').appendChild(note);
+    }
 
     entryLine.replaceChildren();
     if (data.result === 'AUTHORIZED') {

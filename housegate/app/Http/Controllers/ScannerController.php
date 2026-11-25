@@ -192,6 +192,8 @@ $reason = "Building Mismatch - Pass is only authorized for {$authorizedBuildingN
         return response()->json([
             'result' => $result,
             'reason' => $reason,
+            // Admin's revoke note, only for REVOKED scans (null otherwise, or for passes revoked before this feature)
+            'revoke_note' => ($result === 'REVOKED' && $pass) ? $pass->revoke_reason : null,
             'visitor_name' => $visitorName,
             'pass_number' => $passNumber,
             'authorized_building' => $authorizedBuildingName,
