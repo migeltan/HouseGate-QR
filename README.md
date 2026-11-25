@@ -26,34 +26,31 @@ It is designed to **supplement** existing guards and physical passes, not replac
 
 ## Project Resources
 
-| Resource         | Link                                                                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource         | Link                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --- |
 | Live demo        | [housegate-qr-demo.onrender.com](https://housegate-qr-demo.onrender.com/login) (free hosting, see [Hosted Demo](#hosted-demo-render)) |
-| Video demo       |                                                                                                                                        |
-| Project document |                                                                                                                                        |
-| Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR)                                                           |
+| Project document | [HouseGate-QR Project Document (PDF)](docs/HouseGate-QR-Proposal-Paper.pdf)                                                           |     |
+| Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR)                                                          |
 
 ---
 
 ## Screenshots
 
-> Add images to `docs/screenshots/` using the file names below, or change the paths.
+| Scanner: access authorized                                     | Scanner: building mismatch                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| ![Scanner authorized](docs/screenshots/scanner-authorized.png) | ![Scanner unauthorized](docs/screenshots/scanner-unauthorized.png) |
 
-| Login                                | Scanner (AUTHORIZED result)                         |
-| ------------------------------------ | --------------------------------------------------- |
-| ![Login](docs/screenshots/login.png) | ![Scanner](docs/screenshots/scanner-authorized.png) |
+| Scanner: revoked pass, with the admin's reason           | Visitor pass registry                         |
+| -------------------------------------------------------- | --------------------------------------------- |
+| ![Scanner revoked](docs/screenshots/scanner-revoked.png) | ![Pass registry](docs/screenshots/passes.png) |
 
-| Pass registry                                 | Register visitor (modal)                                 |
-| --------------------------------------------- | -------------------------------------------------------- |
-| ![Pass registry](docs/screenshots/passes.png) | ![Register visitor](docs/screenshots/register-modal.png) |
+| Register visitor (modal)                                 | Audit logs                         |
+| -------------------------------------------------------- | ---------------------------------- |
+| ![Register visitor](docs/screenshots/register-modal.png) | ![Logs](docs/screenshots/logs.png) |
 
-| Audit logs                         | Congressman directory                        |
-| ---------------------------------- | -------------------------------------------- |
-| ![Logs](docs/screenshots/logs.png) | ![Directory](docs/screenshots/directory.png) |
-
-| Printable QR pass                                | Admin: users and inventory           |
-| ------------------------------------------------ | ------------------------------------ |
-| ![Printable pass](docs/screenshots/print-qr.png) | ![Admin](docs/screenshots/admin.png) |
+| Congressman directory                        | Visitor pass cards                                 |
+| -------------------------------------------- | -------------------------------------------------- |
+| ![Directory](docs/screenshots/directory.png) | ![Visitor pass](docs/screenshots/visitor-pass.png) |
 
 ---
 
@@ -77,15 +74,14 @@ It is designed to **supplement** existing guards and physical passes, not replac
 
 ### Buildings and card colors
 
-| Code | Building              | Card color |
-| ---- | --------------------- | ---------- |
-| NW   | North Wing            | Red        |
-| SW   | South Wing            | Orange     |
-| RVM  | RVM Building          | Green      |
-| MB   | Main Building         | Blue       |
-| SWA  | South Wing Annex      | Yellow     |
+| Code | Building                         | Card color |
+| ---- | -------------------------------- | ---------- |
+| NW   | North Wing                       | Red        |
+| SW   | South Wing                       | Orange     |
+| RVM  | RVM Building                     | Green      |
+| MB   | Main Building                    | Blue       |
+| SWA  | South Wing Annex                 | Yellow     |
 | NG   | Gate 6 and Others (General Pass) | Pink       |
-
 
 - **Gate 6** is the **multi-building pass**: one card valid at any mix of the five buildings and/or Others. It is never a destination or a scanning station of its own. Only admins can issue or edit these passes. (The database code stays `NG` from its earlier name, North Gate.)
 - **Others** is a single destination category for offices and people outside the five buildings (for example LSB or a bank). It has no card pool: a visitor going to Others is issued a Gate 6 pass, with an optional "which place" note kept in the logs. Guards can sign in to an Others station to scan, but registering visitors there is admin-only for now.
@@ -232,10 +228,6 @@ Deactivated users are logged out immediately.
 **Photo privacy**
 
 - Visitor, ID and verification photos live on a private `photos` disk with no public URL. They are served only through login-protected, throttled `/photos/...` routes.
-
-**Reminders**
-
-- Daily "still checked in" reminder and a long-term "expiring soon" reminder, sent only if the visitor gave an email. Mail is queued.
 
 ---
 
