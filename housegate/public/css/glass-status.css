@@ -621,11 +621,23 @@ select.gov-location-badge option {
     border: 0 !important;
     padding: 0 !important;
 }
-#reader video,
 #securityCamVideo {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover;
+}
+/* QR mode: keep the video at the camera's real size (the decoder measures it), scale only visually */
+#reader {
+    overflow: hidden;
+}
+#reader video {
+    position: absolute !important;
+    left: 50%;
+    top: 50%;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    transform: translate(-50%, -50%) scale(var(--cam-scale, 1));
 }
 #securityCamVideo {
     position: absolute;

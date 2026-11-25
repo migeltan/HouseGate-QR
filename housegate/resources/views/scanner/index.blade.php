@@ -454,8 +454,8 @@ async function processScanToken(token) {
 }
 
 function flashCaptureFeedback() {
-    if (!securityCamStream) return;
-    const video = document.getElementById('securityCamVideo');
+    const video = activeCamVideo();
+    if (!video) return;
     video.classList.add('gov-capture-flash');
     setTimeout(() => video.classList.remove('gov-capture-flash'), 200);
 }
@@ -738,6 +738,7 @@ async function startCamera() {
                 (text) => { if (shouldHandleQrScan(text)) processScanToken(text); },
                 () => {}
             );
+            fitReaderVideo();
         } else {
             securityCamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             const video = document.getElementById('securityCamVideo');
@@ -776,9 +777,26 @@ qrCheckbox.addEventListener('change', () => {
     if (isCameraActive) runCameraTransition(async () => { await stopCamera(); await startCamera(); });
 });
 syncQrTemplate();
+// The video that is currently showing: plain camera, or the QR reader's own
+function activeCamVideo() {
+    return securityCamStream
+        ? document.getElementById('securityCamVideo')
+        : document.querySelector('#reader video');
+}
+
+// Visually fills the box without changing the element size the QR decoder reads
+function fitReaderVideo() {
+    const box = document.getElementById('reader');
+    const video = box.querySelector('video');
+    if (!video || !video.videoWidth) return;
+    video.style.setProperty('--cam-scale',
+        Math.max(box.clientWidth / video.videoWidth, box.clientHeight / video.videoHeight));
+}
+new ResizeObserver(fitReaderVideo).observe(document.getElementById('reader'));
+
 function captureSecurityFrame() {
-    if (!securityCamStream) return null;
-    const video = document.getElementById('securityCamVideo');
+    const video = activeCamVideo();
+    if (!video || !video.videoWidth) return null;
     const canvas = document.getElementById('securityCamCanvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;

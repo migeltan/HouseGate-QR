@@ -876,9 +876,7 @@ h3,
     width: 100%;
     height: 100%;
 }
-#reader video,
 #reader canvas,
-#reader__scan_region video,
 #reader__scan_region canvas,
 #reader__scan_region {
     position: absolute !important;
