@@ -99,7 +99,14 @@ Gotchas: fixed `/passes/...` routes above `/passes/{pass}`; scheduler/queue need
 
 make the vistor pass registry grid (1-3 steps) actually useful and explains the features u can do in this tab since theres a lot. maybe like make these info clickable?
 
-1. add local dials + trunk line to the congressmen database. the csv for this (attached) can be ur reference but there is also a csv under this project regarding the congressmen's directory so cross reference both spreadsheets.
+listed by a previous CLAUDE convo:
+1. No self-service password reset and no forced password change on first login. Admins reset passwords.
+2. Starter cards have guessable tokens. Generate real card stock from Pass inventory before real use.
+3. Camera needs HTTPS. The webcam scanner library loads from a CDN, so it needs internet; the USB scanner and manual entry work offline.
+4. Email reminders are only logged unless a mailer and queue worker are configured.
+5. isitor identities and ID photos are stored. A Data Privacy Act of 2012 review is needed before real use.
+
+6. add local dials + trunk line to the congressmen database. the csv for this (attached) can be ur reference but there is also a csv under this project regarding the congressmen's directory so cross reference both spreadsheets.
 
 - Dropped: speed work (he expects the office to optimise at deployment). If revived: self-host `html5-qrcode` (currently from unpkg), hover prefetch, drop `database` session driver.
 
