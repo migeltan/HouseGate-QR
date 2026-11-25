@@ -12,3 +12,5 @@ Thumbs.db
 
 # Never commit a real environment file, wherever it ends up
 .env
+
+node_modules/

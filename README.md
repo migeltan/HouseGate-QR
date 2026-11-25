@@ -27,9 +27,9 @@ It is designed to **supplement** existing guards and physical passes, not replac
 ## Project Resources
 
 | Resource         | Link                                                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Live demo        | [housegate-qr-demo.onrender.com](https://housegate-qr-demo.onrender.com/login) (free hosting, see [Hosted Demo](#hosted-demo-render)) |
-| Project document | [HouseGate-QR Project Document (PDF)](docs/HouseGate-QR-Proposal-Paper.pdf)                                                           |     |
+| Project document | [HouseGate-QR Project Document (PDF)](docs/HouseGate-QR-Proposal-Paper.pdf)                                                           |
 | Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR)                                                          |
 
 ---
