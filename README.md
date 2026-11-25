@@ -83,8 +83,8 @@ It is designed to **supplement** existing guards and physical passes, not replac
 | RVM  | RVM Building          | Green      |
 | MB   | Main Building         | Blue       |
 | SWA  | South Wing Annex      | Yellow     |
-| NG   | Gate 6 (General Pass) | Pink       |
-| OTH  | Others (no cards)     | Gray       |
+| NG   | Gate 6 and Others (General Pass) | Pink       |
+
 
 - **Gate 6** is the **multi-building pass**: one card valid at any mix of the five buildings and/or Others. It is never a destination or a scanning station of its own. Only admins can issue or edit these passes. (The database code stays `NG` from its earlier name, North Gate.)
 - **Others** is a single destination category for offices and people outside the five buildings (for example LSB or a bank). It has no card pool: a visitor going to Others is issued a Gate 6 pass, with an optional "which place" note kept in the logs. Guards can sign in to an Others station to scan, but registering visitors there is admin-only for now.
