@@ -26,11 +26,12 @@ It is designed to **supplement** existing guards and physical passes, not replac
 
 ## Project Resources
 
-| Resource         | Link                                                                         |
-| ---------------- | ---------------------------------------------------------------------------- |
-| Video demo       |                                                             |
-| Project document |                                                           |
-| Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR) |
+| Resource         | Link                                                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Live demo        | [housegate-qr-demo.onrender.com](https://housegate-qr-demo.onrender.com/login) (free hosting, see [Hosted Demo](#hosted-demo-render)) |
+| Video demo       |                                                                                                                                        |
+| Project document |                                                                                                                                        |
+| Source code      | [github.com/migeltan/HouseGate-QR](https://github.com/migeltan/HouseGate-QR)                                                           |
 
 ---
 
@@ -321,6 +322,50 @@ php artisan test                                  # run the tests
 
 ---
 
+## Hosted Demo (Render)
+
+Live at **https://housegate-qr-demo.onrender.com/login**. It runs as a Docker web service on Render's free plan, with a free TiDB Cloud (MySQL-compatible) database, both under the author's accounts. It exists only so the system can be tried without hosting anything. Use fake data only.
+
+### How it is built
+
+| File                      | Purpose                                                      |
+| ------------------------- | ------------------------------------------------------------ |
+| `render.yaml` (repo root) | Render blueprint: service settings and environment variables |
+| `housegate/Dockerfile`    | PHP 8.3-FPM + nginx image                                    |
+| `housegate/docker/`       | nginx, PHP-FPM and supervisor config, and `start.sh`         |
+
+On every start, `docker/start.sh` caches config, runs `php artisan migrate --force`, seeds only if `RUN_SEED=true`, then starts nginx, PHP-FPM and `php artisan schedule:work` (pass expiry every 5 minutes, daily sweep at 19:00) under supervisor. The queue runs as `sync` and mail is `log`, so reminder emails are not delivered.
+
+### Free-tier limits
+
+- The instance sleeps after about 15 minutes idle, so the first load can take about a minute. An external uptime monitor on `/login` keeps it awake, which also keeps the scheduler running.
+- Photos are stored on the container's disk and are lost on every restart or redeploy. Accounts, passes and logs live in the database and survive.
+- Set `RUN_SEED=false` after the first successful boot. Seeding again resets the starter passes to `available`.
+- The admin password is printed once in the deploy logs on the first seed. It is never stored in the repository.
+
+### Run the same image on your own server
+
+```bash
+cd HouseGate-QR/housegate
+docker build -t housegate .
+
+docker run -d --name housegate -p 8080:10000 \
+  -e APP_ENV=production -e APP_DEBUG=false \
+  -e APP_KEY=<output of: php artisan key:generate --show> \
+  -e APP_URL=<the https URL people will open> \
+  -e DB_CONNECTION=mysql -e DB_HOST=<db host> -e DB_PORT=3306 \
+  -e DB_DATABASE=<db name> -e DB_USERNAME=<db user> -e DB_PASSWORD=<db password> \
+  -e SESSION_DRIVER=database -e CACHE_STORE=database \
+  -e SESSION_SECURE_COOKIE=true -e QUEUE_CONNECTION=sync -e MAIL_MAILER=log \
+  -e RUN_SEED=true \
+  -v housegate-photos:/var/www/html/storage/app/private/photos \
+  housegate
+```
+
+Put it behind an HTTPS reverse proxy (the camera requires HTTPS), set `RUN_SEED=false` after the first start, and back up both the database and the photos volume. Do not copy `MYSQL_ATTR_SSL_CA` from `render.yaml`; it is only for TiDB Cloud's TLS connection.
+
+---
+
 ## Demo Deployment (multiple devices, different networks)
 
 To demo from other laptops and phones on different networks without hosting anything, run the app on one machine and expose it through an HTTPS tunnel (ngrok). **HTTPS is required:** browsers only allow camera access on HTTPS or `localhost`, and both registration and scanning use the camera.
@@ -384,7 +429,7 @@ Then open `https://gainfully-strum-viewpoint.ngrok-free.dev` on any device. On t
 
 ## Project Structure
 
-The repository root holds only README.md, CLAUDE.md and docs/. The Laravel app lives in housegate/, and every path and command in this README is relative to that folder.
+The repository root holds README.md, CLAUDE.md, render.yaml (the Render blueprint) and docs/. The Laravel app lives in housegate/, together with its Dockerfile and docker/ folder, and every path and command in this README is relative to that folder.
 
 ```
 app/
@@ -408,6 +453,7 @@ public/               css/ (page stylesheets + committed tailwind.css), app-sw.j
 routes/               web.php, console.php (schedule)
 scripts/              optimize-images.mjs (one-off image optimizer)
 tests/                feature tests
+Dockerfile, docker/   container build (nginx, PHP-FPM, scheduler) used by the hosted demo
 ```
 
 ### Pass tokens
