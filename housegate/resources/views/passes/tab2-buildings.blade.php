@@ -324,6 +324,7 @@ function openPassInfoModal(info) {
         ['Visitor', [['Gender', info.gender], ['Contact No.', info.contact_no], ['Email', info.visitor_email]]],
         ['Identification', [['ID Type', info.id_type], ['ID Number', info.id_ref]]],
         ['Visit', [['Office to Visit', info.office_to_visit], ['Contact Person', info.contact_person], ['Reason', info.purpose], ['Vehicle', info.vehicle]]],
+        ['Revocation', [['Reason', info.revoke_reason], ['Revoked By', info.revoked_by], ['Revoked At', info.revoked_at]]],
         ['Pass', [['Registered By', info.registered_by], ['Pass Class', info.pass_class === 'long_term' ? 'Long-term' : 'Day'], ['Issued', info.issued_at], ['Expected Return', info.expected_return_date]]],
     ];
 

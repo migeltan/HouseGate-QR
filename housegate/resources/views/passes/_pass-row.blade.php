@@ -71,6 +71,9 @@
                     data-confirm-title="Revoke this pass?"
                     data-confirm-subject="Pass #{{ $p->pass_number }} · {{ $p->visitor_name }}"
                     data-confirm-message="The visitor will be denied on their next scan."
+                    data-confirm-input="revoke_reason"
+                    data-confirm-input-label="Reason for revoking (required)"
+                    data-confirm-input-placeholder="e.g. Lost card, misused pass, visitor left with it…"
                     data-confirm-label="Revoke pass">
                     @csrf
 <button type="submit" class="gov-pass-row-btn is-ghost is-danger"><i class="fa-solid fa-ban"></i> Revoke</button>

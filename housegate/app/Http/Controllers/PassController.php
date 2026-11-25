@@ -726,7 +726,8 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
                 'unassign_reason' => 'returned',
             ]);
 
-            $pass->update([
+$pass->update([
+                'revoke_reason' => null, 'revoked_at' => null, 'revoked_by' => null,   // wipe the note with the visitor data
                 'visitor_name' => null, 'first_name' => null, 'middle_name' => null, 'last_name' => null,
                 'gender' => null, 'contact_no' => null, 'id_ref' => null, 'id_type' => null,
                 'purpose' => null, 'office_to_visit' => null, 'contact_person' => null, 'vehicle' => null,
@@ -900,7 +901,13 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
     {
         $this->authorizeGuardScope($request, $pass);
 
-        $already = DB::transaction(function () use ($pass) {
+        // A revoke must always say why (shown in View Info, kept in the admin log).
+        $data = $request->validate([
+            'revoke_reason' => 'required|string|min:3|max:255',
+        ]);
+        $reason = trim($data['revoke_reason']);
+
+        $already = DB::transaction(function () use ($pass, $request, $reason) {
             $this->lockFresh($pass);
 
             if (in_array($pass->status, ['available', 'revoked'], true)) {
@@ -911,6 +918,9 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
                 'status' => 'revoked',
                 'current_building_id' => null,
                 'checked_in_at' => null,
+                'revoke_reason' => $reason,
+                'revoked_at' => now(),
+                'revoked_by' => $request->user()->name,
             ]);
 
             return false;
@@ -923,9 +933,7 @@ $nums = VisitorPass::query()->toBase()->get(['building_id', 'is_multi_building',
 
             return $this->passActionResponse($request, $pass, $msg, false, 409);
         }
-
-        AdminLog::record('pass.revoked', $pass->visitor_name, "Pass #{$pass->pass_number} revoked.");
-
+        AdminLog::record('pass.revoked', $pass->visitor_name, "Pass #{$pass->pass_number} revoked. Reason: {$reason}");
         return $this->passActionResponse($request, $pass, "Pass #{$pass->pass_number} revoked.");
     }
 

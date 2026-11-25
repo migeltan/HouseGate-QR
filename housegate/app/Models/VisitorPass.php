@@ -21,6 +21,7 @@ class VisitorPass extends Model
     'egress_reminder_sent_on', 'expiry_reminder_sent_on',
     'holder_building_id',
     'hold_reason', 'hold_note', 'hold_at', 'hold_by',
+    'revoke_reason', 'revoked_at', 'revoked_by',   // why/when/who revoked the card
 ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class VisitorPass extends Model
         'egress_reminder_sent_on' => 'date',
         'expiry_reminder_sent_on' => 'date',
         'hold_at' => 'datetime',
+        'revoked_at' => 'datetime',
     ];
 
     const MAX_LONG_TERM_DAYS = 7;          // calendar days from today
@@ -249,6 +251,9 @@ class VisitorPass extends Model
             'pass_class' => $this->pass_class,
             'issued_at' => $this->issued_at?->format('M j, Y g:i A'),
             'expected_return_date' => $this->expected_return_date?->format('M j, Y'),
+            'revoke_reason' => $this->status === 'revoked' ? $this->revoke_reason : null,   // shown in View Info
+            'revoked_by' => $this->status === 'revoked' ? $this->revoked_by : null,
+            'revoked_at' => $this->status === 'revoked' ? $this->revoked_at?->format('M j, Y g:i A') : null,
             'photo_url' => $this->photo_path ? route('photos.pass', [$this, 'visitor']) : null,
             'id_photo_url' => $this->id_photo_path ? route('photos.pass', [$this, 'id']) : null,
         ];

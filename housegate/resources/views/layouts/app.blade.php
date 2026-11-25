@@ -8,9 +8,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     {{-- Favicon: explicit links so every device finds it (versioned so browsers drop the old cached one) --}}
-    <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v={{ filemtime(public_path('images/favicon-32.png')) }}">
-    <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}?v={{ filemtime(public_path('images/apple-touch-icon.png')) }}">
+    <link rel="icon" type="image/png" href="{{ asset('images/lsb-seal.png') }}?v={{ filemtime(public_path('images/lsb-seal.png')) }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/lsb-seal.png') }}?v={{ filemtime(public_path('images/lsb-seal.png')) }}">
 
     {{-- Self-hosted fonts (Source Sans 3 / Source Serif 4) and Font Awesome: no external CDN dependency --}}
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ filemtime(public_path('css/fonts.css')) }}">
@@ -186,7 +185,7 @@ function dismissAllToasts() {
 
 // Styled replacement for window.confirm(). Resolves true/false.
 // All text goes in via textContent, so visitor names can't inject markup.
-function confirmDialog({ title = 'Are you sure?', subject = '', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger' } = {}) {
+function confirmDialog({ title = 'Are you sure?', subject = '', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger', input = null } = {}) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'gov-toast-container';
@@ -199,6 +198,11 @@ function confirmDialog({ title = 'Are you sure?', subject = '', message = '', co
                 <div class="gov-toast-title"></div>
                 <div class="gov-confirm-subject"></div>
                 <div class="gov-toast-message"></div>
+                <div class="gov-confirm-note" hidden style="width:100%;margin:0 0 .9rem;text-align:left">
+                    <label class="gov-confirm-note-label" style="display:block;font-size:.8rem;font-weight:700;margin-bottom:.3rem"></label>
+                    <textarea class="gov-confirm-note-input" rows="3" maxlength="255" style="width:100%;border:1px solid #cbd5e1;border-radius:.6rem;padding:.6rem .75rem;font:inherit;resize:vertical"></textarea>
+                    <div class="gov-confirm-note-err" hidden style="color:#b91c1c;font-size:.8rem;margin-top:.25rem"></div>
+                </div>
                 <div class="gov-confirm-actions">
                     <button type="button" class="gov-confirm-cancel"></button>
                     <button type="button" class="gov-confirm-ok"></button>
@@ -214,6 +218,14 @@ function confirmDialog({ title = 'Are you sure?', subject = '', message = '', co
         q('.gov-confirm-ok').textContent = confirmLabel;
         overlay.setAttribute('aria-label', title);
 
+        // Optional required note (used by Revoke). Resolves with the typed text instead of true.
+        const noteWrap = q('.gov-confirm-note'), noteEl = q('.gov-confirm-note-input'), noteErr = q('.gov-confirm-note-err');
+        if (input) {
+            noteWrap.hidden = false;
+            q('.gov-confirm-note-label').textContent = input.label || 'Note';
+            noteEl.placeholder = input.placeholder || '';
+            noteEl.addEventListener('input', () => { noteErr.hidden = true; });
+        }
         const close = (result) => {
             document.removeEventListener('keydown', onKey);
             box.classList.add('is-leaving');
@@ -224,10 +236,20 @@ function confirmDialog({ title = 'Are you sure?', subject = '', message = '', co
         document.addEventListener('keydown', onKey);
         overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(false); });
         q('.gov-confirm-cancel').addEventListener('click', () => close(false));
-        q('.gov-confirm-ok').addEventListener('click', () => close(true));
+        q('.gov-confirm-ok').addEventListener('click', () => {
+            if (!input) return close(true);
+            const v = noteEl.value.trim();
+            if (v.length < (input.min || 3)) {            // block empty / throwaway notes
+                noteErr.textContent = 'Please enter a reason (at least ' + (input.min || 3) + ' characters).';
+                noteErr.hidden = false;
+                noteEl.focus();
+                return;
+            }
+            close(v);                                     // truthy string = confirmed + note
+        });
 
         document.body.appendChild(overlay);
-        q('.gov-confirm-cancel').focus(); // safe default for destructive actions
+        (input ? q('.gov-confirm-note-input') : q('.gov-confirm-cancel')).focus(); // note box first when one is required
     });
 }
 
@@ -238,11 +260,18 @@ document.addEventListener('submit', async (e) => {
     if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) return;
     e.preventDefault();
     const d = form.dataset;
+    const noteField = d.confirmInput;                     // e.g. "revoke_reason"
     const ok = await confirmDialog({
+        input: noteField ? { label: d.confirmInputLabel, placeholder: d.confirmInputPlaceholder } : null,
         title: d.confirmTitle, subject: d.confirmSubject, message: d.confirmMessage,
         confirmLabel: d.confirmLabel, tone: d.confirmTone || 'danger',
     });
     if (!ok) return;
+    if (noteField) {                                      // put the note into the form so FormData / normal submit send it
+        let h = form.querySelector('input[name="' + noteField + '"]');
+        if (!h) { h = document.createElement('input'); h.type = 'hidden'; h.name = noteField; form.appendChild(h); }
+        h.value = ok;
+    }
     if (form.hasAttribute('data-inplace') && typeof window.submitPassAction === 'function') {
         window.submitPassAction(form);                    // background request, no reload
     } else {
